@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://schemabounce.github.io/Kolumn-deploy/sitemap.xml
