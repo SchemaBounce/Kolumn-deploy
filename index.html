@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kolumn - Infrastructure-as-Code for the Modern Data Stack</title>
+    <meta name="description" content="Revolutionary infrastructure-as-code tool with enterprise governance, Terraform compatibility, and 70% less code.">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 60px 40px;
+        }
+        
+        .logo {
+            font-size: 4em;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 1.4em;
+            opacity: 0.95;
+            margin-bottom: 40px;
+            font-weight: 400;
+        }
+        
+        .quick-install {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            margin-top: 40px;
+        }
+        
+        .install-command {
+            background: rgba(0,0,0,0.8);
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 16px;
+            margin: 20px 0;
+            border-left: 4px solid #00ff00;
+            position: relative;
+            overflow-x: auto;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .main-content {
+            padding: 60px 40px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin: 60px 0;
+        }
+        
+        .feature {
+            padding: 30px;
+            background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15);
+        }
+        
+        .feature-icon {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        
+        .feature h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        
+        .feature p {
+            color: #6c757d;
+            line-height: 1.6;
+        }
+        
+        .getting-started {
+            background: linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 50px;
+            border-radius: 12px;
+            margin: 60px 0;
+        }
+        
+        .getting-started h2 {
+            color: #1565c0;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+        
+        .command-example {
+            background: #263238;
+            color: #4fc3f7;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'SF Mono', monospace;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        .links-section {
+            text-align: center;
+            padding: 60px 40px;
+            background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+        
+        .links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+        
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .link-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            
+            .header {
+                padding: 40px 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .main-content {
+                padding: 40px 20px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .links {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🚀</div>
+            <h1>Kolumn</h1>
+            <p class="subtitle">Infrastructure-as-Code for the Modern Data Stack</p>
+            
+            <div class="quick-install">
+                <h3>🏗️ One-Command Installation</h3>
+                <div class="install-command" id="install-cmd">
+                    curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash
+                    <button class="copy-btn" onclick="copyInstallCommand()">Copy</button>
+                </div>
+                <p>✅ Automatically detects your OS • ✅ Downloads latest version • ✅ Installs to /usr/local/bin</p>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Enterprise Safety Built-In</h3>
+                    <p>Revolutionary destroy operations with automatic risk assessment, rollback plans, and safety validation. Never lose data again.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Full Terraform Compatibility</h3>
+                    <p>Drop-in replacement with identical patterns. Migrate existing Terraform providers in &lt;4 hours with zero code changes required.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h3>Universal Data Stack Management</h3>
+                    <p>Beyond infrastructure - manage databases, streaming, ETL, orchestration, and storage with unified governance and compliance.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>70% Less Code</h3>
+                    <p>Revolutionary SDK eliminates boilerplate code while providing enterprise-grade capabilities. Focus on business logic, not infrastructure.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Provider Ecosystem Independence</h3>
+                    <p>True repository separation surpassing Terraform's architecture. Independent provider development and distribution.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered Governance</h3>
+                    <p>Built-in PII detection, schema analysis, and predictive compliance recommendations powered by machine learning.</p>
+                </div>
+            </div>
+            
+            <div class="getting-started">
+                <h2>🎯 Getting Started</h2>
+                <p>After installation, try these commands to get up and running:</p>
+                
+                <div class="command-example">
+                    # Verify installation<br>
+                    kolumn version<br><br>
+                    
+                    # Create a new project<br>
+                    kolumn init<br><br>
+                    
+                    # Plan your infrastructure<br>
+                    kolumn plan<br><br>
+                    
+                    # Apply changes safely<br>
+                    kolumn apply
+                </div>
+                
+                <p><strong>🔥 Revolutionary Features:</strong></p>
+                <ul style="margin: 20px 0; padding-left: 20px;">
+                    <li>✨ <strong>Data Objects</strong> - Universal schema definitions across all providers</li>
+                    <li>🔐 <strong>Built-in Classifications</strong> - Automatic PII detection and encryption</li>
+                    <li>🌊 <strong>File Discovery</strong> - Seamlessly integrate SQL, Python, and Java files</li>
+                    <li>🛡️ <strong>Enhanced Destroy</strong> - Never accidentally destroy production again</li>
+                    <li>🎭 <strong>Hybrid Provider Development</strong> - Choose your complexity level</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="links-section">
+            <h2>🔗 Resources & Support</h2>
+            <div class="links">
+                <a href="https://github.com/schemabounce/Kolumn-deploy/releases" class="link-btn">
+                    📦 Download Releases
+                </a>
+                <a href="https://github.com/schemabounce/Kolumn-deploy" class="link-btn">
+                    📖 Documentation
+                </a>
+                <a href="https://github.com/schemabounce/Kolumn-deploy/issues" class="link-btn">
+                    💬 Get Support
+                </a>
+                <a href="https://github.com/schemabounce/Kolumn-deploy/releases/latest" class="link-btn">
+                    🔄 Latest Version
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyInstallCommand() {
+            const command = "curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash";
+            navigator.clipboard.writeText(command).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = 'rgba(40, 167, 69, 0.8)';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = 'rgba(255,255,255,0.2)';
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = command;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
