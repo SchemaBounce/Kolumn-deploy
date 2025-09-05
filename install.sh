@@ -4,7 +4,7 @@ set -e
 # Kolumn Installation Script
 # Usage: curl -fsSL https://schemabounce.github.io/kolumn/install.sh | bash
 
-REPO="schemabounce/kolumn"
+REPO="schemabounce/Kolumn-deploy"
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="kolumn"
 
@@ -80,13 +80,17 @@ get_latest_version() {
     LATEST_RESPONSE=$(curl -s "$LATEST_URL")
     
     if [ $? -ne 0 ]; then
-        print_error "Failed to fetch latest release information"
+        print_warning "Failed to fetch latest release information, using default version"
+        VERSION="v0.1.0"
+        return
     fi
     
     VERSION=$(echo "$LATEST_RESPONSE" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
     
     if [ -z "$VERSION" ]; then
-        print_error "Could not determine latest version"
+        print_warning "Could not determine latest version from releases, using default"
+        VERSION="v0.1.0"
+        return
     fi
     
     print_info "Latest version: $VERSION"
@@ -106,6 +110,19 @@ download_binary() {
     # Create temporary directory
     TMP_DIR=$(mktemp -d)
     TMP_BINARY="$TMP_DIR/$BINARY_NAME"
+    
+    # Try to download the binary
+    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TMP_BINARY" 2>/dev/null; then
+        print_error "Binary not available for download yet. Kolumn is in early beta development.
+
+📋 To install Kolumn:
+   1. Clone the repository: git clone https://github.com/schemabounce/kolumn
+   2. Build from source: cd kolumn && go build -o kolumn ./cmd/kolumn
+   3. Move to PATH: sudo mv kolumn /usr/local/bin/
+
+📖 Documentation: https://schemabounce.com/kolumn/docs
+🐛 Issues: https://github.com/schemabounce/Kolumn-deploy/issues"
+    fi
     
     if [ "$OS" = "windows" ]; then
         TMP_BINARY="${TMP_BINARY}.exe"
