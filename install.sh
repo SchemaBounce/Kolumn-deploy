@@ -76,24 +76,60 @@ detect_platform() {
 get_latest_version() {
     print_info "Fetching latest Kolumn version..."
     
+    # Try GitHub API first
     LATEST_URL="https://api.github.com/repos/$REPO/releases/latest"
-    LATEST_RESPONSE=$(curl -s "$LATEST_URL")
+    LATEST_RESPONSE=$(curl -s --fail --max-time 10 "$LATEST_URL" 2>/dev/null)
     
-    if [ $? -ne 0 ]; then
-        print_warning "Failed to fetch latest release information, using default version"
-        VERSION="v0.1.0"
-        return
+    if [ $? -eq 0 ] && [ -n "$LATEST_RESPONSE" ]; then
+        VERSION=$(echo "$LATEST_RESPONSE" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+        if [ -n "$VERSION" ]; then
+            print_info "Latest version from GitHub API: $VERSION"
+            return
+        fi
     fi
     
-    VERSION=$(echo "$LATEST_RESPONSE" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+    # Fallback 1: Try to get version from GitHub Pages version.json
+    print_info "Trying GitHub Pages version info..."
+    VERSION_JSON_URL="https://schemabounce.github.io/Kolumn-deploy/releases/latest/version.json"
+    VERSION_RESPONSE=$(curl -s --fail --max-time 10 "$VERSION_JSON_URL" 2>/dev/null)
     
-    if [ -z "$VERSION" ]; then
-        print_warning "Could not determine latest version from releases, using default"
-        VERSION="v0.1.0"
-        return
+    if [ $? -eq 0 ] && [ -n "$VERSION_RESPONSE" ]; then
+        VERSION=$(echo "$VERSION_RESPONSE" | grep -o '"version": "[^"]*' | cut -d'"' -f4)
+        if [ -n "$VERSION" ] && [ "$VERSION" != "null" ]; then
+            # Ensure version has v prefix
+            if [[ ! "$VERSION" =~ ^v ]]; then
+                VERSION="v$VERSION"
+            fi
+            print_info "Latest version from GitHub Pages: $VERSION"
+            return
+        fi
     fi
     
-    print_info "Latest version: $VERSION"
+    # Fallback 2: Try to detect from GitHub releases page
+    print_info "Trying GitHub releases page..."
+    RELEASES_PAGE=$(curl -s --fail --max-time 10 "https://github.com/$REPO/releases" 2>/dev/null)
+    
+    if [ $? -eq 0 ] && [ -n "$RELEASES_PAGE" ]; then
+        VERSION=$(echo "$RELEASES_PAGE" | grep -o 'releases/tag/v[0-9][^"]*' | head -1 | sed 's/releases\/tag\///')
+        if [ -n "$VERSION" ]; then
+            print_info "Latest version from releases page: $VERSION"
+            return
+        fi
+    fi
+    
+    # Fallback 3: Use current development version
+    print_warning "Could not determine latest version from any source"
+    print_info "This usually means Kolumn is in early development"
+    
+    # Try a reasonable default based on current timestamp
+    DEV_VERSION="v0.1.0-dev.$(date +%Y%m%d)"
+    
+    print_info "Using development version: $DEV_VERSION"
+    print_info "Note: You may want to build from source instead:"
+    echo "  git clone https://github.com/schemabounce/kolumn"
+    echo "  cd kolumn && make build"
+    
+    VERSION="$DEV_VERSION"
 }
 
 # Download and verify binary
@@ -111,26 +147,50 @@ download_binary() {
     TMP_DIR=$(mktemp -d)
     TMP_BINARY="$TMP_DIR/$BINARY_NAME"
     
-    # Try to download the binary
-    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TMP_BINARY" 2>/dev/null; then
-        print_error "Binary not available for download yet. Kolumn is in early beta development.
-
-📋 To install Kolumn:
-   1. Clone the repository: git clone https://github.com/schemabounce/kolumn
-   2. Build from source: cd kolumn && go build -o kolumn ./cmd/kolumn
-   3. Move to PATH: sudo mv kolumn /usr/local/bin/
-
-📖 Documentation: https://schemabounce.com/kolumn/docs
-🐛 Issues: https://github.com/schemabounce/Kolumn-deploy/issues"
-    fi
-    
     if [ "$OS" = "windows" ]; then
         TMP_BINARY="${TMP_BINARY}.exe"
     fi
     
-    # Download binary
-    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TMP_BINARY"; then
-        print_error "Failed to download Kolumn binary"
+    # Try to download the binary with better error handling
+    HTTP_CODE=$(curl -w "%{http_code}" -fsSL "$DOWNLOAD_URL" -o "$TMP_BINARY" 2>/dev/null)
+    CURL_EXIT_CODE=$?
+    
+    if [ $CURL_EXIT_CODE -ne 0 ] || [ "$HTTP_CODE" -ge 400 ]; then
+        case "$HTTP_CODE" in
+            404)
+                print_error "Binary not found for $VERSION on $OS/$ARCH platform.
+
+📋 This usually means:
+   • The release hasn't been published yet
+   • Your platform ($OS/$ARCH) isn't supported in this release
+   • The version ($VERSION) doesn't exist
+
+💡 Alternative installation methods:
+   1. 🔧 Build from source:
+      git clone https://github.com/schemabounce/kolumn
+      cd kolumn && make build
+      sudo mv bin/kolumn /usr/local/bin/
+
+   2. 📦 Check available releases:
+      https://github.com/$REPO/releases
+
+   3. 🐛 Report issues:
+      https://github.com/$REPO/issues"
+                ;;
+            403)
+                print_error "Access denied. This might be a rate limit issue.
+Please wait a few minutes and try again."
+                ;;
+            *)
+                print_error "Download failed (HTTP $HTTP_CODE). 
+Please check your internet connection and try again."
+                ;;
+        esac
+    fi
+    
+    # Verify file was downloaded and has content
+    if [ ! -f "$TMP_BINARY" ] || [ ! -s "$TMP_BINARY" ]; then
+        print_error "Downloaded file is empty or doesn't exist"
     fi
     
     # Make executable (not needed on Windows)
@@ -138,9 +198,12 @@ download_binary() {
         chmod +x "$TMP_BINARY"
     fi
     
-    # Verify binary works
-    if ! "$TMP_BINARY" version >/dev/null 2>&1; then
-        print_warning "Downloaded binary failed version check, but continuing..."
+    # Verify binary works - more lenient check
+    if ! "$TMP_BINARY" --help >/dev/null 2>&1; then
+        print_warning "Binary validation failed, but continuing installation..."
+        print_info "You can verify after installation with: kolumn version"
+    else
+        print_success "Binary validation passed!"
     fi
     
     echo "$TMP_BINARY"
