@@ -25,6 +25,7 @@ on:
 env:
   DEPLOY_REPO: 'schemabounce/Kolumn-deploy'
   SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+  DEPLOY_REPO_TOKEN: ${{ secrets.DEPLOY_REPO_TOKEN || secrets.SOURCE_REPO_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
@@ -149,7 +150,7 @@ jobs:
       - name: Clone public deploy repository
         run: |
           echo "📂 Cloning ${{ env.DEPLOY_REPO }}"
-          git clone https://$SOURCE_REPO_TOKEN@github.com/${{ env.DEPLOY_REPO }}.git deploy
+          git clone https://$DEPLOY_REPO_TOKEN@github.com/${{ env.DEPLOY_REPO }}.git deploy
           cd deploy
           
           # Create directory structure
@@ -402,7 +403,7 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
-          token: ${{ env.SOURCE_REPO_TOKEN }}
+          token: ${{ env.DEPLOY_REPO_TOKEN }}
           tag_name: ${{ inputs.tag }}
           name: "Kolumn ${{ inputs.version }}"
           body_path: deploy/release-notes.md
