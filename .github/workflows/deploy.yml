@@ -25,6 +25,8 @@ on:
 env:
   DEPLOY_REPO: 'schemabounce/Kolumn-deploy'
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Use DEPLOY_TOKEN for cross-repository access (artifact downloads)
+  SOURCE_REPO_TOKEN: ${{ secrets.DEPLOY_TOKEN || secrets.GITHUB_TOKEN }}
 
 jobs:
   deploy:
@@ -35,30 +37,81 @@ jobs:
         run: |
           echo "🔽 Downloading release packages from ${{ inputs.source_repo }} run ${{ inputs.run_id }}"
           
-          # Get the artifact download URL using GitHub API
-          ARTIFACT_URL=$(curl -L \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ inputs.source_repo }}/actions/runs/${{ inputs.run_id }}/artifacts" \
-            | jq -r '.artifacts[] | select(.name == "kolumn-release-packages") | .archive_download_url')
+          # Retry mechanism for artifact availability
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+          ARTIFACT_URL=""
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "🔄 Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES - Checking for artifacts..."
+            
+            # Get the artifact download URL using GitHub API
+            ARTIFACT_RESPONSE=$(curl -s -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ env.SOURCE_REPO_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${{ inputs.source_repo }}/actions/runs/${{ inputs.run_id }}/artifacts")
+            
+            # Check if we got a valid response
+            if echo "$ARTIFACT_RESPONSE" | jq -e '.artifacts' > /dev/null 2>&1; then
+              ARTIFACT_URL=$(echo "$ARTIFACT_RESPONSE" | jq -r '.artifacts[] | select(.name == "kolumn-release-packages") | .archive_download_url')
+              
+              if [ "$ARTIFACT_URL" != "null" ] && [ -n "$ARTIFACT_URL" ]; then
+                echo "✅ Found artifact URL: $ARTIFACT_URL"
+                break
+              else
+                echo "⏳ Artifact not ready yet. Available artifacts:"
+                echo "$ARTIFACT_RESPONSE" | jq -r '.artifacts[].name' || echo "No artifacts found"
+              fi
+            else
+              echo "❌ API Error response:"
+              echo "$ARTIFACT_RESPONSE"
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "⏳ Waiting 30 seconds before retry..."
+              sleep 30
+            fi
+          done
           
           if [ "$ARTIFACT_URL" = "null" ] || [ -z "$ARTIFACT_URL" ]; then
-            echo "❌ Error: Could not find kolumn-release-packages artifact"
-            curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            echo "❌ Error: Could not find kolumn-release-packages artifact after $MAX_RETRIES attempts"
+            echo "🔍 Final artifacts check:"
+            curl -H "Authorization: Bearer ${{ env.SOURCE_REPO_TOKEN }}" \
               "https://api.github.com/repos/${{ inputs.source_repo }}/actions/runs/${{ inputs.run_id }}/artifacts"
             exit 1
           fi
           
           echo "📦 Artifact URL: $ARTIFACT_URL"
           
-          # Download the artifact
-          curl -L \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -o release-packages.zip \
-            "$ARTIFACT_URL"
+          # Download the artifact with retry
+          echo "⬇️ Downloading artifact..."
+          MAX_DOWNLOAD_RETRIES=3
+          DOWNLOAD_RETRY=0
+          
+          while [ $DOWNLOAD_RETRY -lt $MAX_DOWNLOAD_RETRIES ]; do
+            if curl -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ env.SOURCE_REPO_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -o release-packages.zip \
+              "$ARTIFACT_URL"; then
+              echo "✅ Download successful!"
+              break
+            else
+              DOWNLOAD_RETRY=$((DOWNLOAD_RETRY + 1))
+              if [ $DOWNLOAD_RETRY -lt $MAX_DOWNLOAD_RETRIES ]; then
+                echo "⏳ Download failed, retrying in 10 seconds..."
+                sleep 10
+              fi
+            fi
+          done
+          
+          if [ $DOWNLOAD_RETRY -eq $MAX_DOWNLOAD_RETRIES ]; then
+            echo "❌ Failed to download artifact after $MAX_DOWNLOAD_RETRIES attempts"
+            exit 1
+          fi
           
           # Extract packages
           echo "📂 Extracting release packages..."
