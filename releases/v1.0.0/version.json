@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "tag": "v1.0.0",
+  "released": "2025-09-08T05:04:50Z",
+  "platforms": [
+    "linux-amd64", "linux-arm64",
+    "darwin-amd64", "darwin-arm64", 
+    "windows-amd64", "windows-arm64"
+  ]
+}
