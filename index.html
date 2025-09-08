@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -507,6 +506,646 @@
             </div>
             <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8; color: #FFFBEA;">
                 Status: Stable • Semantic Version: 2.0.0
+            </div>
+            
+            <div class="quick-install">
+                <h3 style="color: var(--ad-pattern-primary); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 1px;">🏗️ ONE-COMMAND INSTALLATION</h3>
+                <div class="install-command" id="install-cmd">
+                    curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash
+                    <button class="copy-btn" onclick="copyInstallCommand()">Copy</button>
+                </div>
+                <p style="color: #FFFBEA; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px;">✅ AUTOMATICALLY DETECTS YOUR OS • ✅ DOWNLOADS LATEST VERSION • ✅ INSTALLS TO /USR/LOCAL/BIN</p>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Safety-First Design</h3>
+                    <p>Built-in validation and safety checks help prevent accidental data loss with confirmation prompts and validation steps.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Infrastructure-as-Code for Data</h3>
+                    <p>Terraform-style declarative configuration specifically designed for managing modern data infrastructure with built-in governance.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h3>Universal Data Stack Management</h3>
+                    <p>Beyond infrastructure - manage databases, streaming, ETL, orchestration, and storage with unified governance and compliance.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Simplified Provider Development</h3>
+                    <p>Clean SDK patterns reduce boilerplate code for provider development. Focus on business logic with built-in safety features.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Modular Provider Architecture</h3>
+                    <p>Independent provider repositories enable focused development and distribution. Build data infrastructure providers independently.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🔌</div>
+                    <h3>Claude Code Integration</h3>
+                    <p>Built-in schema analysis and recommendation engine designed for AI agent integration. Provides structured data for intelligent infrastructure assistance.</p>
+                </div>
+            </div>
+            
+            <div class="getting-started">
+                <h2>🎯 Getting Started</h2>
+                <p>After installation, try these commands to get up and running:</p>
+                
+                <div class="command-example">
+                    # Verify installation<br>
+                    kolumn version<br><br>
+                    
+                    # Create a new project<br>
+                    kolumn init<br><br>
+                    
+                    # Plan your infrastructure<br>
+                    kolumn plan<br><br>
+                    
+                    # Apply changes safely<br>
+                    kolumn apply
+                </div>
+                
+                <p><strong>🔥 Key Features:</strong></p>
+                <ul style="margin: 20px 0; padding-left: 20px;">
+                    <li>✨ <strong>Data Objects</strong> - Schema definitions for data infrastructure</li>
+                    <li>🔐 <strong>Classification System</strong> - Data classification and governance controls</li>
+                    <li>🌊 <strong>File Integration</strong> - Work with SQL, Python, and configuration files</li>
+                    <li>🛡️ <strong>Safety Controls</strong> - Built-in validation and safety checks</li>
+                    <li>🔌 <strong>Agent-Ready</strong> - Built-in analysis engine designed for AI agent integration and assistance</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="links-section">
+            <h2 style="color: var(--ad-pattern-primary); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);">🔗 RESOURCES & SUPPORT</h2>
+            <div class="links">
+                <a href="https://github.com/schemabounce/Kolumn-deploy/releases" class="link-btn">
+                    📦 DOWNLOAD RELEASES
+                </a>
+                <a href="https://schemabounce.com/kolumn/docs" class="link-btn">
+                    📖 DOCUMENTATION
+                </a>
+                <a href="https://github.com/schemabounce/Kolumn-deploy/issues" class="link-btn">
+                    💬 GET SUPPORT
+                </a>
+                <a href="https://github.com/schemabounce/Kolumn-deploy/releases/latest" class="link-btn">
+                    🔄 LATEST VERSION
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyInstallCommand() {
+            const command = "curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash";
+            navigator.clipboard.writeText(command).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = 'rgba(40, 167, 69, 0.8)';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = 'var(--ad-pattern-primary)';
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = command;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kolumn v1.0.0 - Infrastructure-as-Code for the Modern Data Stack</title>
+    <meta name="description" content="Revolutionary infrastructure-as-code tool with enterprise governance, Terraform compatibility, and 70% less code.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        /* Art Deco pattern variables */
+        :root {
+          --ad-pattern-primary: #D4AF37;
+          --ad-pattern-secondary: #4A4A4A;
+          --ad-pattern-accent: #B8976F;
+          --ad-pattern-size: 20px;
+          --ad-chevron-width: 12px;
+          --ad-sunburst-radius: 16px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', 'Courier New', 'Monaco', 'Menlo', monospace;
+            line-height: 1.6;
+            color: #FFFBEA;
+            background: #181818;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #181818;
+            border-radius: 0;
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.3);
+            border: 2px solid var(--ad-pattern-primary);
+            overflow: hidden;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid var(--ad-pattern-primary);
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .header {
+            background: #181818;
+            color: #FFFBEA;
+            text-align: center;
+            padding: 60px 40px;
+            position: relative;
+            border-bottom: 2px solid var(--ad-pattern-primary);
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                transparent 10%,
+                var(--ad-pattern-primary) 10%,
+                var(--ad-pattern-primary) 20%,
+                transparent 20%,
+                transparent 30%,
+                var(--ad-pattern-primary) 30%,
+                var(--ad-pattern-primary) 40%,
+                transparent 40%,
+                transparent 50%,
+                var(--ad-pattern-primary) 50%,
+                var(--ad-pattern-primary) 60%,
+                transparent 60%,
+                transparent 70%,
+                var(--ad-pattern-primary) 70%,
+                var(--ad-pattern-primary) 80%,
+                transparent 80%,
+                transparent 90%,
+                var(--ad-pattern-primary) 90%,
+                var(--ad-pattern-primary) 100%
+            );
+        }
+        
+        .logo {
+            font-size: 4em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+        }
+        
+        h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3em;
+            margin-bottom: 20px;
+            font-weight: 700;
+            color: var(--ad-pattern-primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+            position: relative;
+            padding-top: 12px;
+        }
+        
+        h1::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 8px;
+            background: var(--ad-pattern-primary);
+            clip-path: polygon(
+                0% 50%,
+                15% 0%,
+                35% 0%,
+                50% 50%,
+                65% 0%,
+                85% 0%,
+                100% 50%,
+                85% 100%,
+                65% 100%,
+                50% 50%,
+                35% 100%,
+                15% 100%
+            );
+        }
+        
+        .subtitle {
+            font-size: 1.4em;
+            opacity: 0.95;
+            margin-bottom: 40px;
+            font-weight: 400;
+            color: #FFFBEA;
+            letter-spacing: 1px;
+        }
+        
+        .version-badge {
+            display: inline-block;
+            background: var(--ad-pattern-primary);
+            color: #181818;
+            padding: 12px 24px;
+            border-radius: 0;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 2px solid var(--ad-pattern-primary);
+            font-size: 1.2em;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .version-badge::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid var(--ad-pattern-primary);
+            pointer-events: none;
+        }
+        
+        .quick-install {
+            background: rgba(68, 68, 68, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 0;
+            border: 2px solid var(--ad-pattern-primary);
+            margin-top: 40px;
+            position: relative;
+        }
+        
+        .quick-install::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid var(--ad-pattern-primary);
+            pointer-events: none;
+        }
+        
+        .install-command {
+            background: #222222;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            margin: 20px 0;
+            border-left: 4px solid #00ff00;
+            border: 2px solid var(--ad-pattern-primary);
+            position: relative;
+            overflow-x: auto;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--ad-pattern-primary);
+            color: #181818;
+            border: 2px solid var(--ad-pattern-primary);
+            padding: 8px 16px;
+            border-radius: 0;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background: #181818;
+            color: var(--ad-pattern-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+        
+        .main-content {
+            padding: 60px 40px;
+            background: #181818;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin: 60px 0;
+        }
+        
+        .feature {
+            padding: 30px;
+            background: #222222;
+            border-radius: 0;
+            border: 2px solid var(--ad-pattern-primary);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .feature::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid var(--ad-pattern-primary);
+            pointer-events: none;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+        }
+        
+        .feature-icon {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            position: relative;
+            display: inline-block;
+            padding: 8px;
+        }
+        
+        .feature-icon::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid var(--ad-pattern-primary);
+            border-radius: 2px;
+            clip-path: polygon(
+                0 0,
+                100% 0,
+                100% 20%,
+                90% 20%,
+                90% 10%,
+                10% 10%,
+                10% 20%,
+                0 20%,
+                0 100%,
+                20% 100%,
+                20% 90%,
+                10% 90%,
+                10% 80%,
+                90% 80%,
+                90% 90%,
+                80% 90%,
+                80% 100%,
+                100% 100%,
+                100% 80%,
+                90% 80%,
+                90% 10%,
+                10% 10%,
+                10% 90%,
+                0 90%
+            );
+        }
+        
+        .feature h3 {
+            color: var(--ad-pattern-primary);
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .feature p {
+            color: #FFFBEA;
+            line-height: 1.6;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.5px;
+        }
+        
+        .getting-started {
+            background: #222222;
+            padding: 50px;
+            border-radius: 0;
+            border: 2px solid var(--ad-pattern-primary);
+            margin: 60px 0;
+            position: relative;
+        }
+        
+        .getting-started::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid var(--ad-pattern-primary);
+            pointer-events: none;
+        }
+        
+        .getting-started h2 {
+            color: var(--ad-pattern-primary);
+            margin-bottom: 30px;
+            font-size: 2em;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+        }
+        
+        .command-example {
+            background: #181818;
+            color: #4fc3f7;
+            padding: 20px;
+            border-radius: 0;
+            border: 2px solid var(--ad-pattern-primary);
+            font-family: 'JetBrains Mono', monospace;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        .links-section {
+            text-align: center;
+            padding: 60px 40px;
+            background: #181818;
+            border-top: 2px solid var(--ad-pattern-primary);
+            position: relative;
+        }
+        
+        .links-section::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 12px;
+            background: var(--ad-pattern-primary);
+            clip-path: polygon(
+                20% 0%,
+                40% 50%,
+                20% 100%,
+                0% 100%,
+                20% 50%,
+                0% 0%,
+                20% 0%,
+                40% 50%,
+                60% 0%,
+                80% 0%,
+                60% 50%,
+                80% 100%,
+                60% 100%,
+                40% 50%,
+                60% 0%
+            );
+        }
+        
+        .links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+        
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 30px;
+            background: var(--ad-pattern-primary);
+            color: #181818;
+            text-decoration: none;
+            border-radius: 0;
+            border: 2px solid var(--ad-pattern-primary);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .link-btn::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid var(--ad-pattern-primary);
+            pointer-events: none;
+        }
+        
+        .link-btn:hover {
+            transform: translateY(-2px);
+            background: #181818;
+            color: var(--ad-pattern-primary);
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            :root {
+                --ad-pattern-size: 16px;
+                --ad-chevron-width: 8px;
+                --ad-sunburst-radius: 12px;
+            }
+            
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            
+            .header {
+                padding: 40px 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .main-content {
+                padding: 40px 20px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .links {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🚀</div>
+            <h1>Kolumn</h1>
+            <p class="subtitle">Infrastructure-as-Code for the Modern Data Stack</p>
+            <div class="version-badge">
+                v1.0.0
+            </div>
+            <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8; color: #FFFBEA;">
+                Status: Stable • Semantic Version: 1.0.0
             </div>
             
             <div class="quick-install">
