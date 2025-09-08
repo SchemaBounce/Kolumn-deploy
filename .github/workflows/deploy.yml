@@ -24,9 +24,9 @@ on:
 
 env:
   DEPLOY_REPO: 'schemabounce/Kolumn-deploy'
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_TOKEN: ${{ env.SOURCE_REPO_TOKEN }}
   # Use DEPLOY_TOKEN for cross-repository access (artifact downloads)
-  SOURCE_REPO_TOKEN: ${{ secrets.DEPLOY_TOKEN || secrets.GITHUB_TOKEN }}
+  SOURCE_REPO_TOKEN: ${{ secrets.DEPLOY_TOKEN || env.SOURCE_REPO_TOKEN }}
 
 jobs:
   deploy:
@@ -130,7 +130,7 @@ jobs:
       - name: Clone public deploy repository
         run: |
           echo "📂 Cloning ${{ env.DEPLOY_REPO }}"
-          git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ env.DEPLOY_REPO }}.git deploy
+          git clone https://${{ env.SOURCE_REPO_TOKEN }}@github.com/${{ env.DEPLOY_REPO }}.git deploy
           cd deploy
           
           # Create directory structure
@@ -383,7 +383,7 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.SOURCE_REPO_TOKEN }}
           tag_name: ${{ inputs.tag }}
           name: "Kolumn ${{ inputs.version }}"
           body_path: deploy/release-notes.md
