@@ -312,8 +312,77 @@ jobs:
           VERSION="${{ inputs.version }}"
           TAG="${{ inputs.tag }}"
           
-          # Create release notes
-          cat > release-notes.md << EOF
+          # Create release notes with beta detection
+          if [[ "$VERSION" == *"beta"* ]]; then
+            cat > release-notes.md << EOF
+          # Kolumn ${VERSION} 🚧 BETA RELEASE
+          
+          > **⚠️ BETA SOFTWARE**: This is a pre-release beta version of Kolumn. While functional, it may contain bugs and breaking changes. Not recommended for production use.
+          
+          Infrastructure-as-code tool for the modern data stack with enterprise governance.
+          
+          ## 🚧 Beta Notice
+          
+          **This is beta software in active development:**
+          - ✅ Core functionality is working and tested
+          - ⚠️ APIs may change between beta releases  
+          - 🐛 Some features may have bugs or limitations
+          - 📝 Documentation is still being completed
+          - 🔄 Breaking changes possible until v1.0.0
+          
+          **Production Readiness**: This beta is suitable for:
+          - ✅ Development and testing environments
+          - ✅ Proof-of-concept projects
+          - ✅ Feature evaluation and feedback  
+          - ❌ Critical production workloads (wait for v1.0.0)
+          
+          ## 🚀 Installation
+          
+          ### Quick Install (Recommended)
+          \`\`\`bash
+          curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash
+          \`\`\`
+          
+          ### Manual Download
+          Download the appropriate package for your platform:
+          - Linux AMD64: [kolumn-${VERSION}-linux-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-linux-amd64.tar.gz)
+          - Linux ARM64: [kolumn-${VERSION}-linux-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-linux-arm64.tar.gz)
+          - macOS AMD64: [kolumn-${VERSION}-darwin-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-darwin-amd64.tar.gz)
+          - macOS ARM64: [kolumn-${VERSION}-darwin-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-darwin-arm64.tar.gz)
+          - Windows AMD64: [kolumn-${VERSION}-windows-amd64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-windows-amd64.zip)
+          - Windows ARM64: [kolumn-${VERSION}-windows-arm64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-windows-arm64.zip)
+          
+          ## ✨ What's Included
+          - **kolumn**: Main CLI binary
+          - **kolumn-provider-kolumn**: Governance provider binary
+          - Multi-platform support (Linux, macOS, Windows)
+          - Both AMD64 and ARM64 architectures
+          
+          ## 🎯 Getting Started
+          \`\`\`bash
+          # Verify installation
+          kolumn version
+          
+          # Create a new project
+          kolumn init
+          
+          # See available commands
+          kolumn --help
+          \`\`\`
+          
+          ## 🔗 Links
+          - 📖 [Documentation](https://schemabounce.github.io/Kolumn-deploy)
+          - 💬 [Support](https://github.com/schemabounce/Kolumn-deploy/issues)
+          
+          ## 💬 Beta Feedback
+          We'd love your feedback on this beta release:
+          - 🐛 [Report bugs](https://github.com/schemabounce/Kolumn-deploy/issues)
+          - 💡 [Request features](https://github.com/schemabounce/Kolumn-deploy/issues)
+          - 💬 [Join discussions](https://github.com/schemabounce/Kolumn-deploy/discussions)
+          EOF
+          else
+            # Standard release notes for stable versions
+            cat > release-notes.md << EOF
           # Kolumn ${VERSION}
           
           Infrastructure-as-code tool for the modern data stack with enterprise governance.
@@ -356,6 +425,7 @@ jobs:
           - 📖 [Documentation](https://schemabounce.github.io/Kolumn-deploy)
           - 💬 [Support](https://github.com/schemabounce/Kolumn-deploy/issues)
           EOF
+          fi
 
       - name: Commit and push to deploy repo
         run: |
