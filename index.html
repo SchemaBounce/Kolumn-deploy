@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kolumn - Infrastructure-as-Code for the Modern Data Stack</title>
+    <title>Kolumn v2.0.0 - Infrastructure-as-Code for the Modern Data Stack</title>
     <meta name="description" content="Revolutionary infrastructure-as-code tool with enterprise governance, Terraform compatibility, and 70% less code.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -150,6 +150,33 @@
             font-weight: 400;
             color: #FFFBEA;
             letter-spacing: 1px;
+        }
+        
+        .version-badge {
+            display: inline-block;
+            background: var(--ad-pattern-primary);
+            color: #181818;
+            padding: 12px 24px;
+            border-radius: 0;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 2px solid var(--ad-pattern-primary);
+            font-size: 1.2em;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .version-badge::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid var(--ad-pattern-primary);
+            pointer-events: none;
         }
         
         .quick-install {
@@ -475,10 +502,11 @@
             <div class="logo">🚀</div>
             <h1>Kolumn</h1>
             <p class="subtitle">Infrastructure-as-Code for the Modern Data Stack</p>
-            <div style="margin-top: 15px; font-size: 1.1em; opacity: 0.9;">
-                <span style="background: var(--ad-pattern-primary); color: #181818; padding: 8px 16px; border-radius: 0; font-weight: 600; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 1px; border: 2px solid var(--ad-pattern-primary);">
-                    f9b290c Beta
-                </span>
+            <div class="version-badge">
+                v2.0.0
+            </div>
+            <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8; color: #FFFBEA;">
+                Status: Stable • Semantic Version: 2.0.0
             </div>
             
             <div class="quick-install">
@@ -588,7 +616,7 @@
                 btn.style.background = 'rgba(40, 167, 69, 0.8)';
                 setTimeout(() => {
                     btn.textContent = originalText;
-                    btn.style.background = 'rgba(255,255,255,0.2)';
+                    btn.style.background = 'var(--ad-pattern-primary)';
                 }, 2000);
             }).catch(() => {
                 // Fallback for older browsers
