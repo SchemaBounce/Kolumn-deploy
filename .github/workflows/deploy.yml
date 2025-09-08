@@ -24,9 +24,8 @@ on:
 
 env:
   DEPLOY_REPO: 'schemabounce/Kolumn-deploy'
-  GITHUB_TOKEN: ${{ env.SOURCE_REPO_TOKEN }}
-  # Use DEPLOY_TOKEN for cross-repository access (artifact downloads)
-  SOURCE_REPO_TOKEN: ${{ secrets.DEPLOY_TOKEN || env.SOURCE_REPO_TOKEN }}
+  SOURCE_REPO_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
 
 jobs:
   deploy:
