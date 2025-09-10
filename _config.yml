@@ -1,0 +1,73 @@
+# Jekyll configuration for Kolumn-deploy GitHub Pages site
+
+# Basic site settings
+title: "Kolumn - Infrastructure-as-Code for Data Stack"
+description: "The world's first infrastructure-as-code tool with full Terraform compatibility and enterprise governance"
+url: "https://schemabounce.github.io"
+baseurl: "/Kolumn-deploy"
+
+# Jekyll settings
+markdown: kramdown
+highlighter: rouge
+incremental: false
+
+# GitHub Pages settings
+plugins:
+  - jekyll-github-metadata
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-feed
+
+# Exclude directories and files from Jekyll processing
+exclude:
+  - examples/          # Exclude examples directory - contains SQL files with incompatible syntax
+  - scripts/           # Exclude scripts directory
+  - test-pipeline.sh   # Exclude shell scripts
+  - releases/          # Exclude binary releases
+  - DOCUMENTATION_SYSTEM.md  # Exclude internal documentation
+  - README.md          # Exclude repository README
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+
+# Collections and defaults
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:name/
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+  - scope:
+      path: "docs"
+      type: "docs"
+    values:
+      layout: default
+
+# SEO and metadata
+author:
+  name: "SchemaBounce"
+  email: "info@schemabounce.com"
+
+twitter:
+  username: schemabounce
+  card: summary
+
+social:
+  name: SchemaBounce
+  links:
+    - https://twitter.com/schemabounce
+    - https://github.com/schemabounce
+
+# GitHub metadata
+repository: "schemabounce/Kolumn-deploy"
