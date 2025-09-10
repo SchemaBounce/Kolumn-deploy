@@ -1,0 +1,217 @@
+# Data Platform - Variable Declarations
+# Comprehensive variable system for multi-provider data platform
+
+# === GOVERNANCE CONFIGURATION ===
+variable "enable_audit_logging" {
+  description = "Enable comprehensive audit logging across all providers"
+  type        = bool
+  default     = true
+}
+
+variable "encryption_level" {
+  description = "Data encryption level (basic, standard, high, maximum)"
+  type        = string
+  default     = "standard"
+
+  validation {
+    condition     = contains(["basic", "standard", "high", "maximum"], var.encryption_level)
+    error_message = "Encryption level must be one of: basic, standard, high, maximum"
+  }
+}
+
+variable "data_retention_days" {
+  description = "Default data retention period in days"
+  type        = number
+  default     = 2555 # ~7 years
+}
+
+# === POSTGRESQL CONFIGURATION ===
+variable "postgres_host" {
+  description = "PostgreSQL host for analytical workloads"
+  type        = string
+  default     = "localhost"
+}
+
+variable "postgres_port" {
+  description = "PostgreSQL port"
+  type        = number
+  default     = 5432
+}
+
+variable "postgres_database" {
+  description = "PostgreSQL database name"
+  type        = string
+  default     = "data_platform"
+}
+
+variable "postgres_username" {
+  description = "PostgreSQL username"
+  type        = string
+  default     = "data_platform_user"
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL password"
+  type        = string
+  sensitive   = true
+}
+
+variable "postgres_max_connections" {
+  description = "Maximum PostgreSQL connections"
+  type        = number
+  default     = 200
+}
+
+# === SNOWFLAKE CONFIGURATION ===
+variable "snowflake_account" {
+  description = "Snowflake account identifier"
+  type        = string
+}
+
+variable "snowflake_username" {
+  description = "Snowflake username"
+  type        = string
+}
+
+variable "snowflake_password" {
+  description = "Snowflake password"
+  type        = string
+  sensitive   = true
+}
+
+variable "snowflake_warehouse" {
+  description = "Snowflake warehouse name"
+  type        = string
+  default     = "COMPUTE_WH"
+}
+
+variable "snowflake_database" {
+  description = "Snowflake database name"
+  type        = string
+  default     = "DATA_PLATFORM"
+}
+
+variable "snowflake_schema" {
+  description = "Snowflake schema name"
+  type        = string
+  default     = "PUBLIC"
+}
+
+variable "snowflake_role" {
+  description = "Snowflake role name"
+  type        = string
+  default     = "DATA_ENGINEER"
+}
+
+# === KAFKA CONFIGURATION ===
+variable "kafka_brokers" {
+  description = "Kafka broker addresses"
+  type        = list(string)
+  default     = ["localhost:9092"]
+}
+
+variable "kafka_security_protocol" {
+  description = "Kafka security protocol"
+  type        = string
+  default     = "SASL_SSL"
+}
+
+variable "kafka_sasl_mechanism" {
+  description = "Kafka SASL mechanism"
+  type        = string
+  default     = "PLAIN"
+}
+
+variable "kafka_username" {
+  description = "Kafka SASL username"
+  type        = string
+}
+
+variable "kafka_password" {
+  description = "Kafka SASL password"
+  type        = string
+  sensitive   = true
+}
+
+variable "schema_registry_url" {
+  description = "Confluent Schema Registry URL"
+  type        = string
+  default     = "https://localhost:8081"
+}
+
+variable "schema_registry_username" {
+  description = "Schema Registry username"
+  type        = string
+}
+
+variable "schema_registry_password" {
+  description = "Schema Registry password"
+  type        = string
+  sensitive   = true
+}
+
+# === MONGODB CONFIGURATION ===
+variable "mongodb_connection_string" {
+  description = "MongoDB connection string"
+  type        = string
+  sensitive   = true
+}
+
+variable "mongodb_database" {
+  description = "MongoDB database name"
+  type        = string
+  default     = "data_platform"
+}
+
+variable "mongodb_replica_set" {
+  description = "MongoDB replica set name"
+  type        = string
+  default     = "rs0"
+}
+
+# === AWS S3 CONFIGURATION ===
+variable "aws_region" {
+  description = "AWS region for S3 data lake"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "aws_access_key" {
+  description = "AWS access key ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "aws_secret_key" {
+  description = "AWS secret access key"
+  type        = string
+  sensitive   = true
+}
+
+variable "s3_data_lake_bucket" {
+  description = "S3 bucket name for data lake"
+  type        = string
+}
+
+# === ENVIRONMENT CONFIGURATION ===
+variable "environment" {
+  description = "Environment (dev, staging, prod)"
+  type        = string
+
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be one of: dev, staging, prod"
+  }
+}
+
+variable "project_name" {
+  description = "Data platform project name"
+  type        = string
+  default     = "data-platform"
+}
+
+variable "team_name" {
+  description = "Data team responsible for platform"
+  type        = string
+  default     = "data-engineering"
+}

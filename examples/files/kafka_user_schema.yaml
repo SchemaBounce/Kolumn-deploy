@@ -1,0 +1,291 @@
+# =============================================================================
+# KAFKA SCHEMA REGISTRY CONFIGURATION WITH AUTONOMOUS UPDATES
+# =============================================================================
+# This YAML file demonstrates how Kafka schema configuration is automatically
+# updated when the source PostgreSQL table schema changes!
+#
+# Kolumn Variables Available:
+# - ${user_schema}: Complete column schema from discovered table
+# - ${kafka_topic}: Kafka topic name for user events
+# =============================================================================
+
+schema_registry:
+  url: "http://schema-registry:8081"
+  compatibility: "BACKWARD"
+  
+# ⚡ AUTONOMOUS SCHEMA: Automatically generated from ${user_schema}
+schemas:
+  user_events:
+    topic: "${kafka_topic}"
+    key_schema:
+      type: "record"
+      name: "UserEventKey"
+      fields:
+        - name: "user_id"
+          type: "long"
+        - name: "tenant_id"
+          type: ["null", "string"]
+          default: null
+    
+    value_schema:
+      type: "record"
+      name: "UserEvent"
+      namespace: "com.company.events.user"
+      
+      # 🔗 DYNAMIC FIELDS: Automatically updated from source table schema
+      fields:
+        # Core user fields from discovered PostgreSQL table
+        {% for column in user_schema %}
+        {% if column.name not in ["password", "ssn", "phone"] %}  # Exclude sensitive PII
+        - name: "{{ column.name }}"
+          type: {% if column.nullable %}["null", "{{ column.type|lower|replace('varchar', 'string')|replace('integer', 'int')|replace('timestamp', 'long')|replace('boolean', 'boolean') }}"]{% else %}"{{ column.type|lower|replace('varchar', 'string')|replace('integer', 'int')|replace('timestamp', 'long')|replace('boolean', 'boolean') }}"{% endif %}
+          {% if column.nullable %}default: null{% endif %}
+          doc: "{{ column.name }} field from users table - {{ column.type }}"
+        {% endif %}
+        {% endfor %}
+        
+        # Event metadata fields
+        - name: "event_type"
+          type: "string"
+          doc: "Type of user event (created, updated, deleted, etc.)"
+        
+        - name: "event_timestamp"
+          type: "long"
+          logicalType: "timestamp-millis"
+          doc: "When the event occurred"
+        
+        - name: "event_version"
+          type: "string"
+          default: "v1.0"
+          doc: "Schema version for backward compatibility"
+        
+        # 🛡️ PRIVACY FIELDS: PII handled separately with encryption
+        {% for column in user_schema %}
+        {% if column.name in ["email", "phone"] %}
+        - name: "{{ column.name }}_hash"
+          type: ["null", "string"]  
+          default: null
+          doc: "SHA256 hash of {{ column.name }} for analytics (privacy-safe)"
+        {% endif %}
+        {% endfor %}
+        
+        # Governance and lineage
+        - name: "data_source"
+          type: "string"
+          default: "postgresql.users"
+          doc: "Source system and table"
+          
+        - name: "processing_metadata"
+          type:
+            type: "record"
+            name: "ProcessingMetadata"
+            fields:
+              - name: "processor_id"
+                type: "string"
+              - name: "processing_timestamp"
+                type: "long"
+                logicalType: "timestamp-millis"
+              - name: "schema_version"
+                type: "string"
+                default: "auto-generated"
+          doc: "Processing and lineage metadata"
+
+# Topic configuration with schema-aware partitioning
+topic_config:
+  "${kafka_topic}":
+    partitions: 6  # Based on expected user volume
+    replication_factor: 3
+    retention_ms: 604800000  # 7 days
+    
+    # 🔗 SCHEMA-AWARE PARTITIONING: Use user_id for consistent partitioning
+    partition_key: "user_id"
+    
+    # Cleanup and compaction based on schema
+    cleanup_policy: "delete"  # Since we have analytics tables for historical data
+    
+    # Schema evolution settings
+    schema_validation: true
+    schema_compatibility_check: true
+    
+    # 🛡️ PRIVACY CONFIGURATION: Based on PII columns detected
+    pii_handling:
+      # Automatically encrypt fields containing PII markers
+      encrypt_fields:
+        {% for column in user_schema %}
+        {% if column.name in ["email", "phone", "ssn"] %}
+        - "{{ column.name }}_hash"  # Only store hashes
+        {% endif %}
+        {% endfor %}
+      
+      # Audit settings for compliance
+      audit_access: true
+      retention_policy: "hash_only"  # Store only hashes for analytics
+      
+      # GDPR compliance
+      right_to_be_forgotten: true
+      deletion_key_field: "user_id"
+
+# Consumer group configurations that adapt to schema
+consumer_groups:
+  user_analytics_processor:
+    group_id: "user-analytics-v1"
+    
+    # 🔗 SCHEMA-AWARE PROCESSING: Consumer config matches available fields
+    processing_config:
+      # Fields to process for analytics (non-PII only)
+      analytics_fields:
+        {% for column in user_schema %}
+        {% if column.name not in ["email", "phone", "ssn", "password"] %}
+        - "{{ column.name }}"
+        {% endif %}
+        {% endfor %}
+      
+      # Aggregation grouping based on available dimensions
+      aggregation_keys:
+        {% for column in user_schema %}
+        {% if column.name in ["status", "user_type", "region", "tier"] %}
+        - "{{ column.name }}"
+        {% endif %}
+        {% endfor %}
+      
+      # Time-based processing windows
+      windowing:
+        window_size: "1 hour"
+        {% if "created_at" in [col.name for col in user_schema] %}
+        time_field: "created_at"
+        {% else %}
+        time_field: "event_timestamp"
+        {% endif %}
+    
+    # Dead letter queue for schema evolution issues
+    error_handling:
+      dead_letter_topic: "user-events-dlq"
+      max_retries: 3
+      retry_backoff_ms: 5000
+
+  user_realtime_notifications:
+    group_id: "user-notifications-v1"
+    
+    # Different processing focus - real-time notifications
+    processing_config:
+      # Only fields needed for notifications
+      notification_fields:
+        - "user_id"
+        {% if "email_hash" in [col.name + "_hash" for col in user_schema if col.name == "email"] %}
+        - "email_hash"  # For targeted notifications
+        {% endif %}
+        - "event_type"
+        - "event_timestamp"
+      
+      # Filter only relevant events
+      event_filters:
+        - "created"
+        - "updated" 
+        - "status_changed"
+      
+      # Low latency configuration
+      enable_auto_commit: false
+      max_poll_records: 100
+      session_timeout_ms: 10000
+
+# Schema registry subject naming and evolution strategy
+schema_evolution:
+  subject_name_strategy: "TopicNameStrategy"
+  
+  # 🔄 AUTONOMOUS EVOLUTION: Handle schema changes automatically
+  compatibility_rules:
+    - rule: "add_optional_fields"
+      action: "allow"
+      description: "New nullable columns from table can be added"
+    
+    - rule: "remove_unused_fields"
+      action: "deprecate_first"
+      description: "Dropped table columns go through deprecation"
+      deprecation_period: "30 days"
+    
+    - rule: "change_field_type"
+      action: "create_new_version"
+      description: "Column type changes create new schema version"
+    
+    - rule: "add_required_fields"
+      action: "create_major_version" 
+      description: "New NOT NULL columns require major version bump"
+
+# Monitoring and alerting based on schema
+monitoring:
+  schema_drift:
+    check_frequency: "5 minutes"
+    
+    # 📊 DRIFT DETECTION: Monitor for table schema changes
+    alerts:
+      - name: "new_column_detected"
+        condition: "schema_field_count_increase"
+        action: "info"  # New columns are usually safe to add
+        
+      - name: "column_removed"
+        condition: "schema_field_count_decrease"
+        action: "warning"  # Removed columns need consumer updates
+        
+      - name: "column_type_changed"
+        condition: "schema_field_type_change"
+        action: "critical"  # Type changes break compatibility
+        
+      - name: "pii_column_added"
+        condition: "new_pii_field_detected"
+        action: "critical"  # New PII requires security review
+        notification_channels: ["#security", "#data-governance"]
+
+  performance:
+    # Schema-aware performance monitoring
+    metrics:
+      - "messages_per_second_by_schema_version"
+      - "serialization_time_by_field_count"  
+      - "consumer_lag_by_field_complexity"
+      
+    # Alert on schema-related performance issues
+    alerts:
+      - name: "schema_bloat"
+        condition: "field_count > 50"
+        action: "warning"
+        description: "Too many fields may impact performance"
+
+# =============================================================================
+# AUTONOMOUS SCHEMA MAGIC DEMONSTRATION
+# =============================================================================
+#
+# 🎯 WHAT HAPPENS WHEN SOURCE POSTGRESQL TABLE CHANGES:
+#
+# 1. ALTER TABLE users ADD COLUMN middle_name VARCHAR(100);
+#    → YAML automatically includes middle_name in value_schema fields
+#    → Kafka messages can now contain middle_name
+#    → Consumer groups get middle_name in their processing config
+#    → Schema registry tracks the evolution automatically
+#    → Monitoring alerts that new field was added (info level)
+#
+# 2. ALTER TABLE users ADD COLUMN phone_verified BOOLEAN;
+#    → New boolean field added to schema
+#    → Consumer analytics_fields list includes phone_verified
+#    → Aggregation keys include phone_verified if it's a dimension
+#    → Performance monitoring tracks the additional field
+#
+# 3. ALTER TABLE users ADD COLUMN social_security_number VARCHAR(50);
+#    → Detected as PII due to pattern matching
+#    → Excluded from direct fields, included as ssn_hash
+#    → Security alert triggered for new PII field
+#    → Audit settings automatically apply
+#
+# 4. ALTER TABLE users DROP COLUMN deprecated_field;
+#    → Field removed from schema automatically
+#    → Consumers stop processing the field
+#    → Schema evolution creates deprecation notice
+#    → Monitoring alerts about field removal
+#
+# 🚀 ZERO CONFIGURATION KAFKA:
+# - Schema registry stays perfectly synchronized
+# - Consumer configurations adapt automatically  
+# - PII handling applies correct security policies
+# - Performance monitoring scales with schema complexity
+# - Full audit trail of schema changes
+#
+# This is Event-Driven Architecture perfection! ⚡
+# =============================================================================

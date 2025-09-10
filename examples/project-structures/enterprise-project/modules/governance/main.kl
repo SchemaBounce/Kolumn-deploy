@@ -1,0 +1,674 @@
+# Governance Module - Auto-discovered from modules/governance/
+# Provides enterprise data governance with universal classifications, RBAC, and compliance policies
+
+# === MODULE VARIABLES ===
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
+variable "organization" {
+  description = "Organization name"
+  type        = string
+}
+
+variable "compliance_level" {
+  description = "Compliance level (basic, standard, strict, maximum)"
+  type        = string
+}
+
+variable "encryption_level" {
+  description = "Encryption level (basic, standard, high, maximum)"
+  type        = string
+}
+
+variable "data_retention_policy" {
+  description = "Data retention policy configuration"
+  type        = any
+}
+
+# === UNIVERSAL DATA CLASSIFICATIONS ===
+
+create "kolumn_classification" "highly_sensitive_pii" {
+  name        = "HIGHLY_SENSITIVE_PII"
+  description = "Highly sensitive personally identifiable information requiring maximum protection"
+
+  requirements = {
+    encryption        = true
+    audit_access      = true
+    restricted_access = true
+    data_masking      = true
+    retention_days    = var.data_retention_policy.pii_retention_days
+    compliance_tags   = ["GDPR", "CCPA", "HIPAA"]
+  }
+
+  encryption_config = {
+    postgres = {
+      method            = var.encryption_level == "maximum" ? "column_level_encryption" : "transparent_data_encryption"
+      algorithm         = "AES-256-GCM"
+      key_rotation_days = 90
+      deterministic     = false # Non-deterministic for maximum security
+    }
+    snowflake = {
+      method      = "dynamic_data_masking"
+      mask_type   = "full"
+      policy_name = "HIGHLY_SENSITIVE_PII_POLICY"
+    }
+    kafka = {
+      method         = "envelope_encryption"
+      algorithm      = "AES-256-CTR"
+      key_derivation = "PBKDF2"
+      salt_length    = 32
+    }
+    mongodb = {
+      method       = "field_level_encryption"
+      key_alt_name = "highly_sensitive_pii_master_key"
+      algorithm    = "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+    }
+    s3 = {
+      method     = "client_side_encryption"
+      kms_key_id = "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:key/highly-sensitive-pii-key"
+    }
+  }
+
+  access_controls = {
+    break_glass_access         = var.compliance_level == "maximum"
+    approval_workflow_required = var.environment == "production"
+    session_timeout_minutes    = 30
+    ip_whitelist_required      = contains(["strict", "maximum"], var.compliance_level)
+  }
+}
+
+create "kolumn_classification" "financial_data" {
+  name        = "FINANCIAL_DATA"
+  description = "Financial information requiring regulatory compliance and audit trails"
+
+  requirements = {
+    encryption        = true
+    audit_access      = true
+    restricted_access = true
+    retention_days    = var.data_retention_policy.financial_retention_days
+    compliance_tags   = ["PCI_DSS", "SOX", "GLBA", "BASEL_III"]
+    immutable_logging = true
+  }
+
+  encryption_config = {
+    postgres = {
+      method            = "transparent_data_encryption"
+      algorithm         = "AES-256"
+      key_rotation_days = 90
+      backup_encryption = true
+    }
+    snowflake = {
+      method                     = "column_level_security"
+      classification_tag         = "FINANCIAL"
+      data_classification_policy = "FINANCIAL_DATA_POLICY"
+    }
+    kafka = {
+      method              = "field_level_encryption"
+      algorithm           = "AES-256-GCM"
+      producer_encryption = true
+      consumer_decryption = true
+    }
+    mongodb = {
+      method       = "field_level_encryption"
+      key_alt_name = "financial_data_master_key"
+      algorithm    = "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic" # Deterministic for analytics
+    }
+    s3 = {
+      method     = "server_side_encryption_kms"
+      kms_key_id = "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:key/financial-data-key"
+    }
+  }
+}
+
+create "kolumn_classification" "business_confidential" {
+  name        = "BUSINESS_CONFIDENTIAL"
+  description = "Business confidential information with controlled access"
+
+  requirements = {
+    encryption      = var.encryption_level != "basic"
+    audit_access    = true
+    retention_days  = var.data_retention_policy.general_retention_days
+    compliance_tags = ["INTERNAL_USE_ONLY"]
+  }
+
+  encryption_config = {
+    postgres = {
+      method = contains(["high", "maximum"], var.encryption_level) ? "column_encryption" : "transport_encryption"
+    }
+    snowflake = {
+      method            = "role_based_access_control"
+      tag_based_masking = var.encryption_level == "high"
+    }
+    kafka = {
+      method      = "transport_encryption"
+      ssl_enabled = true
+    }
+    mongodb = {
+      method = contains(["high", "maximum"], var.encryption_level) ? "field_level_encryption" : "transport_encryption"
+    }
+  }
+}
+
+create "kolumn_classification" "public_data" {
+  name        = "PUBLIC_DATA"
+  description = "Public or anonymized data safe for general access"
+
+  requirements = {
+    encryption     = false
+    audit_access   = false
+    retention_days = 365
+  }
+}
+
+# === UNIVERSAL DATA OBJECTS WITH GOVERNANCE ===
+
+create "kolumn_data_object" "customer_profile" {
+  name        = "customer_profile"
+  description = "Comprehensive customer profile with multi-tier data classification"
+
+  column "customer_id" {
+    type            = "UUID"
+    primary_key     = true
+    classifications = [kolumn_classification.public_data]
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
+
+  column "phone_number" {
+    type            = "VARCHAR(20)"
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
+
+  column "full_name" {
+    type            = "VARCHAR(200)"
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
+
+  column "date_of_birth" {
+    type            = "DATE"
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
+
+  column "social_security_number" {
+    type            = "VARCHAR(11)"
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
+
+  column "address" {
+    type            = "TEXT"
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
+
+  column "credit_score" {
+    type            = "INTEGER"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "account_balance" {
+    type            = "DECIMAL(15,2)"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "customer_segment" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.business_confidential]
+  }
+
+  column "marketing_preferences" {
+    type            = "JSONB"
+    classifications = [kolumn_classification.business_confidential]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    classifications = [kolumn_classification.public_data]
+  }
+
+  # Governance metadata
+  governance_config = {
+    data_owner              = "customer_experience_team"
+    data_steward            = "chief_data_officer"
+    business_glossary_terms = ["customer", "profile", "identity"]
+    data_lineage_tracking   = true
+    quality_metrics         = ["completeness", "accuracy", "consistency"]
+  }
+}
+
+create "kolumn_data_object" "financial_transaction" {
+  name        = "financial_transaction"
+  description = "Financial transaction with comprehensive compliance controls"
+
+  column "transaction_id" {
+    type            = "UUID"
+    primary_key     = true
+    classifications = [kolumn_classification.business_confidential]
+  }
+
+  column "customer_id" {
+    type            = "UUID"
+    classifications = [kolumn_classification.business_confidential]
+  }
+
+  column "account_number" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "transaction_amount" {
+    type            = "DECIMAL(15,2)"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "currency" {
+    type            = "CHAR(3)"
+    classifications = [kolumn_classification.public_data]
+  }
+
+  column "payment_method" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "merchant_id" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.business_confidential]
+  }
+
+  column "transaction_type" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.business_confidential]
+  }
+
+  column "fraud_score" {
+    type            = "DECIMAL(3,2)"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "risk_category" {
+    type            = "VARCHAR(20)"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "regulatory_flags" {
+    type            = "JSONB"
+    classifications = [kolumn_classification.financial_data]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    classifications = [kolumn_classification.business_confidential]
+  }
+
+  # Financial-specific governance
+  governance_config = {
+    data_owner              = "finance_team"
+    data_steward            = "chief_financial_officer"
+    business_glossary_terms = ["transaction", "payment", "financial"]
+    regulatory_compliance   = ["PCI_DSS", "SOX", "AML"]
+    immutable_audit_trail   = true
+    retention_policy        = "regulatory_financial"
+  }
+}
+
+# === ROLE-BASED ACCESS CONTROL (RBAC) ===
+
+create "kolumn_permission" "data_scientist_masked_access" {
+  name = "data_scientist_masked_pii_access"
+
+  actions = {
+    select = true
+    insert = false
+    update = false
+    delete = false
+    export = false
+  }
+
+  applies_to_classifications = [kolumn_classification.highly_sensitive_pii]
+
+  transformations = {
+    type = "masking"
+    provider_functions = {
+      postgres  = "hash_pii(${column_name})"
+      snowflake = "MASK(${column_name}, '*', 4, 2)" # Show first 4 and last 2 chars
+      mongodb   = "{ $redact: { $cond: { if: { $eq: ['$$classification', 'HIGHLY_SENSITIVE_PII'] }, then: { $literal: '[MASKED]' }, else: '$$DESCEND' } } }"
+      kafka     = "PII_HASH_INTERCEPTOR"
+    }
+  }
+
+  conditions = {
+    time_based_access = {
+      allowed_hours      = "09:00-17:00"
+      timezone           = "UTC"
+      business_days_only = true
+    }
+
+    location_restrictions = var.compliance_level == "maximum" ? {
+      allowed_countries = ["US", "CA", "UK"]
+      vpn_required      = true
+    } : null
+  }
+}
+
+create "kolumn_permission" "financial_analyst_full_access" {
+  name = "financial_analyst_full_financial_data"
+
+  actions = {
+    select    = true
+    insert    = false
+    update    = false
+    delete    = false
+    export    = true
+    aggregate = true
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.financial_data,
+    kolumn_classification.business_confidential
+  ]
+
+  # No transformations - full access to financial data
+
+  conditions = {
+    session_recording            = contains(["strict", "maximum"], var.compliance_level)
+    approval_required_for_export = var.environment == "production"
+
+    audit_enhanced = {
+      log_query_text          = true
+      log_result_counts       = true
+      log_export_destinations = true
+    }
+  }
+}
+
+create "kolumn_permission" "data_engineer_admin_access" {
+  name = "data_engineer_administrative_access"
+
+  actions = {
+    select            = true
+    insert            = true
+    update            = true
+    delete            = false # Even admins cannot delete in production
+    create_table      = true
+    drop_table        = var.environment != "production"
+    grant_permissions = false # Separate role for permission management
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.public_data,
+    kolumn_classification.business_confidential
+  ]
+
+  conditions = {
+    mfa_required = var.environment == "production"
+    approval_workflow = var.compliance_level == "maximum" ? {
+      required_approvers     = 2
+      approval_timeout_hours = 24
+    } : null
+  }
+}
+
+create "kolumn_permission" "compliance_officer_audit_access" {
+  name = "compliance_officer_audit_access"
+
+  actions = {
+    select           = true
+    insert           = false
+    update           = false
+    delete           = false
+    audit_log_access = true
+    policy_review    = true
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.highly_sensitive_pii,
+    kolumn_classification.financial_data,
+    kolumn_classification.business_confidential
+  ]
+
+  transformations = {
+    type = "audit_view" # Special view for compliance purposes
+    provider_functions = {
+      postgres  = "audit_safe_view(${column_name})"
+      snowflake = "AUDIT_SUMMARY(${column_name})"
+    }
+  }
+
+  conditions = {
+    purpose_limitation = {
+      allowed_purposes             = ["audit", "compliance_review", "risk_assessment"]
+      purpose_declaration_required = true
+    }
+  }
+}
+
+# === UNIVERSAL ROLES ===
+
+create "kolumn_role" "data_scientist" {
+  name        = "data_scientist"
+  description = "Data scientists with masked access to sensitive data for analytics"
+
+  permissions = [
+    kolumn_permission.data_scientist_masked_access
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 15
+    query_timeout_minutes  = 60
+    max_result_rows        = 1000000
+    export_allowed         = false
+    ml_model_access        = var.feature_flags.enable_machine_learning
+  }
+
+  assignment_rules = {
+    department         = ["data_science", "analytics"]
+    job_title_contains = ["data scientist", "analyst", "researcher"]
+    clearance_level    = "standard"
+  }
+}
+
+create "kolumn_role" "senior_data_scientist" {
+  name        = "senior_data_scientist"
+  description = "Senior data scientists with broader access and export capabilities"
+
+  permissions = [
+    kolumn_permission.data_scientist_masked_access,
+    kolumn_permission.financial_analyst_full_access
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 25
+    query_timeout_minutes  = 120
+    max_result_rows        = 5000000
+    export_allowed         = true
+    export_size_limit_mb   = 100
+    ml_model_deployment    = var.feature_flags.enable_machine_learning
+  }
+
+  assignment_rules = {
+    department           = ["data_science", "analytics"]
+    job_title_contains   = ["senior data scientist", "lead analyst", "principal"]
+    experience_years_min = 3
+    clearance_level      = "high"
+  }
+}
+
+create "kolumn_role" "financial_analyst" {
+  name        = "financial_analyst"
+  description = "Financial analysts with full access to financial data"
+
+  permissions = [
+    kolumn_permission.financial_analyst_full_access
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 10
+    query_timeout_minutes  = 90
+    max_result_rows        = 2000000
+    export_allowed         = true
+    financial_reporting    = true
+    regulatory_reporting   = contains(["strict", "maximum"], var.compliance_level)
+  }
+
+  assignment_rules = {
+    department       = ["finance", "treasury", "risk"]
+    certifications   = ["CPA", "CFA", "FRM"]
+    background_check = "financial_services"
+  }
+}
+
+create "kolumn_role" "data_engineer" {
+  name        = "data_engineer"
+  description = "Data engineers with administrative capabilities for data infrastructure"
+
+  permissions = [
+    kolumn_permission.data_engineer_admin_access
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 50
+    query_timeout_minutes  = 300
+    admin_operations       = true
+    schema_modification    = true
+    pipeline_deployment    = true
+    monitoring_access      = true
+  }
+
+  assignment_rules = {
+    department         = ["engineering", "data_platform"]
+    job_title_contains = ["data engineer", "platform engineer", "devops"]
+    technical_skills   = ["sql", "python", "kafka", "airflow"]
+  }
+}
+
+create "kolumn_role" "compliance_officer" {
+  name        = "compliance_officer"
+  description = "Compliance officers with audit and policy review access"
+
+  permissions = [
+    kolumn_permission.compliance_officer_audit_access
+  ]
+
+  capabilities = {
+    max_concurrent_queries  = 5
+    query_timeout_minutes   = 180
+    audit_log_access        = true
+    policy_management       = true
+    violation_investigation = true
+    regulatory_reporting    = true
+  }
+
+  assignment_rules = {
+    department       = ["compliance", "legal", "risk"]
+    certifications   = ["CISA", "CISM", "privacy_professional"]
+    background_check = "security_clearance"
+  }
+}
+
+# Data sources for AWS information
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+# === MODULE OUTPUTS ===
+
+output "data_classifications" {
+  description = "Universal data classifications with encryption and compliance requirements"
+  value = {
+    highly_sensitive_pii = {
+      name                = kolumn_classification.highly_sensitive_pii.name
+      encryption_required = kolumn_classification.highly_sensitive_pii.requirements.encryption
+      compliance_tags     = kolumn_classification.highly_sensitive_pii.requirements.compliance_tags
+      retention_days      = kolumn_classification.highly_sensitive_pii.requirements.retention_days
+    }
+    financial_data = {
+      name                = kolumn_classification.financial_data.name
+      encryption_required = kolumn_classification.financial_data.requirements.encryption
+      compliance_tags     = kolumn_classification.financial_data.requirements.compliance_tags
+      immutable_logging   = kolumn_classification.financial_data.requirements.immutable_logging
+    }
+    business_confidential = {
+      name             = kolumn_classification.business_confidential.name
+      encryption_level = var.encryption_level
+      retention_days   = kolumn_classification.business_confidential.requirements.retention_days
+    }
+    public_data = {
+      name                = kolumn_classification.public_data.name
+      encryption_required = kolumn_classification.public_data.requirements.encryption
+    }
+  }
+}
+
+output "universal_data_objects" {
+  description = "Universal data objects with governance controls"
+  value = {
+    customer_profile = {
+      name             = kolumn_data_object.customer_profile.name
+      column_count     = length(kolumn_data_object.customer_profile.columns)
+      governance_owner = kolumn_data_object.customer_profile.governance_config.data_owner
+      lineage_tracking = kolumn_data_object.customer_profile.governance_config.data_lineage_tracking
+    }
+    financial_transaction = {
+      name                    = kolumn_data_object.financial_transaction.name
+      column_count            = length(kolumn_data_object.financial_transaction.columns)
+      compliance_requirements = kolumn_data_object.financial_transaction.governance_config.regulatory_compliance
+      immutable_audit         = kolumn_data_object.financial_transaction.governance_config.immutable_audit_trail
+    }
+  }
+}
+
+output "rbac_roles" {
+  description = "Role-based access control configuration"
+  value = {
+    data_scientist = {
+      name           = kolumn_role.data_scientist.name
+      description    = kolumn_role.data_scientist.description
+      max_queries    = kolumn_role.data_scientist.capabilities.max_concurrent_queries
+      export_allowed = kolumn_role.data_scientist.capabilities.export_allowed
+    }
+    senior_data_scientist = {
+      name            = kolumn_role.senior_data_scientist.name
+      enhanced_access = true
+      ml_deployment   = kolumn_role.senior_data_scientist.capabilities.ml_model_deployment
+    }
+    financial_analyst = {
+      name                 = kolumn_role.financial_analyst.name
+      financial_reporting  = kolumn_role.financial_analyst.capabilities.financial_reporting
+      regulatory_reporting = kolumn_role.financial_analyst.capabilities.regulatory_reporting
+    }
+    data_engineer = {
+      name                = kolumn_role.data_engineer.name
+      admin_operations    = kolumn_role.data_engineer.capabilities.admin_operations
+      schema_modification = kolumn_role.data_engineer.capabilities.schema_modification
+    }
+    compliance_officer = {
+      name              = kolumn_role.compliance_officer.name
+      audit_access      = kolumn_role.compliance_officer.capabilities.audit_log_access
+      policy_management = kolumn_role.compliance_officer.capabilities.policy_management
+    }
+  }
+}
+
+output "governance_policies" {
+  description = "Data governance policies and compliance configuration"
+  value = {
+    compliance_level      = var.compliance_level
+    encryption_level      = var.encryption_level
+    data_retention_policy = var.data_retention_policy
+
+    policy_enforcement = {
+      break_glass_access = kolumn_classification.highly_sensitive_pii.access_controls.break_glass_access
+      approval_workflows = var.environment == "production"
+      session_recording  = contains(["strict", "maximum"], var.compliance_level)
+    }
+
+    audit_configuration = {
+      enhanced_logging   = var.compliance_level != "basic"
+      query_text_logging = contains(["strict", "maximum"], var.compliance_level)
+      result_auditing    = var.environment == "production"
+    }
+  }
+}

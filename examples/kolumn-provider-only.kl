@@ -1,0 +1,1053 @@
+# =============================================================================
+# KOLUMN PROVIDER RESOURCES - COMPLETE EXAMPLE
+# =============================================================================
+# This example demonstrates ALL resources provided by the Kolumn provider
+# (this repository) without any external provider dependencies.
+#
+# This showcases the universal data governance layer that coordinates
+# across all external providers in the Kolumn ecosystem.
+#
+# Resources Demonstrated:
+# - kolumn_data_object: Universal schema definitions
+# - kolumn_classification: Security classifications with encryption
+# - kolumn_role: RBAC roles with capabilities  
+# - kolumn_permission: Granular permissions with transformations
+# - kolumn_file: File discovery with bidirectional processing
+#
+# NOTE: External providers (postgres, kafka, s3, etc.) are in separate
+# repositories and consume these governance resources for unified security.
+# =============================================================================
+
+# =============================================================================
+# DATA CLASSIFICATIONS: SECURITY AND COMPLIANCE FOUNDATION
+# =============================================================================
+
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+
+  requirements = {
+    encryption        = true
+    audit_access      = true
+    masking           = true
+    retention_days    = 2555 # 7 years for compliance
+    deletion_required = true
+  }
+
+  # Provider-specific encryption configurations
+  encryption_config = {
+    postgres = {
+      method            = "column_encryption"
+      algorithm         = "AES-256-GCM"
+      key_rotation_days = 90
+    }
+    kafka = {
+      method            = "field_level"
+      algorithm         = "AES-256-CTR"
+      key_rotation_days = 30
+    }
+    s3 = {
+      method     = "sse_kms"
+      kms_key_id = "alias/pii-encryption"
+    }
+    dynamodb = {
+      method     = "client_side_encryption"
+      algorithm  = "AES-256-GCM"
+      kms_key_id = "alias/dynamodb-pii"
+    }
+  }
+}
+
+create "kolumn_classification" "financial" {
+  name        = "FINANCIAL"
+  description = "Financial transaction and payment data"
+
+  requirements = {
+    encryption          = true
+    audit_access        = true
+    immutable           = true
+    hsm_required        = true
+    compliance_required = ["PCI_DSS", "SOX"]
+  }
+
+  encryption_config = {
+    postgres = {
+      method          = "transparent_data_encryption"
+      algorithm       = "AES-256-GCM"
+      hsm_integration = true
+    }
+    kafka = {
+      method          = "envelope_encryption"
+      algorithm       = "ChaCha20-Poly1305"
+      hsm_integration = true
+    }
+    s3 = {
+      method     = "sse_kms"
+      kms_key_id = "alias/financial-data"
+    }
+  }
+}
+
+create "kolumn_classification" "analytics" {
+  name        = "ANALYTICS"
+  description = "High-volume analytics data optimized for performance"
+
+  requirements = {
+    encryption      = false # Performance optimization for real-time analytics
+    audit_access    = false
+    retention_days  = 365
+    high_throughput = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "PUBLIC"
+  description = "Public information with no restrictions"
+
+  requirements = {
+    encryption   = false
+    audit_access = false
+  }
+}
+
+create "kolumn_classification" "internal" {
+  name        = "INTERNAL"
+  description = "Internal business data with basic protections"
+
+  requirements = {
+    encryption     = true
+    audit_access   = true
+    retention_days = 1095 # 3 years
+  }
+}
+
+# =============================================================================
+# UNIVERSAL DATA OBJECTS: SCHEMA DEFINITIONS
+# =============================================================================
+
+create "kolumn_data_object" "customer" {
+  name        = "Customer Master Data"
+  description = "Universal customer schema for all providers"
+  version     = "2.1.0"
+
+  column "id" {
+    type            = "BIGINT"
+    primary_key     = true
+    auto_increment  = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    unique          = true
+    nullable        = false
+    classifications = [kolumn_classification.pii]
+    validation = {
+      format     = "email"
+      required   = true
+      max_length = 255
+    }
+  }
+
+  column "first_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.pii]
+    validation = {
+      required   = true
+      min_length = 1
+      max_length = 100
+    }
+  }
+
+  column "last_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "phone" {
+    type            = "VARCHAR(20)"
+    nullable        = true
+    classifications = [kolumn_classification.pii]
+    validation = {
+      pattern = "^\\+?[1-9]\\d{1,14}$" # E.164 format
+    }
+  }
+
+  column "date_of_birth" {
+    type            = "DATE"
+    nullable        = true
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "account_status" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    default         = "active"
+    classifications = [kolumn_classification.internal]
+    validation = {
+      enum = ["active", "suspended", "closed", "pending_verification"]
+    }
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMPTZ"
+    nullable        = false
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "updated_at" {
+    type            = "TIMESTAMPTZ"
+    nullable        = false
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  # Cross-provider configuration hints
+  config = {
+    postgres = {
+      schema           = "customers"
+      table_name       = "customer_profiles"
+      partition_column = "created_at"
+      partition_type   = "monthly"
+    }
+    kafka = {
+      topic         = "customer-events"
+      partitions    = 12
+      key_field     = "id"
+      schema_format = "avro"
+    }
+    dynamodb = {
+      table_name    = "customer-profiles"
+      partition_key = "id"
+      sort_key      = "email"
+      ttl_attribute = "expires_at"
+    }
+  }
+
+  # Business metadata
+  metadata = {
+    owner              = "customer-data-team"
+    steward            = "data-governance@company.com"
+    business_glossary  = "customer-360-view"
+    lineage_tags       = ["source_system", "golden_record"]
+    quality_score      = 0.95
+    completeness_score = 0.87
+  }
+}
+
+create "kolumn_data_object" "transaction" {
+  name        = "Financial Transaction"
+  description = "Universal transaction schema with financial compliance"
+  version     = "1.3.0"
+
+  column "id" {
+    type            = "BIGINT"
+    primary_key     = true
+    auto_increment  = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "customer_id" {
+    type            = "BIGINT"
+    nullable        = false
+    foreign_key     = "customer.id"
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "amount" {
+    type            = "DECIMAL(15,2)"
+    nullable        = false
+    classifications = [kolumn_classification.financial]
+    validation = {
+      min_value = 0.01
+      max_value = 1000000.00
+      precision = 2
+    }
+  }
+
+  column "currency" {
+    type            = "CHAR(3)"
+    nullable        = false
+    default         = "USD"
+    classifications = [kolumn_classification.financial]
+    validation = {
+      enum = ["USD", "EUR", "GBP", "CAD", "JPY", "AUD"]
+    }
+  }
+
+  column "transaction_type" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    classifications = [kolumn_classification.financial]
+    validation = {
+      enum = ["purchase", "refund", "fee", "interest", "dividend", "transfer"]
+    }
+  }
+
+  column "payment_method" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.financial, kolumn_classification.pii]
+    validation = {
+      enum = ["credit_card", "debit_card", "bank_transfer", "paypal", "apple_pay", "google_pay"]
+    }
+  }
+
+  column "merchant_id" {
+    type            = "VARCHAR(100)"
+    nullable        = true
+    classifications = [kolumn_classification.internal]
+  }
+
+  column "status" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    default         = "pending"
+    classifications = [kolumn_classification.financial]
+    validation = {
+      enum = ["pending", "processing", "completed", "failed", "refunded", "disputed"]
+    }
+  }
+
+  column "processed_at" {
+    type            = "TIMESTAMPTZ"
+    nullable        = false
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "metadata" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.internal]
+  }
+
+  config = {
+    postgres = {
+      schema         = "finance"
+      table_name     = "transactions"
+      partition_type = "daily" # High volume, daily partitioning
+    }
+    kafka = {
+      topic        = "transaction-events"
+      partitions   = 24
+      retention_ms = 2592000000 # 30 days
+    }
+  }
+
+  metadata = {
+    owner            = "finance-data-team"
+    compliance       = ["PCI_DSS", "SOX", "GDPR"]
+    audit_required   = true
+    immutable_after  = "24h"
+    retention_policy = "7_years"
+  }
+}
+
+create "kolumn_data_object" "user_activity" {
+  name        = "User Activity Events"
+  description = "High-volume user interaction analytics"
+  version     = "1.0.5"
+
+  column "event_id" {
+    type            = "UUID"
+    primary_key     = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "user_id" {
+    type            = "BIGINT"
+    nullable        = true # Anonymous events allowed
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "session_id" {
+    type            = "UUID"
+    nullable        = false
+    classifications = [kolumn_classification.analytics]
+  }
+
+  column "event_type" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    classifications = [kolumn_classification.analytics]
+    validation = {
+      enum = ["page_view", "click", "search", "purchase", "login", "logout", "error"]
+    }
+  }
+
+  column "page_url" {
+    type            = "TEXT"
+    nullable        = true
+    classifications = [kolumn_classification.analytics]
+  }
+
+  column "user_agent" {
+    type            = "TEXT"
+    nullable        = true
+    classifications = [kolumn_classification.analytics]
+  }
+
+  column "ip_address" {
+    type            = "INET"
+    nullable        = true
+    classifications = [kolumn_classification.pii] # Can be PII in some jurisdictions
+  }
+
+  column "properties" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.analytics]
+  }
+
+  column "timestamp" {
+    type            = "TIMESTAMPTZ"
+    nullable        = false
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  config = {
+    postgres = {
+      schema         = "analytics"
+      table_name     = "user_events"
+      partition_type = "daily"
+      compression    = "lz4"
+    }
+    kafka = {
+      topic        = "user-activity"
+      partitions   = 48        # Very high throughput
+      retention_ms = 604800000 # 7 days
+      compression  = "snappy"
+    }
+  }
+
+  metadata = {
+    owner            = "analytics-team"
+    volume_estimate  = "10M_events_per_day"
+    retention_policy = "90_days"
+    privacy_impact   = "low"
+  }
+}
+
+# =============================================================================
+# RBAC SYSTEM: ROLES AND PERMISSIONS
+# =============================================================================
+
+create "kolumn_role" "data_administrator" {
+  name        = "Data Administrator"
+  description = "Full administrative access to all data resources"
+
+  permissions = [
+    kolumn_permission.full_data_access,
+    kolumn_permission.schema_management,
+    kolumn_permission.user_management,
+    kolumn_permission.audit_access
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 50
+    can_export_data        = true
+    can_modify_schema      = true
+    can_manage_permissions = true
+    can_access_audit_logs  = true
+    session_timeout        = "8h"
+  }
+}
+
+create "kolumn_role" "data_analyst" {
+  name        = "Data Analyst"
+  description = "Analytics access with PII restrictions"
+
+  permissions = [
+    kolumn_permission.analytics_read_only,
+    kolumn_permission.aggregated_data_access,
+    kolumn_permission.report_generation
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 20
+    can_export_data        = true
+    can_create_reports     = true
+    can_schedule_queries   = true
+    session_timeout        = "12h"
+  }
+}
+
+create "kolumn_role" "customer_service" {
+  name        = "Customer Service Representative"
+  description = "Customer support with masked PII access"
+
+  permissions = [
+    kolumn_permission.customer_masked_access,
+    kolumn_permission.transaction_read_only,
+    kolumn_permission.support_tools_access
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 5
+    can_export_data        = false
+    can_view_pii           = "masked_only"
+    session_timeout        = "4h"
+  }
+}
+
+create "kolumn_role" "finance_auditor" {
+  name        = "Finance Auditor"
+  description = "Financial data auditing and compliance access"
+
+  permissions = [
+    kolumn_permission.financial_audit_access,
+    kolumn_permission.compliance_reporting,
+    kolumn_permission.transaction_history_full
+  ]
+
+  capabilities = {
+    max_concurrent_queries   = 10
+    can_export_data          = true
+    can_access_audit_logs    = true
+    export_approval_required = true
+    session_timeout          = "6h"
+  }
+}
+
+create "kolumn_role" "application_service" {
+  name        = "Application Service Account"
+  description = "Programmatic access for applications"
+
+  permissions = [
+    kolumn_permission.api_data_access,
+    kolumn_permission.batch_processing,
+    kolumn_permission.event_streaming
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 100
+    rate_limit_per_second  = 1000
+    can_bulk_export        = true
+    api_key_rotation       = "quarterly"
+  }
+}
+
+# =============================================================================
+# GRANULAR PERMISSIONS WITH PROVIDER TRANSFORMATIONS
+# =============================================================================
+
+create "kolumn_permission" "full_data_access" {
+  name = "Full Data Access"
+
+  actions = {
+    select = true
+    insert = true
+    update = true
+    delete = true
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.public,
+    kolumn_classification.internal,
+    kolumn_classification.pii,
+    kolumn_classification.financial,
+    kolumn_classification.analytics
+  ]
+
+  # No transformations - full access
+}
+
+create "kolumn_permission" "customer_masked_access" {
+  name = "Customer Data with PII Masking"
+
+  actions = {
+    select = true
+    update = true # Can update non-PII fields
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.pii,
+    kolumn_classification.internal,
+    kolumn_classification.public
+  ]
+
+  transformations = {
+    type = "masking"
+    provider_functions = {
+      postgres = {
+        email      = "LEFT(email, 3) || '*****@' || SUBSTRING(email FROM POSITION('@' IN email) + 1)"
+        phone      = "'***-***-' || RIGHT(phone, 4)"
+        first_name = "LEFT(first_name, 1) || REPEAT('*', LENGTH(first_name) - 1)"
+        last_name  = "LEFT(last_name, 1) || REPEAT('*', LENGTH(last_name) - 1)"
+      }
+      kafka = {
+        filter_interceptor = "PII_MASKING_INTERCEPTOR"
+        mask_fields        = ["email", "phone", "first_name", "last_name"]
+      }
+      s3 = {
+        redaction_policy = "customer_pii_redaction"
+        mask_pattern     = "***"
+      }
+    }
+  }
+}
+
+create "kolumn_permission" "analytics_read_only" {
+  name = "Analytics Data Read Access"
+
+  actions = {
+    select = true
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.analytics,
+    kolumn_classification.public
+  ]
+
+  transformations = {
+    type = "aggregation_required"
+    provider_functions = {
+      postgres = {
+        require_group_by = true
+        min_group_size   = 100
+        time_window      = "1 hour"
+      }
+      kafka = {
+        windowing_required = true
+        min_window_size    = "5m"
+      }
+    }
+  }
+}
+
+create "kolumn_permission" "financial_audit_access" {
+  name = "Financial Audit Access"
+
+  actions = {
+    select = true
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.financial,
+    kolumn_classification.public
+  ]
+
+  transformations = {
+    type = "audit_logging"
+    provider_functions = {
+      postgres = {
+        log_all_queries = true
+        include_results = false # Log query but not sensitive results
+        alert_threshold = 1000  # Alert if >1000 rows accessed
+      }
+      kafka = {
+        audit_consumer = "financial_audit_log"
+        include_offset = true
+      }
+    }
+  }
+}
+
+create "kolumn_permission" "api_data_access" {
+  name = "API Service Data Access"
+
+  actions = {
+    select = true
+    insert = true
+    update = true
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.public,
+    kolumn_classification.internal,
+    kolumn_classification.analytics
+  ]
+
+  transformations = {
+    type = "rate_limiting"
+    provider_functions = {
+      postgres = {
+        max_queries_per_minute = 1000
+        max_rows_per_query     = 10000
+        connection_pooling     = true
+      }
+      kafka = {
+        max_throughput_mbps = 100
+        batch_size_limit    = 1000
+      }
+    }
+  }
+}
+
+# =============================================================================
+# FILE DISCOVERY SYSTEM
+# =============================================================================
+
+discover "kolumn_file" "customer_analytics_sql" {
+  location = "./sql/customer_analytics.sql"
+
+  inputs = {
+    # Data object references for type safety
+    customer_schema = kolumn_data_object.customer.columns
+    customer_config = kolumn_data_object.customer.config.postgres
+
+    # Environment-specific parameters
+    schema_name      = "analytics"
+    analysis_period  = "30 days"
+    min_transactions = 5
+
+    # Business logic parameters
+    segmentation = {
+      high_value   = 10000.00
+      medium_value = 1000.00
+      low_value    = 100.00
+    }
+
+    # Governance parameters
+    mask_pii     = true
+    audit_access = true
+  }
+
+  # Bidirectional processing configuration
+  extractor_config = {
+    tables       = "true" # Extract table definitions
+    views        = "true" # Extract view definitions
+    functions    = "true" # Extract function definitions
+    dependencies = "true" # Extract dependency relationships
+  }
+}
+
+discover "kolumn_file" "transaction_pipeline_python" {
+  location = "./python/transaction_pipeline.py"
+
+  inputs = {
+    # Data object schemas
+    transaction_schema = kolumn_data_object.transaction.columns
+    customer_schema    = kolumn_data_object.customer.columns
+
+    # Processing configuration
+    batch_size      = 10000
+    retry_attempts  = 3
+    timeout_seconds = 300
+
+    # Data quality thresholds
+    quality_checks = {
+      completeness_threshold = 0.95
+      accuracy_threshold     = 0.98
+      timeliness_hours       = 2
+    }
+
+    # Governance integration
+    classifications = {
+      financial = kolumn_classification.financial.requirements
+      pii       = kolumn_classification.pii.requirements
+    }
+  }
+
+  extractor_config = {
+    functions = "true"
+    classes   = "true"
+    imports   = "true"
+    dag       = "true"
+    pipelines = "true"
+  }
+}
+
+discover "kolumn_file" "api_configuration_yaml" {
+  location = "./config/api-config.yaml"
+
+  inputs = {
+    # Environment configuration
+    environment = "production"
+    region      = "us-west-2"
+
+    # Data access configuration from data objects
+    customer_table_config   = kolumn_data_object.customer.config
+    transaction_permissions = kolumn_permission.api_data_access
+
+    # Security configuration from classifications
+    encryption_config = {
+      pii_encryption       = kolumn_classification.pii.encryption_config
+      financial_encryption = kolumn_classification.financial.encryption_config
+    }
+
+    # RBAC configuration
+    service_role = kolumn_role.application_service.capabilities
+
+    # Rate limiting
+    rate_limits = {
+      requests_per_minute = 10000
+      burst_capacity      = 50000
+      throttling_enabled  = true
+    }
+  }
+}
+
+discover "kolumn_file" "monitoring_dashboard_json" {
+  location = "./dashboards/data_governance_dashboard.json"
+
+  inputs = {
+    # Governance metrics from all data objects
+    data_objects = [
+      {
+        name    = kolumn_data_object.customer.name
+        version = kolumn_data_object.customer.version
+        metrics = kolumn_data_object.customer.metadata
+      },
+      {
+        name    = kolumn_data_object.transaction.name
+        version = kolumn_data_object.transaction.version
+        metrics = kolumn_data_object.transaction.metadata
+      },
+      {
+        name    = kolumn_data_object.user_activity.name
+        version = kolumn_data_object.user_activity.version
+        metrics = kolumn_data_object.user_activity.metadata
+      }
+    ]
+
+    # Classification monitoring
+    classifications = [
+      kolumn_classification.pii.name,
+      kolumn_classification.financial.name,
+      kolumn_classification.analytics.name
+    ]
+
+    # RBAC monitoring  
+    roles = [
+      kolumn_role.data_administrator.name,
+      kolumn_role.data_analyst.name,
+      kolumn_role.customer_service.name,
+      kolumn_role.finance_auditor.name
+    ]
+  }
+
+  extractor_config = {
+    widgets    = "true"
+    queries    = "true"
+    alerts     = "true"
+    thresholds = "true"
+  }
+}
+
+# =============================================================================
+# OUTPUTS: DEMONSTRATE GOVERNANCE CAPABILITIES
+# =============================================================================
+
+output "governance_summary" {
+  description = "Complete data governance configuration"
+  value = {
+    # Classification system
+    classifications = {
+      total_count = 5
+      details = [
+        {
+          name      = kolumn_classification.pii.name
+          encrypted = kolumn_classification.pii.requirements.encryption
+          audited   = kolumn_classification.pii.requirements.audit_access
+          retention = kolumn_classification.pii.requirements.retention_days
+        },
+        {
+          name         = kolumn_classification.financial.name
+          encrypted    = kolumn_classification.financial.requirements.encryption
+          hsm_required = kolumn_classification.financial.requirements.hsm_required
+          immutable    = kolumn_classification.financial.requirements.immutable
+        },
+        {
+          name            = kolumn_classification.analytics.name
+          high_throughput = kolumn_classification.analytics.requirements.high_throughput
+          retention       = kolumn_classification.analytics.requirements.retention_days
+        }
+      ]
+    }
+
+    # Data object registry
+    data_objects = {
+      total_count = 3
+      details = [
+        {
+          name         = kolumn_data_object.customer.name
+          version      = kolumn_data_object.customer.version
+          column_count = 9
+          owner        = kolumn_data_object.customer.metadata.owner
+        },
+        {
+          name         = kolumn_data_object.transaction.name
+          version      = kolumn_data_object.transaction.version
+          column_count = 9
+          compliance   = kolumn_data_object.transaction.metadata.compliance
+        },
+        {
+          name         = kolumn_data_object.user_activity.name
+          version      = kolumn_data_object.user_activity.version
+          column_count = 8
+          volume       = kolumn_data_object.user_activity.metadata.volume_estimate
+        }
+      ]
+    }
+
+    # RBAC system
+    rbac_system = {
+      roles_count       = 5
+      permissions_count = 4
+
+      role_summary = [
+        {
+          name             = kolumn_role.data_administrator.name
+          permission_count = length(kolumn_role.data_administrator.permissions)
+          max_queries      = kolumn_role.data_administrator.capabilities.max_concurrent_queries
+        },
+        {
+          name             = kolumn_role.data_analyst.name
+          permission_count = length(kolumn_role.data_analyst.permissions)
+          can_export       = kolumn_role.data_analyst.capabilities.can_export_data
+        },
+        {
+          name             = kolumn_role.customer_service.name
+          permission_count = length(kolumn_role.customer_service.permissions)
+          session_timeout  = kolumn_role.customer_service.capabilities.session_timeout
+        }
+      ]
+    }
+
+    # File discovery system
+    file_discovery = {
+      total_files = 4
+      file_types  = ["sql", "python", "yaml", "json"]
+
+      discovery_summary = [
+        {
+          name         = "customer_analytics_sql"
+          file_type    = "sql"
+          has_extracts = true
+        },
+        {
+          name         = "transaction_pipeline_python"
+          file_type    = "python"
+          has_extracts = true
+        },
+        {
+          name      = "api_configuration_yaml"
+          file_type = "yaml"
+        },
+        {
+          name         = "monitoring_dashboard_json"
+          file_type    = "json"
+          has_extracts = true
+        }
+      ]
+    }
+  }
+}
+
+output "cross_provider_integration" {
+  description = "How Kolumn governance integrates with external providers"
+  value = {
+    supported_providers = [
+      {
+        name = "PostgreSQL"
+        capabilities = [
+          "column_encryption",
+          "transparent_data_encryption",
+          "row_level_security",
+          "audit_logging"
+        ]
+        data_objects_supported = [
+          kolumn_data_object.customer.name,
+          kolumn_data_object.transaction.name,
+          kolumn_data_object.user_activity.name
+        ]
+      },
+      {
+        name = "Apache Kafka"
+        capabilities = [
+          "field_level_encryption",
+          "envelope_encryption",
+          "schema_registry_integration",
+          "consumer_interceptors"
+        ]
+        data_objects_supported = [
+          kolumn_data_object.customer.name,
+          kolumn_data_object.transaction.name,
+          kolumn_data_object.user_activity.name
+        ]
+      },
+      {
+        name = "Amazon S3"
+        capabilities = [
+          "sse_kms_encryption",
+          "bucket_policies",
+          "access_logging",
+          "lifecycle_management"
+        ]
+        data_objects_supported = [
+          kolumn_data_object.customer.name,
+          kolumn_data_object.transaction.name
+        ]
+      },
+      {
+        name = "Amazon DynamoDB"
+        capabilities = [
+          "client_side_encryption",
+          "point_in_time_recovery",
+          "fine_grained_access_control",
+          "streams_integration"
+        ]
+        data_objects_supported = [
+          kolumn_data_object.customer.name
+        ]
+      }
+    ]
+
+    integration_pattern    = "external_providers_consume_kolumn_governance"
+    governance_propagation = "automatic_via_data_objects_and_classifications"
+  }
+}
+
+output "development_guidance" {
+  description = "Guidance for external provider developers"
+  value = {
+    sdk_information = {
+      repository    = "https://github.com/SchemaBounce/Kolumn-sdk"
+      documentation = "See CLAUDE.md for comprehensive SDK patterns"
+
+      development_options = [
+        {
+          approach = "Simple 4-Method SDK"
+          methods  = ["Configure", "GetSchema", "CallFunction", "Close"]
+          benefits = "70% less code, automatic RPC handling, enterprise safety"
+        },
+        {
+          approach = "Full Terraform Protocol"
+          methods  = 11
+          benefits = "100% Terraform compatibility, <4 hour migration"
+        },
+        {
+          approach = "Hybrid Approach"
+          benefits = "Mix simple and complex patterns as needed"
+        }
+      ]
+    }
+
+    governance_integration = {
+      required_steps = [
+        "Reference kolumn_data_object for schema consistency",
+        "Apply kolumn_classification encryption configs",
+        "Implement kolumn_permission transformations",
+        "Support kolumn_role capabilities"
+      ]
+
+      example_patterns = {
+        postgres = "postgres_table uses kolumn_data_object.columns"
+        kafka    = "kafka_topic uses kolumn_data_object.config.kafka"
+        s3       = "s3_bucket applies kolumn_classification.encryption_config.s3"
+      }
+    }
+
+    testing_approach = {
+      unit_tests        = "SDK provides comprehensive test framework"
+      integration_tests = "Test with mock Kolumn governance layer"
+      compliance_tests  = "Validate classification and permission enforcement"
+    }
+  }
+}

@@ -1,0 +1,261 @@
+# Data Platform - Streaming Data Configuration
+# Real-time data processing and streaming infrastructure
+
+# === KAFKA TOPICS ===
+
+# Customer events stream
+create "kafka_topic" "customer_events" {
+  partitions         = 12
+  replication_factor = 3
+
+  config = {
+    "retention.ms"        = "604800000" # 7 days
+    "cleanup.policy"      = "delete"
+    "compression.type"    = "lz4"
+    "max.message.bytes"   = "1048576" # 1MB
+    "min.insync.replicas" = "2"
+  }
+
+  # Use universal data object schema
+  schema = {
+    key_schema   = "customer_id:UUID"
+    value_schema = kolumn_data_object.customer
+  }
+}
+
+# Transaction events stream  
+create "kafka_topic" "transaction_events" {
+  partitions         = 24
+  replication_factor = 3
+
+  config = {
+    "retention.ms"        = "86400000" # 24 hours
+    "cleanup.policy"      = "delete"
+    "compression.type"    = "snappy"
+    "max.message.bytes"   = "524288" # 512KB
+    "min.insync.replicas" = "2"
+  }
+
+  # Use universal transaction data object
+  schema = {
+    key_schema   = "transaction_id:UUID"
+    value_schema = kolumn_data_object.transaction
+  }
+}
+
+# Audit log stream for compliance
+create "kafka_topic" "audit_logs" {
+  partitions         = 6
+  replication_factor = 3
+
+  config = {
+    "retention.ms"        = "2592000000" # 30 days
+    "cleanup.policy"      = "delete"
+    "compression.type"    = "gzip"
+    "max.message.bytes"   = "262144" # 256KB
+    "min.insync.replicas" = "3"      # Higher durability for audit logs
+  }
+
+  # Audit log schema
+  schema = {
+    key_schema = "event_id:UUID"
+    value_schema = {
+      event_id                = "UUID"
+      user_id                 = "STRING"
+      action                  = "STRING"
+      resource                = "STRING"
+      timestamp               = "TIMESTAMP"
+      ip_address              = "STRING"
+      user_agent              = "STRING"
+      classification_accessed = "ARRAY<STRING>"
+    }
+  }
+}
+
+# === STREAM PROCESSING ===
+
+# Real-time customer data processing
+create "kafka_stream" "customer_enrichment" {
+  input_topics = [kafka_topic.customer_events]
+  output_topic = "enriched_customers"
+
+  processing_config = {
+    application_id       = "customer-enrichment-${var.environment}"
+    processing_guarantee = "exactly_once"
+    num_stream_threads   = 4
+  }
+
+  # Stream processing logic (in actual implementation, this would reference external code)
+  processor_class = "com.dataplatform.CustomerEnrichmentProcessor"
+}
+
+# Transaction fraud detection stream
+create "kafka_stream" "fraud_detection" {
+  input_topics = [kafka_topic.transaction_events]
+  output_topic = "fraud_alerts"
+
+  processing_config = {
+    application_id       = "fraud-detection-${var.environment}"
+    processing_guarantee = "exactly_once"
+    num_stream_threads   = 8
+
+    # Fraud detection specific settings
+    windowing = {
+      type             = "tumbling"
+      duration_minutes = 5
+    }
+  }
+
+  processor_class = "com.dataplatform.FraudDetectionProcessor"
+}
+
+# === KAFKA CONNECT ===
+
+# PostgreSQL source connector
+create "kafka_connector" "postgres_source" {
+  type            = "source"
+  connector_class = "io.debezium.connector.postgresql.PostgresConnector"
+
+  config = {
+    "database.hostname"    = var.postgres_host
+    "database.port"        = var.postgres_port
+    "database.user"        = var.postgres_username
+    "database.password"    = var.postgres_password
+    "database.dbname"      = var.postgres_database
+    "database.server.name" = "data-platform-${var.environment}"
+
+    # CDC configuration
+    "table.include.list" = "public.customers,public.transactions"
+    "plugin.name"        = "pgoutput"
+    "slot.name"          = "kolumn_slot"
+
+    # Output topic configuration
+    "transforms"                   = "route"
+    "transforms.route.type"        = "org.apache.kafka.connect.transforms.RegexRouter"
+    "transforms.route.regex"       = "([^.]+)\\.([^.]+)\\.([^.]+)"
+    "transforms.route.replacement" = "$3_cdc"
+  }
+}
+
+# Snowflake sink connector
+create "kafka_connector" "snowflake_sink" {
+  type            = "sink"
+  connector_class = "com.snowflake.kafka.connector.SnowflakeSinkConnector"
+
+  config = {
+    "snowflake.url.name"      = "https://${var.snowflake_account}.snowflakecomputing.com"
+    "snowflake.user.name"     = var.snowflake_username
+    "snowflake.private.key"   = var.snowflake_password
+    "snowflake.database.name" = var.snowflake_database
+    "snowflake.schema.name"   = "STREAMING"
+
+    # Topic to table mapping
+    "topics" = "enriched_customers,transaction_events,fraud_alerts"
+
+    # Data format
+    "key.converter"                  = "org.apache.kafka.connect.json.JsonConverter"
+    "value.converter"                = "org.apache.kafka.connect.json.JsonConverter"
+    "value.converter.schemas.enable" = "false"
+
+    # Snowflake specific settings
+    "buffer.count.records" = "10000"
+    "buffer.flush.time"    = "60"
+    "buffer.size.bytes"    = "5000000"
+  }
+}
+
+# === SCHEMA REGISTRY ===
+
+# Customer schema registration
+create "schema_registry_subject" "customer_events_value" {
+  subject     = "customer_events-value"
+  schema_type = "AVRO"
+
+  schema = jsonencode({
+    type      = "record"
+    name      = "CustomerEvent"
+    namespace = "com.dataplatform.schemas"
+    fields = [
+      {
+        name        = "customer_id"
+        type        = "string"
+        logicalType = "uuid"
+      },
+      {
+        name = "event_type"
+        type = "string"
+      },
+      {
+        name        = "timestamp"
+        type        = "long"
+        logicalType = "timestamp-millis"
+      },
+      {
+        name = "data"
+        type = "record"
+        fields = [
+          { name = "email", type = ["null", "string"], default = null },
+          { name = "phone", type = ["null", "string"], default = null },
+          { name = "first_name", type = ["null", "string"], default = null },
+          { name = "last_name", type = ["null", "string"], default = null }
+        ]
+      }
+    ]
+  })
+
+  compatibility_level = "BACKWARD"
+}
+
+# Transaction schema registration  
+create "schema_registry_subject" "transaction_events_value" {
+  subject     = "transaction_events-value"
+  schema_type = "AVRO"
+
+  schema = jsonencode({
+    type      = "record"
+    name      = "TransactionEvent"
+    namespace = "com.dataplatform.schemas"
+    fields = [
+      {
+        name        = "transaction_id"
+        type        = "string"
+        logicalType = "uuid"
+      },
+      {
+        name        = "customer_id"
+        type        = "string"
+        logicalType = "uuid"
+      },
+      {
+        name        = "amount"
+        type        = "string"
+        logicalType = "decimal"
+        precision   = 15
+        scale       = 2
+      },
+      {
+        name = "currency"
+        type = "string"
+      },
+      {
+        name = "payment_method"
+        type = "string"
+      },
+      {
+        name = "status"
+        type = {
+          type    = "enum"
+          name    = "TransactionStatus"
+          symbols = ["PENDING", "COMPLETED", "FAILED", "CANCELLED"]
+        }
+      },
+      {
+        name        = "timestamp"
+        type        = "long"
+        logicalType = "timestamp-millis"
+      }
+    ]
+  })
+
+  compatibility_level = "BACKWARD"
+}

@@ -1,0 +1,490 @@
+# Enterprise Project - Variable Declarations
+# Comprehensive variable system for enterprise-grade multi-provider data platform
+
+# === ENVIRONMENT AND WORKSPACE CONFIGURATION ===
+
+variable "environment" {
+  description = "Environment name (development, staging, production)"
+  type        = string
+
+  validation {
+    condition     = contains(["development", "staging", "production"], var.environment)
+    error_message = "Environment must be one of: development, staging, production"
+  }
+}
+
+variable "workspace" {
+  description = "Workspace name for environment isolation"
+  type        = string
+  default     = "default"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9-_]*[a-zA-Z0-9]$", var.workspace))
+    error_message = "Workspace name must be alphanumeric with hyphens and underscores allowed."
+  }
+}
+
+variable "project_name" {
+  description = "Enterprise project name"
+  type        = string
+  default     = "enterprise-data-platform"
+
+  validation {
+    condition     = length(var.project_name) <= 50
+    error_message = "Project name must be 50 characters or less."
+  }
+}
+
+variable "organization" {
+  description = "Organization or company name"
+  type        = string
+  default     = "enterprise-corp"
+}
+
+variable "team" {
+  description = "Team responsible for this platform"
+  type        = string
+  default     = "data-platform-engineering"
+}
+
+variable "cost_center" {
+  description = "Cost center for resource billing"
+  type        = string
+  default     = "engineering"
+}
+
+variable "compliance_level" {
+  description = "Compliance level (basic, standard, strict, maximum)"
+  type        = string
+  default     = "standard"
+
+  validation {
+    condition     = contains(["basic", "standard", "strict", "maximum"], var.compliance_level)
+    error_message = "Compliance level must be one of: basic, standard, strict, maximum"
+  }
+}
+
+# === UNIVERSAL GOVERNANCE SETTINGS ===
+
+variable "enable_audit_logging" {
+  description = "Enable comprehensive audit logging across all providers"
+  type        = bool
+  default     = true
+}
+
+variable "encryption_level" {
+  description = "Data encryption level (basic, standard, high, maximum)"
+  type        = string
+  default     = "standard"
+
+  validation {
+    condition     = contains(["basic", "standard", "high", "maximum"], var.encryption_level)
+    error_message = "Encryption level must be one of: basic, standard, high, maximum"
+  }
+}
+
+variable "enable_policy_enforcement" {
+  description = "Enable enterprise policy enforcement"
+  type        = bool
+  default     = true
+}
+
+variable "data_retention_policy" {
+  description = "Global data retention configuration"
+  type = object({
+    pii_retention_days       = number
+    financial_retention_days = number
+    audit_log_retention_days = number
+    general_retention_days   = number
+  })
+  default = {
+    pii_retention_days       = 2555 # ~7 years
+    financial_retention_days = 2555 # ~7 years for compliance
+    audit_log_retention_days = 2190 # 6 years
+    general_retention_days   = 1095 # 3 years
+  }
+}
+
+variable "timezone" {
+  description = "Default timezone for all operations"
+  type        = string
+  default     = "UTC"
+}
+
+# === STATE BACKEND CONFIGURATION ===
+
+variable "state_backend_type" {
+  description = "State backend type (local, s3, azure, gcs, postgres, schemabounce)"
+  type        = string
+  default     = "s3"
+
+  validation {
+    condition     = contains(["local", "s3", "azure", "gcs", "postgres", "schemabounce"], var.state_backend_type)
+    error_message = "State backend must be supported type."
+  }
+}
+
+variable "state_backend_config" {
+  description = "State backend configuration"
+  type        = map(any)
+  default = {
+    bucket     = "enterprise-kolumn-state"
+    region     = "us-west-2"
+    encryption = true
+    versioning = true
+    locking    = true
+  }
+}
+
+# === PROVIDER VERSION CONSTRAINTS ===
+
+variable "provider_version_constraints" {
+  description = "Version constraints for all providers"
+  type        = map(string)
+  default = {
+    postgres      = "~> 2.1"
+    snowflake     = ">= 1.5.0, < 2.0"
+    kafka         = "^3.2"
+    mongodb       = "~> 1.8"
+    s3            = ">= 4.0, < 6.0"
+    azure_storage = "~> 3.0"
+    redis         = "~> 2.5"
+    elasticsearch = ">= 7.0, < 9.0"
+    airflow       = "~> 1.2"
+  }
+}
+
+# === POSTGRESQL CONFIGURATION ===
+
+variable "postgres_config" {
+  description = "PostgreSQL database configuration"
+  type = object({
+    host             = string
+    port             = number
+    database         = string
+    username         = string
+    password         = string
+    max_connections  = number
+    timeout          = number
+    pool_min         = number
+    pool_max         = number
+    backup_retention = number
+  })
+
+  sensitive = true # Contains password
+}
+
+# === SNOWFLAKE CONFIGURATION ===
+
+variable "snowflake_config" {
+  description = "Snowflake data warehouse configuration"
+  type = object({
+    account        = string
+    username       = string
+    password       = string
+    warehouse      = string
+    database       = string
+    default_schema = string
+    role           = string
+    query_timeout  = number
+    auto_suspend   = number
+  })
+
+  sensitive = true # Contains password
+}
+
+# === KAFKA CONFIGURATION ===
+
+variable "kafka_config" {
+  description = "Kafka streaming platform configuration"
+  type = object({
+    brokers                  = list(string)
+    security_protocol        = string
+    sasl_mechanism           = string
+    username                 = string
+    password                 = string
+    ssl_ca_cert              = optional(string)
+    ssl_cert                 = optional(string)
+    ssl_key                  = optional(string)
+    schema_registry_url      = string
+    schema_registry_username = string
+    schema_registry_password = string
+  })
+
+  sensitive = true # Contains passwords and certificates
+}
+
+# === MONGODB CONFIGURATION ===
+
+variable "mongodb_config" {
+  description = "MongoDB document database configuration"
+  type = object({
+    connection_string = string
+    database          = string
+    replica_set       = string
+    read_preference   = string
+    write_concern     = string
+    max_pool_size     = number
+    min_pool_size     = number
+    auth_source       = string
+    tls_ca_file       = optional(string)
+  })
+
+  sensitive = true # Contains connection string with credentials
+}
+
+# === AWS CONFIGURATION ===
+
+variable "aws_config" {
+  description = "AWS cloud services configuration"
+  type = object({
+    region                 = string
+    access_key             = string
+    secret_key             = string
+    assume_role_arn        = optional(string)
+    kms_key_id             = string
+    backup_region          = string
+    elasticsearch_role_arn = optional(string)
+  })
+
+  sensitive = true # Contains AWS credentials
+}
+
+# === AZURE CONFIGURATION ===
+
+variable "azure_config" {
+  description = "Azure cloud services configuration"
+  type = object({
+    storage_account_name = string
+    storage_account_key  = string
+    environment          = string
+    tenant_id            = string
+    replication_type     = string
+  })
+
+  sensitive = true # Contains Azure credentials
+  default = {
+    storage_account_name = ""
+    storage_account_key  = ""
+    environment          = "AzurePublicCloud"
+    tenant_id            = ""
+    replication_type     = "GRS"
+  }
+}
+
+variable "multi_cloud_enabled" {
+  description = "Enable multi-cloud deployment strategy"
+  type        = bool
+  default     = false
+}
+
+# === REDIS CONFIGURATION ===
+
+variable "redis_config" {
+  description = "Redis caching configuration"
+  type = object({
+    host            = string
+    port            = number
+    password        = string
+    database        = number
+    cluster_enabled = bool
+    cluster_nodes   = optional(list(string))
+    pool_size       = number
+    dial_timeout    = number
+    read_timeout    = number
+    tls_ca_cert     = optional(string)
+    tls_cert_file   = optional(string)
+    tls_key_file    = optional(string)
+  })
+
+  sensitive = true # Contains password and certificates
+}
+
+# === ELASTICSEARCH CONFIGURATION ===
+
+variable "elasticsearch_config" {
+  description = "Elasticsearch search and analytics configuration"
+  type = object({
+    urls             = list(string)
+    username         = string
+    password         = string
+    cloud_id         = optional(string)
+    api_key          = optional(string)
+    default_shards   = number
+    default_replicas = number
+    refresh_interval = string
+    snapshot_bucket  = optional(string)
+  })
+
+  sensitive = true # Contains credentials
+}
+
+# === AIRFLOW CONFIGURATION ===
+
+variable "airflow_config" {
+  description = "Apache Airflow orchestration configuration"
+  type = object({
+    host           = string
+    port           = number
+    username       = string
+    password       = string
+    base_url       = string
+    dag_repository = string
+    dag_branch     = string
+    sync_interval  = string
+  })
+
+  sensitive = true # Contains credentials
+}
+
+# === NETWORKING CONFIGURATION ===
+
+variable "network_config" {
+  description = "Enterprise networking configuration"
+  type = object({
+    vpc_cidr           = string
+    private_subnets    = list(string)
+    public_subnets     = list(string)
+    availability_zones = list(string)
+    enable_nat_gateway = bool
+    enable_vpn_gateway = bool
+    dns_servers        = list(string)
+  })
+
+  default = {
+    vpc_cidr           = "10.0.0.0/16"
+    private_subnets    = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+    public_subnets     = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+    availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
+    enable_nat_gateway = true
+    enable_vpn_gateway = false
+    dns_servers        = ["10.0.0.2"]
+  }
+}
+
+# === SECURITY CONFIGURATION ===
+
+variable "security_config" {
+  description = "Enterprise security configuration"
+  type = object({
+    enable_waf                    = bool
+    enable_ddos_protection        = bool
+    ssl_certificate_arn           = optional(string)
+    allowed_cidr_blocks           = list(string)
+    enable_intrusion_detection    = bool
+    log_retention_days            = number
+    enable_vulnerability_scanning = bool
+  })
+
+  default = {
+    enable_waf                    = true
+    enable_ddos_protection        = true
+    ssl_certificate_arn           = null
+    allowed_cidr_blocks           = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+    enable_intrusion_detection    = true
+    log_retention_days            = 90
+    enable_vulnerability_scanning = true
+  }
+}
+
+# === MONITORING CONFIGURATION ===
+
+variable "monitoring_config" {
+  description = "Enterprise monitoring and observability configuration"
+  type = object({
+    enable_prometheus      = bool
+    enable_grafana         = bool
+    enable_elk_stack       = bool
+    alert_email            = string
+    slack_webhook_url      = optional(string)
+    pagerduty_token        = optional(string)
+    metrics_retention_days = number
+    log_retention_days     = number
+  })
+
+  default = {
+    enable_prometheus      = true
+    enable_grafana         = true
+    enable_elk_stack       = true
+    alert_email            = "data-platform-alerts@enterprise-corp.com"
+    slack_webhook_url      = null
+    pagerduty_token        = null
+    metrics_retention_days = 90
+    log_retention_days     = 30
+  }
+}
+
+# === BACKUP AND DISASTER RECOVERY ===
+
+variable "backup_config" {
+  description = "Backup and disaster recovery configuration"
+  type = object({
+    enable_cross_region_backup    = bool
+    backup_retention_days         = number
+    snapshot_frequency            = string
+    enable_point_in_time_recovery = bool
+    disaster_recovery_region      = string
+    rto_minutes                   = number # Recovery Time Objective
+    rpo_minutes                   = number # Recovery Point Objective
+  })
+
+  default = {
+    enable_cross_region_backup    = true
+    backup_retention_days         = 30
+    snapshot_frequency            = "daily"
+    enable_point_in_time_recovery = true
+    disaster_recovery_region      = "us-east-1"
+    rto_minutes                   = 240 # 4 hours
+    rpo_minutes                   = 15  # 15 minutes
+  }
+}
+
+# === SCALING CONFIGURATION ===
+
+variable "scaling_config" {
+  description = "Auto-scaling configuration for enterprise workloads"
+  type = object({
+    enable_auto_scaling       = bool
+    min_capacity              = number
+    max_capacity              = number
+    target_cpu_utilization    = number
+    target_memory_utilization = number
+    scale_up_cooldown         = number
+    scale_down_cooldown       = number
+  })
+
+  default = {
+    enable_auto_scaling       = true
+    min_capacity              = 2
+    max_capacity              = 20
+    target_cpu_utilization    = 70
+    target_memory_utilization = 80
+    scale_up_cooldown         = 300 # 5 minutes
+    scale_down_cooldown       = 600 # 10 minutes
+  }
+}
+
+# === FEATURE FLAGS ===
+
+variable "feature_flags" {
+  description = "Enterprise feature flags for gradual rollout"
+  type = object({
+    enable_advanced_analytics   = bool
+    enable_real_time_processing = bool
+    enable_machine_learning     = bool
+    enable_data_lineage         = bool
+    enable_automated_governance = bool
+    enable_cost_optimization    = bool
+    enable_performance_tuning   = bool
+  })
+
+  default = {
+    enable_advanced_analytics   = true
+    enable_real_time_processing = true
+    enable_machine_learning     = false
+    enable_data_lineage         = true
+    enable_automated_governance = true
+    enable_cost_optimization    = true
+    enable_performance_tuning   = true
+  }
+}

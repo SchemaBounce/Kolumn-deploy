@@ -1,0 +1,343 @@
+# Data Platform - Governance and Classification Framework
+# Universal data governance across all providers and data sources
+
+# === DATA CLASSIFICATIONS ===
+
+# Highly sensitive personal information
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information requiring encryption and access controls"
+
+  requirements = {
+    encryption        = true
+    audit_access      = true
+    restricted_access = true
+    retention_days    = var.data_retention_days
+  }
+
+  # Provider-specific encryption configurations
+  encryption_config = {
+    postgres = {
+      method            = "column_encryption"
+      algorithm         = "AES-256-GCM"
+      key_rotation_days = 90
+    }
+    snowflake = {
+      method    = "dynamic_data_masking"
+      mask_type = "partial"
+    }
+    kafka = {
+      method    = "field_level_encryption"
+      algorithm = "AES-256-CTR"
+    }
+    mongodb = {
+      method       = "field_level_encryption"
+      key_alt_name = "pii_key"
+    }
+    s3 = {
+      method     = "kms_encryption"
+      kms_key_id = "arn:aws:kms:${var.aws_region}:account:key/pii-key"
+    }
+  }
+}
+
+# Financial and payment data
+create "kolumn_classification" "financial" {
+  name        = "FINANCIAL"
+  description = "Financial data requiring PCI DSS compliance"
+
+  requirements = {
+    encryption        = true
+    audit_access      = true
+    restricted_access = true
+    compliance_tags   = ["PCI_DSS", "SOX"]
+    retention_days    = 2555 # 7 years
+  }
+
+  encryption_config = {
+    postgres = {
+      method    = "transparent_data_encryption"
+      algorithm = "AES-256"
+    }
+    snowflake = {
+      method = "column_level_security"
+    }
+    kafka = {
+      method = "envelope_encryption"
+    }
+    s3 = {
+      method     = "kms_encryption"
+      kms_key_id = "arn:aws:kms:${var.aws_region}:account:key/financial-key"
+    }
+  }
+}
+
+# Business-sensitive internal data
+create "kolumn_classification" "internal" {
+  name        = "INTERNAL"
+  description = "Business-sensitive internal data with access controls"
+
+  requirements = {
+    encryption     = var.encryption_level != "basic"
+    audit_access   = true
+    retention_days = 1095 # 3 years
+  }
+
+  encryption_config = {
+    postgres = {
+      method = conditional(var.encryption_level == "high", "column_encryption", "transport_encryption")
+    }
+    snowflake = {
+      method = "role_based_access"
+    }
+    kafka = {
+      method = "transport_encryption"
+    }
+  }
+}
+
+# Public or anonymized data
+create "kolumn_classification" "public" {
+  name        = "PUBLIC"
+  description = "Public or anonymized data safe for general access"
+
+  requirements = {
+    encryption     = false
+    audit_access   = false
+    retention_days = 365
+  }
+}
+
+# === UNIVERSAL DATA OBJECTS ===
+
+# Customer data object with PII classification
+create "kolumn_data_object" "customer" {
+  name        = "customer"
+  description = "Universal customer data structure across all systems"
+
+  column "customer_id" {
+    type            = "UUID"
+    primary_key     = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "phone" {
+    type            = "VARCHAR(20)"
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "first_name" {
+    type            = "VARCHAR(100)"
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "last_name" {
+    type            = "VARCHAR(100)"
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "date_of_birth" {
+    type            = "DATE"
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    classifications = [kolumn_classification.internal]
+  }
+
+  # Provider-specific configurations
+  config = {
+    postgres = {
+      schema       = var.environment == "prod" ? "public" : "staging"
+      partition_by = "created_at"
+    }
+    snowflake = {
+      database   = var.snowflake_database
+      schema     = "CUSTOMERS"
+      cluster_by = ["created_at"]
+    }
+    kafka = {
+      topic              = "customers"
+      partitions         = 12
+      replication_factor = 3
+    }
+    mongodb = {
+      collection   = "customers"
+      sharding_key = "customer_id"
+    }
+  }
+}
+
+# Transaction data object with financial classification
+create "kolumn_data_object" "transaction" {
+  name        = "transaction"
+  description = "Universal transaction data structure with financial compliance"
+
+  column "transaction_id" {
+    type            = "UUID"
+    primary_key     = true
+    classifications = [kolumn_classification.internal]
+  }
+
+  column "customer_id" {
+    type            = "UUID"
+    classifications = [kolumn_classification.internal]
+  }
+
+  column "amount" {
+    type            = "DECIMAL(15,2)"
+    classifications = [kolumn_classification.financial]
+  }
+
+  column "currency" {
+    type            = "CHAR(3)"
+    classifications = [kolumn_classification.internal]
+  }
+
+  column "payment_method" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.financial]
+  }
+
+  column "status" {
+    type            = "VARCHAR(20)"
+    classifications = [kolumn_classification.internal]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    classifications = [kolumn_classification.internal]
+  }
+
+  config = {
+    postgres = {
+      schema       = "transactions"
+      partition_by = "created_at"
+      indexes      = ["customer_id", "status", "created_at"]
+    }
+    snowflake = {
+      database   = var.snowflake_database
+      schema     = "TRANSACTIONS"
+      cluster_by = ["created_at", "customer_id"]
+    }
+    kafka = {
+      topic              = "transactions"
+      partitions         = 24
+      replication_factor = 3
+      retention_hours    = 168 # 7 days
+    }
+  }
+}
+
+# === UNIVERSAL RBAC ===
+
+# Data scientist role with masked PII access
+create "kolumn_permission" "data_scientist_customers" {
+  name = "data_scientist_customers"
+
+  actions = {
+    select = true
+    insert = false
+    update = false
+    delete = false
+  }
+
+  applies_to_classifications = [kolumn_classification.pii]
+
+  transformations = {
+    type = "masking"
+    provider_functions = {
+      postgres  = "mask_email(email), mask_phone(phone)"
+      snowflake = "MASK(email), MASK(phone)"
+      mongodb   = "$redact: { $cond: { if: { $eq: ['$classification', 'PII'] }, then: '$$PRUNE', else: '$$DESCEND' } }"
+    }
+  }
+}
+
+# Financial analyst role with full financial data access
+create "kolumn_permission" "financial_analyst_transactions" {
+  name = "financial_analyst_transactions"
+
+  actions = {
+    select = true
+    insert = false
+    update = false
+    delete = false
+  }
+
+  applies_to_classifications = [kolumn_classification.financial, kolumn_classification.internal]
+
+  # No transformations - full access to financial data
+}
+
+# Data engineering role with system administration access
+create "kolumn_permission" "data_engineer_admin" {
+  name = "data_engineer_admin"
+
+  actions = {
+    select       = true
+    insert       = true
+    update       = true
+    delete       = true
+    create_table = true
+    drop_table   = false # Restricted even for admins
+  }
+
+  applies_to_classifications = [
+    kolumn_classification.public,
+    kolumn_classification.internal
+  ]
+}
+
+# === UNIVERSAL ROLES ===
+
+create "kolumn_role" "data_scientist" {
+  name        = "data_scientist"
+  description = "Data scientists with masked access to sensitive data"
+
+  permissions = [
+    kolumn_permission.data_scientist_customers
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 10
+    query_timeout_minutes  = 30
+    max_result_rows        = 100000
+  }
+}
+
+create "kolumn_role" "financial_analyst" {
+  name        = "financial_analyst"
+  description = "Financial analysts with full access to financial data"
+
+  permissions = [
+    kolumn_permission.financial_analyst_transactions
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 5
+    query_timeout_minutes  = 60
+    max_result_rows        = 500000
+  }
+}
+
+create "kolumn_role" "data_engineer" {
+  name        = "data_engineer"
+  description = "Data engineers with administrative capabilities"
+
+  permissions = [
+    kolumn_permission.data_engineer_admin
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 20
+    query_timeout_minutes  = 120
+    admin_operations       = true
+  }
+}
