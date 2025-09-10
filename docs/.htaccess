@@ -1,0 +1,36 @@
+# Kolumn Documentation API Configuration
+# Enable proper CORS headers for JSON API consumption
+
+# CORS Headers for JSON files
+<FilesMatch "\.(json)$">
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Accept"
+    Header always set Content-Type "application/json; charset=UTF-8"
+    
+    # Cache for 1 hour for versioned docs, 5 minutes for latest
+    Header always set Cache-Control "public, max-age=3600"
+</FilesMatch>
+
+# Special caching for latest endpoint (shorter cache)
+<Files "docs.json">
+    Header always set Cache-Control "public, max-age=300"
+</Files>
+
+# Enable OPTIONS preflight for CORS
+RewriteEngine On
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ - [R=204,L]
+
+# Redirect patterns for convenience
+# /latest -> /latest/docs.json
+RewriteRule ^latest/?$ latest/docs.json [R=302,L]
+
+# Version redirects: /v1.2.3 -> /v1.2.3/docs.json
+RewriteRule ^v([0-9]+\.[0-9]+\.[0-9]+)/?$ v$1/docs.json [R=302,L]
+
+# Root redirect to docs index
+RewriteRule ^/?$ index.html [R=302,L]
+
+# Error handling
+ErrorDocument 404 "Documentation not found"
