@@ -1,0 +1,3 @@
+# This file tells Jekyll to ignore this directory completely
+# The examples directory contains SQL and other files with YAML frontmatter
+# that are meant for Kolumn CLI examples, not Jekyll processing
