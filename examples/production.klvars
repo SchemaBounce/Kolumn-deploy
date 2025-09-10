@@ -1,0 +1,128 @@
+# Production Environment Variables
+# This file demonstrates production-ready variable configurations
+
+# Critical Production Database Settings
+database_host = "prod-db.company.com"
+database_port = 5432
+database_name = "production_app"
+database_ssl_mode = "require"
+database_ssl_cert = "/etc/ssl/certs/postgresql.crt"
+database_ssl_key = "/etc/ssl/private/postgresql.key"
+database_ssl_root_cert = "/etc/ssl/certs/ca-certificates.crt"
+
+# Production Environment Configuration
+environment = "production"
+debug_enabled = false
+log_level = "warn"
+metrics_enabled = true
+
+# High-Performance Connection Pool
+max_connections = 100
+connection_timeout = "5s"
+idle_timeout = "30m"
+pool_max_idle_conns = 25
+pool_max_open_conns = 100
+
+# Enhanced Security Configuration
+enable_encryption = true
+encryption_algorithm = "AES-256-GCM"
+key_rotation_enabled = true
+key_rotation_schedule = "0 0 1 * *"  # Monthly rotation
+audit_logging = true
+audit_retention_days = 2555  # 7 years for compliance
+access_logging = true
+sensitive_data_masking = true
+
+# Application Metadata
+app_name = "Production Application"
+app_version = "2.1.4"
+release_date = "2025-08-15"
+
+# Production Network Configuration
+allowed_hosts = [
+  "*.company.com",
+  "prod-app-01.internal",
+  "prod-app-02.internal",
+  "prod-lb.company.com"
+]
+
+# Production Feature Flags
+feature_flags = {
+  new_ui = true
+  advanced_analytics = true
+  beta_features = false
+  experimental_features = false
+  a_b_testing = true
+  real_time_notifications = true
+}
+
+# Production Database Tuning
+postgres_production_config = {
+  # Memory settings
+  shared_buffers = "4GB"
+  effective_cache_size = "12GB"
+  work_mem = "64MB"
+  maintenance_work_mem = "512MB"
+  
+  # WAL settings
+  max_wal_size = "8GB"
+  min_wal_size = "1GB"
+  checkpoint_completion_target = 0.9
+  
+  # Connection settings
+  max_connections = 200
+  
+  # Monitoring extensions
+  shared_preload_libraries = "pg_stat_statements,auto_explain,pg_cron"
+  
+  # Logging configuration
+  log_statement = "mod"
+  log_min_duration_statement = 1000  # Log queries > 1s
+  log_connections = true
+  log_disconnections = true
+}
+
+# Production Resource Tags (for cost allocation and governance)
+resource_tags = {
+  project = "core-platform"
+  owner = "platform-team"
+  environment = "production" 
+  cost_center = "engineering"
+  backup_required = "true"
+  monitoring_tier = "critical"
+  compliance = "sox,gdpr,hipaa"
+  data_classification = "confidential"
+  disaster_recovery = "tier1"
+}
+
+# Production Backup Configuration
+backup_settings = {
+  enabled = true
+  schedule = "0 2 * * *"  # Daily at 2 AM
+  retention_days = 90
+  encryption_enabled = true
+  cross_region_replication = true
+  point_in_time_recovery = true
+}
+
+# Monitoring and Alerting
+monitoring = {
+  enabled = true
+  cpu_alert_threshold = 80
+  memory_alert_threshold = 85
+  disk_alert_threshold = 90
+  connection_alert_threshold = 150
+  query_performance_monitoring = true
+  slow_query_threshold_ms = 1000
+}
+
+# Compliance Settings
+compliance = {
+  gdpr_enabled = true
+  sox_compliance = true
+  hipaa_compliance = true
+  data_retention_policy = "7years"
+  audit_trail_required = true
+  encryption_at_rest = true
+  encryption_in_transit = true
+}

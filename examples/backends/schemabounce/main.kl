@@ -1,0 +1,83 @@
+# SchemaBounce Backend Configuration Example
+# This example shows how to configure Kolumn to use SchemaBounce as the state backend
+
+# Configure the SchemaBounce backend in your Kolumn configuration
+state = {
+  backend = "schemabounce"
+  config = {
+    # Required: API key for authentication
+    api_key = "${var.schemabounce_api_key}"
+
+    # Required: Environment ID (identifies your environment in SchemaBounce)
+    environment_id = "env_production_123"
+
+    # Optional: Business ID (for multi-tenant scenarios)
+    business_id = "biz_acme_corp"
+
+    # Optional: API URL (defaults to http://localhost:8080 for local dev)
+    api_url = "https://api.schemabounce.com"
+
+    # Optional: Advanced configuration
+    timeout_seconds   = 30
+    retries           = 3
+    enable_versioning = true
+    enable_encryption = true
+    data_residency    = "us"
+    retention_policy  = "1y"
+    audit_logging     = true
+  }
+}
+
+# Example provider configuration
+provider "postgres" "production" {
+  host     = var.postgres_host
+  port     = 5432
+  database = "production"
+  username = var.postgres_username
+  password = var.postgres_password
+}
+
+# Example table creation
+create "postgres_table" "users" {
+  provider = postgres.production
+
+  column "id" {
+    type        = "bigserial"
+    primary_key = true
+  }
+
+  column "email" {
+    type     = "varchar(255)"
+    not_null = true
+    unique   = true
+  }
+
+  column "created_at" {
+    type    = "timestamp"
+    default = "CURRENT_TIMESTAMP"
+  }
+}
+
+# Variables
+variable "schemabounce_api_key" {
+  description = "API key for SchemaBounce"
+  type        = string
+  sensitive   = true
+}
+
+variable "postgres_host" {
+  description = "PostgreSQL host"
+  type        = string
+  default     = "localhost"
+}
+
+variable "postgres_username" {
+  description = "PostgreSQL username"
+  type        = string
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL password"
+  type        = string
+  sensitive   = true
+}

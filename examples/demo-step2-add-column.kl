@@ -1,0 +1,353 @@
+# =============================================================================
+# DEMO STEP 2: ADD REGULAR COLUMN - AUTONOMOUS PROPAGATION
+# =============================================================================
+# This demonstrates what happens when we add a regular column to our source.
+# Watch as the change propagates automatically to ALL derived resources!
+# =============================================================================
+
+# Use the same provider configuration as step 1
+terraform {
+  required_providers {
+    postgres = {
+      source = "kolumn/postgres"
+    }
+    kafka = {
+      source = "kolumn/kafka"
+    }
+    dagster = {
+      source = "kolumn/dagster"
+    }
+  }
+}
+
+provider "postgres" {
+  host     = "localhost"
+  port     = 5432
+  database = "kolumn_demo"
+  username = "postgres"
+  password = "postgres"
+}
+
+provider "kafka" {
+  bootstrap_servers   = ["localhost:9092"]
+  schema_registry_url = "http://localhost:8081"
+}
+
+provider "dagster" {
+  host = "localhost"
+  port = 3000
+}
+
+# -----------------------------------------------------------------------------
+# STEP 2: EVOLVED SOURCE SCHEMA (Added middle_name column)
+# -----------------------------------------------------------------------------
+
+# The updated users table - now with middle_name column added
+create "postgres_table" "demo_users" {
+  name = "demo_users"
+
+  # Original columns (unchanged)
+  column "id" {
+    type        = "BIGSERIAL"
+    primary_key = true
+  }
+
+  column "email" {
+    type     = "VARCHAR(255)"
+    unique   = true
+    nullable = false
+  }
+
+  column "first_name" {
+    type     = "VARCHAR(100)"
+    nullable = false
+  }
+
+  column "last_name" {
+    type     = "VARCHAR(100)"
+    nullable = false
+  }
+
+  # ⚡ NEW COLUMN: This is what triggers the autonomous propagation!
+  column "middle_name" {
+    type     = "VARCHAR(100)"
+    nullable = true # Optional field
+  }
+
+  column "created_at" {
+    type    = "TIMESTAMP"
+    default = "CURRENT_TIMESTAMP"
+  }
+
+  # Sample data with the new field
+  initial_data = [
+    {
+      email       = "alice@example.com"
+      first_name  = "Alice"
+      middle_name = "Marie" # New field populated
+      last_name   = "Johnson"
+    },
+    {
+      email       = "bob@example.com"
+      first_name  = "Bob"
+      middle_name = "James" # New field populated
+      last_name   = "Smith"
+    },
+    {
+      email       = "carol@example.com"
+      first_name  = "Carol"
+      middle_name = null # Optional field can be null
+      last_name   = "Williams"
+    }
+  ]
+}
+
+# Updated Kolumn data object - now includes the new column automatically
+create "kolumn_data_object" "demo_user_schema" {
+  name        = "Demo User Schema"
+  description = "EVOLVED user schema - now includes middle_name column!"
+
+  # ⚡ AUTONOMOUS MAGIC: Schema now includes the new middle_name column
+  dynamic "column" {
+    for_each = {
+      id = {
+        name        = "id"
+        type        = "BIGINT"
+        nullable    = false
+        primary_key = true
+      }
+      email = {
+        name     = "email"
+        type     = "VARCHAR(255)"
+        nullable = false
+        unique   = true
+      }
+      first_name = {
+        name     = "first_name"
+        type     = "VARCHAR(100)"
+        nullable = false
+      }
+      # 🆕 NEW COLUMN: Automatically included in the schema
+      middle_name = {
+        name     = "middle_name"
+        type     = "VARCHAR(100)"
+        nullable = true
+      }
+      last_name = {
+        name     = "last_name"
+        type     = "VARCHAR(100)"
+        nullable = false
+      }
+      created_at = {
+        name     = "created_at"
+        type     = "TIMESTAMP"
+        nullable = true
+      }
+    }
+
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+
+      # Same classification logic - email is still PII
+      classifications = column.key == "email" ? [
+        kolumn_classification.pii
+        ] : [
+        kolumn_classification.public
+      ]
+    }
+  }
+
+  metadata = {
+    source     = "postgres_table.demo_users"
+    demo_step  = "add_column"
+    evolution  = "added_middle_name_column"
+    created_at = timestamp()
+  }
+}
+
+# Same classification definitions
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  requirements = {
+    encryption   = true
+    audit_access = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "Public"
+  description = "Public information"
+  requirements = {
+    encryption = false
+  }
+}
+
+# -----------------------------------------------------------------------------
+# DERIVED RESOURCES (Automatically inherit the new column!)
+# -----------------------------------------------------------------------------
+
+# ⚡ ANALYTICS TABLE: Automatically gets middle_name column!
+create "postgres_table" "demo_user_analytics" {
+  name = "demo_user_analytics"
+
+  # Same dynamic block - now automatically includes middle_name!
+  dynamic "column" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+    }
+  }
+
+  # Analytics-specific columns (unchanged)
+  column "total_sessions" {
+    type    = "INTEGER"
+    default = 0
+  }
+
+  column "last_activity" {
+    type     = "TIMESTAMP"
+    nullable = true
+  }
+}
+
+# ⚡ KAFKA TOPIC: Schema registry automatically includes middle_name!
+create "kafka_topic" "demo_user_events" {
+  name               = "demo-user-events"
+  partitions         = 3
+  replication_factor = 1
+
+  # Same schema config - now automatically includes middle_name field!
+  schema_registry_config = {
+    # Event-specific fields (unchanged)
+    fields = {
+      event_type = {
+        type     = "string"
+        nullable = false
+      }
+      event_timestamp = {
+        type     = "long"
+        nullable = false
+      }
+    }
+  }
+
+  # Dynamic fields from data object
+  dynamic "schema_field" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name     = schema_field.value.name
+      type     = schema_field.value.type == "VARCHAR(255)" ? "string" : schema_field.value.type == "VARCHAR(100)" ? "string" : schema_field.value.type == "BIGINT" ? "long" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
+      nullable = schema_field.value.nullable
+    }
+  }
+}
+
+# ⚡ SQL FILE: Now has access to middle_name via interpolation!
+discover "kolumn_file" "demo_sql_analytics" {
+  location = "./files/demo_user_analytics.sql"
+  inputs = {
+    user_columns = kolumn_data_object.demo_user_schema.columns # Includes middle_name!
+    source_table = postgres_table.demo_users.name
+  }
+}
+
+# New Dagster job that processes the evolved schema
+create "dagster_job" "demo_user_processor" {
+  name        = "demo-user-processor"
+  description = "Processes user data - now handles middle_name automatically!"
+
+  # ⚡ Job configuration automatically adapts to new schema
+  config = {
+    source_table = postgres_table.demo_users.name
+    target_table = postgres_table.demo_user_analytics.name
+    kafka_topic  = kafka_topic.demo_user_events.name
+
+    # Processing columns - automatically includes middle_name!
+    processing_columns = [
+      for col in kolumn_data_object.demo_user_schema.columns : col.name
+      if !contains(["id", "created_at"], col.name) # Skip system columns
+    ]
+
+    # Full name generation now uses middle_name if available
+    computed_fields = {
+      full_name = "CONCAT(first_name, COALESCE(' ' || middle_name, ''), ' ', last_name)"
+    }
+  }
+}
+
+# =============================================================================
+# AUTONOMOUS PROPAGATION DEMONSTRATION
+# =============================================================================
+
+output "demo_step2_summary" {
+  value = <<-EOT
+    ⚡ DEMO STEP 2: AUTONOMOUS PROPAGATION IN ACTION!
+    
+    What Changed:
+    🔄 Source table: Added 'middle_name VARCHAR(100)' column
+    
+    What Propagated Automatically:
+    ✅ demo_user_analytics: Now has middle_name column (no code changes!)
+    ✅ Kafka schema registry: middle_name field added automatically  
+    ✅ SQL file: Can now access middle_name via ${user_columns}
+    ✅ Dagster job: processing_columns includes middle_name automatically
+    ✅ Full name computation: Now uses middle_name when available
+    
+    Zero Manual Updates Required! 🎉
+    
+    Commands to see the magic:
+    1. kolumn plan -c demo-step2-add-column.kl
+       → See all the automatic updates Kolumn will make
+    2. kolumn apply -c demo-step2-add-column.kl  
+       → Apply the changes and see everything update together
+    3. Compare with step 1 to see the autonomous propagation!
+    
+    Next: Run demo-step3-add-pii.kl to see PII detection magic! 🛡️
+  EOT
+}
+
+output "schema_evolution" {
+  value = {
+    previous_columns = 5
+    new_columns      = 6 # Added middle_name
+    added_column     = "middle_name VARCHAR(100) NULLABLE"
+
+    propagated_to = [
+      "demo_user_analytics table",
+      "demo-user-events Kafka topic",
+      "SQL file interpolation variables",
+      "Dagster job processing config"
+    ]
+
+    automatic_adaptations = [
+      "Full name computation now includes middle_name",
+      "Kafka schema registry version incremented",
+      "SQL queries can reference new column",
+      "Analytics processing handles nullable field correctly"
+    ]
+  }
+}
+
+output "autonomous_magic_proof" {
+  value = <<-EOT
+    🎯 PROOF OF AUTONOMOUS PROPAGATION:
+    
+    Before (Step 1): 5 columns in schema
+    After (Step 2): 6 columns in schema
+    
+    Files That DID NOT CHANGE:
+    ❌ No manual updates to analytics table definition
+    ❌ No manual updates to Kafka schema registry
+    ❌ No manual updates to SQL file structure
+    ❌ No manual updates to job processing logic
+    
+    Everything Updated Automatically! ✨
+    
+    This is the power of Schema-as-Code with Kolumn!
+  EOT
+}

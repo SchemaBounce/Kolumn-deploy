@@ -1,0 +1,92 @@
+# Standard Project - Variable Declarations
+# All variable declarations with types, defaults, and documentation
+
+# Database Configuration
+variable "database_host" {
+  description = "PostgreSQL database host"
+  type        = string
+  default     = "localhost"
+}
+
+variable "database_port" {
+  description = "PostgreSQL database port"
+  type        = number
+  default     = 5432
+}
+
+variable "database_name" {
+  description = "PostgreSQL database name"
+  type        = string
+}
+
+variable "database_user" {
+  description = "PostgreSQL database username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "database_password" {
+  description = "PostgreSQL database password"
+  type        = string
+  sensitive   = true
+}
+
+variable "max_database_connections" {
+  description = "Maximum database connections in pool"
+  type        = number
+  default     = 100
+}
+
+variable "database_ssl_mode" {
+  description = "PostgreSQL SSL connection mode"
+  type        = string
+  default     = "prefer"
+
+  validation {
+    condition     = contains(["disable", "allow", "prefer", "require"], var.database_ssl_mode)
+    error_message = "SSL mode must be one of: disable, allow, prefer, require"
+  }
+}
+
+# Redis Configuration
+variable "redis_host" {
+  description = "Redis server host"
+  type        = string
+  default     = "localhost"
+}
+
+variable "redis_port" {
+  description = "Redis server port"
+  type        = number
+  default     = 6379
+}
+
+variable "redis_password" {
+  description = "Redis server password"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "redis_database" {
+  description = "Redis database number"
+  type        = number
+  default     = 0
+}
+
+# Application Configuration
+variable "environment" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be one of: dev, staging, prod"
+  }
+}
+
+variable "app_name" {
+  description = "Application name used for resource naming"
+  type        = string
+  default     = "standard-app"
+}

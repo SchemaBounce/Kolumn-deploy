@@ -1,0 +1,299 @@
+# =============================================================================
+# DEMO STEP 1: BASELINE SCHEMA SETUP
+# =============================================================================
+# This establishes the baseline with a simple user schema that will be our
+# single source of truth for all autonomous propagation demonstrations.
+#
+# ARCHITECTURE NOTE:
+# - Kolumn Provider (this repo): Provides universal data governance (data_object, 
+#   classification, role, permission, file discovery)
+# - External Providers: Database, streaming, and orchestration providers are 
+#   in separate repositories (kolumn-provider-postgres, kolumn-provider-kafka, etc.)
+# =============================================================================
+
+# External Provider Configuration
+# NOTE: These providers are from separate repositories, not the Kolumn provider
+terraform {
+  required_providers {
+    postgres = {
+      source = "kolumn/postgres"  # External: kolumn-provider-postgres repository
+    }
+    kafka = {
+      source = "kolumn/kafka"     # External: kolumn-provider-kafka repository  
+    }
+    dagster = {
+      source = "kolumn/dagster"   # External: kolumn-provider-dagster repository
+    }
+  }
+}
+
+# Configure providers
+provider "postgres" {
+  host     = "localhost"
+  port     = 5432
+  database = "kolumn_demo"
+  username = "postgres"
+  password = "postgres"
+}
+
+provider "kafka" {
+  bootstrap_servers   = ["localhost:9092"]
+  schema_registry_url = "http://localhost:8081"
+}
+
+provider "dagster" {
+  host = "localhost"
+  port = 3000
+}
+
+# =============================================================================
+# EXTERNAL PROVIDER RESOURCES (from separate repositories)
+# =============================================================================
+# The following resources use external providers that are developed and 
+# maintained in separate repositories using Kolumn's revolutionary SDK.
+
+# -----------------------------------------------------------------------------
+# STEP 1: ESTABLISH BASELINE SCHEMA (Simple User Table)
+# -----------------------------------------------------------------------------
+
+# The initial users table - this is our SINGLE SOURCE OF TRUTH
+# Start with a basic schema that we'll evolve throughout the demo
+create "postgres_table" "demo_users" {
+  name = "demo_users"
+
+  column "id" {
+    type        = "BIGSERIAL"
+    primary_key = true
+  }
+
+  column "email" {
+    type     = "VARCHAR(255)"
+    unique   = true
+    nullable = false
+  }
+
+  column "first_name" {
+    type     = "VARCHAR(100)"
+    nullable = false
+  }
+
+  column "last_name" {
+    type     = "VARCHAR(100)"
+    nullable = false
+  }
+
+  column "created_at" {
+    type    = "TIMESTAMP"
+    default = "CURRENT_TIMESTAMP"
+  }
+
+  # Insert sample data for demonstration
+  initial_data = [
+    {
+      email      = "alice@example.com"
+      first_name = "Alice"
+      last_name  = "Johnson"
+    },
+    {
+      email      = "bob@example.com"
+      first_name = "Bob"
+      last_name  = "Smith"
+    },
+    {
+      email      = "carol@example.com"
+      first_name = "Carol"
+      last_name  = "Williams"
+    }
+  ]
+}
+
+# =============================================================================
+# KOLUMN PROVIDER RESOURCES (this repository)
+# =============================================================================  
+# The following resources are provided by the Kolumn provider (this repository)
+# and provide universal data governance across all external providers.
+
+# Create Kolumn data object to make the schema reusable
+# This will be the foundation for all autonomous propagation
+create "kolumn_data_object" "demo_user_schema" {
+  name        = "Demo User Schema"
+  description = "Baseline user schema for autonomous propagation demo"
+
+  # Extract columns from the source table
+  dynamic "column" {
+    for_each = {
+      id = {
+        name        = "id"
+        type        = "BIGINT"
+        nullable    = false
+        primary_key = true
+      }
+      email = {
+        name     = "email"
+        type     = "VARCHAR(255)"
+        nullable = false
+        unique   = true
+      }
+      first_name = {
+        name     = "first_name"
+        type     = "VARCHAR(100)"
+        nullable = false
+      }
+      last_name = {
+        name     = "last_name"
+        type     = "VARCHAR(100)"
+        nullable = false
+      }
+      created_at = {
+        name     = "created_at"
+        type     = "TIMESTAMP"
+        nullable = true
+      }
+    }
+
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+
+      # Basic classification - email is PII
+      classifications = column.key == "email" ? [
+        kolumn_classification.pii
+        ] : [
+        kolumn_classification.public
+      ]
+    }
+  }
+
+  metadata = {
+    source     = "postgres_table.demo_users"
+    demo_step  = "baseline"
+    created_at = timestamp()
+  }
+}
+
+# Classification definitions
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  requirements = {
+    encryption   = true
+    audit_access = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "Public"
+  description = "Public information"
+  requirements = {
+    encryption = false
+  }
+}
+
+# =============================================================================
+# DERIVED EXTERNAL PROVIDER RESOURCES  
+# =============================================================================
+# These resources demonstrate how external providers inherit schema from 
+# Kolumn data objects, showing the power of universal governance.
+
+# Analytics table that inherits the schema
+create "postgres_table" "demo_user_analytics" {
+  name = "demo_user_analytics"
+
+  # Inherit all columns from the data object
+  dynamic "column" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+    }
+  }
+
+  # Add analytics-specific columns
+  column "total_sessions" {
+    type    = "INTEGER"
+    default = 0
+  }
+
+  column "last_activity" {
+    type     = "TIMESTAMP"
+    nullable = true
+  }
+}
+
+# Kafka topic with schema derived from our data object
+create "kafka_topic" "demo_user_events" {
+  name               = "demo-user-events"
+  partitions         = 3
+  replication_factor = 1
+
+  # Schema registry configuration based on our data object
+  schema_registry_config = {
+    # Event-specific fields
+    fields = {
+      event_type = {
+        type     = "string"
+        nullable = false
+      }
+      event_timestamp = {
+        type     = "long"
+        nullable = false
+      }
+    }
+  }
+
+  # Dynamic fields from data object
+  dynamic "schema_field" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name     = schema_field.value.name
+      type     = schema_field.value.type == "VARCHAR(255)" ? "string" : schema_field.value.type == "VARCHAR(100)" ? "string" : schema_field.value.type == "BIGINT" ? "long" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
+      nullable = schema_field.value.nullable
+    }
+  }
+}
+
+# File discovery for SQL that uses our schema
+discover "kolumn_file" "demo_sql_analytics" {
+  location = "./files/demo_user_analytics.sql"
+  inputs = {
+    user_columns = kolumn_data_object.demo_user_schema.columns
+    source_table = postgres_table.demo_users.name
+  }
+}
+
+# =============================================================================
+# BASELINE DEMO INSTRUCTIONS
+# =============================================================================
+
+output "demo_step1_summary" {
+  value = <<-EOT
+    🎯 DEMO STEP 1: BASELINE ESTABLISHED
+    
+    Source Table: demo_users
+    Columns: id, email, first_name, last_name, created_at
+    
+    Derived Resources:
+    ✅ demo_user_analytics (inherits all columns + analytics fields)
+    ✅ demo-user-events Kafka topic (schema registry with same structure)
+    ✅ SQL file discovery (gets columns via interpolation)
+    
+    Next Steps:
+    1. Run: kolumn apply -c demo-step1-baseline.kl
+    2. Verify: Check that all resources are created with matching schemas
+    3. Continue: Run demo-step2-add-column.kl to see autonomous propagation
+    
+    The magic happens in the next steps when we change the source schema! ✨
+  EOT
+}
+
+output "current_schema" {
+  value = {
+    source_table   = "demo_users"
+    column_count   = 5
+    columns        = ["id", "email", "first_name", "last_name", "created_at"]
+    pii_columns    = ["email"]
+    public_columns = ["id", "first_name", "last_name", "created_at"]
+  }
+}

@@ -1,0 +1,1095 @@
+# Complete Multi-Provider E-Commerce Data Platform
+# This example demonstrates Kolumn's full capability as "Terraform for the entire data stack"
+# with true multi-provider orchestration and universal governance.
+#
+# ARCHITECTURE OVERVIEW:
+# - Kolumn Provider (this repo): Universal governance with data objects, classifications, 
+#   RBAC roles/permissions, and file discovery
+# - External Providers: Database (PostgreSQL, DynamoDB), streaming (Kafka), storage (S3),
+#   orchestration (Dagster) from separate provider repositories
+# - Integration: External providers consume Kolumn's governance layer for unified security
+#
+# Data Flow:
+# - Transactional: PostgreSQL for ACID operations  
+# - Analytics: Kafka streaming → PostgreSQL analytics
+# - NoSQL: DynamoDB for high-scale operations
+# - Storage: S3 for long-term retention  
+# - Orchestration: Dagster for data pipelines
+# - Governance: Universal classification and RBAC across all providers
+
+# =============================================================================
+# KOLUMN PROVIDER: UNIVERSAL DATA GOVERNANCE (this repository)
+# =============================================================================
+
+# Classification System - Define once, apply everywhere
+create "kolumn_classification" "pii_low" {
+  name        = "PII_LOW"
+  description = "Low-sensitivity personal information"
+  requirements = {
+    encryption     = true
+    audit_access   = true
+    retention_days = 2555 # 7 years
+  }
+
+  encryption_config = {
+    postgres = {
+      method            = "column_encryption"
+      algorithm         = "AES-256-GCM"
+      key_rotation_days = 90
+    }
+    kafka = {
+      method            = "field_level"
+      algorithm         = "AES-256-CTR"
+      key_rotation_days = 30
+    }
+    dynamodb = {
+      method     = "client_side_encryption"
+      algorithm  = "AES-256-GCM"
+      kms_key_id = "alias/ecommerce-pii"
+    }
+    s3 = {
+      method     = "sse_kms"
+      kms_key_id = "alias/ecommerce-data"
+    }
+  }
+}
+
+create "kolumn_classification" "pii_high" {
+  name        = "PII_HIGH"
+  description = "High-sensitivity personal information (SSN, payment details)"
+  requirements = {
+    encryption        = true
+    audit_access      = true
+    masking           = true
+    hsm_required      = true
+    retention_days    = 2555
+    deletion_required = true
+  }
+
+  encryption_config = {
+    postgres = {
+      method          = "transparent_data_encryption"
+      algorithm       = "AES-256-GCM"
+      hsm_integration = true
+    }
+    kafka = {
+      method          = "envelope_encryption"
+      algorithm       = "AES-256-GCM"
+      hsm_integration = true
+    }
+    dynamodb = {
+      method          = "client_side_encryption"
+      algorithm       = "AES-256-GCM"
+      hsm_integration = true
+    }
+  }
+}
+
+create "kolumn_classification" "financial" {
+  name        = "FINANCIAL"
+  description = "Financial transaction data"
+  requirements = {
+    encryption          = true
+    audit_access        = true
+    immutable           = true
+    compliance_required = ["PCI_DSS", "SOX"]
+  }
+
+  encryption_config = {
+    postgres = { method = "always_encrypted", compliance = "PCI_DSS_L1" }
+    kafka    = { method = "envelope_encryption", compliance = "PCI_DSS_L1" }
+    s3       = { method = "sse_kms", compliance = "PCI_DSS_L1" }
+  }
+}
+
+create "kolumn_classification" "event_data" {
+  name        = "EVENT_DATA"
+  description = "High-volume analytics events - optimized for performance"
+  requirements = {
+    encryption      = false # Performance-optimized for real-time analytics
+    audit_access    = false
+    retention_days  = 365
+    high_throughput = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "PUBLIC"
+  description = "Public information - no restrictions"
+  requirements = {
+    encryption   = false
+    audit_access = false
+  }
+}
+
+# NOTE: Compliance frameworks are enforced through classifications and permissions.
+# Future enhancement: Dedicated compliance resource planned for enterprise edition.
+
+# Universal Data Objects - Define once, deploy everywhere
+create "kolumn_data_object" "customer" {
+  description = "Universal customer data model"
+
+  column "id" {
+    type            = "BIGINT"
+    primary_key     = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    unique          = true
+    classifications = [kolumn_classification.pii_low]
+    validation = {
+      format   = "email"
+      required = true
+    }
+  }
+
+  column "first_name" {
+    type            = "VARCHAR(100)"
+    classifications = [kolumn_classification.pii_low]
+  }
+
+  column "last_name" {
+    type            = "VARCHAR(100)"
+    classifications = [kolumn_classification.pii_low]
+  }
+
+  column "phone" {
+    type            = "VARCHAR(20)"
+    classifications = [kolumn_classification.pii_high]
+  }
+
+  column "payment_method_id" {
+    type                = "VARCHAR(255)"
+    classifications     = [kolumn_classification.pii_high, kolumn_classification.financial]
+    encryption_required = true
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMPTZ"
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "updated_at" {
+    type            = "TIMESTAMPTZ"
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  # Provider-specific configurations
+  config = {
+    # PostgreSQL (transactional)
+    postgres = {
+      schema     = "ecommerce"
+      table_name = "customers"
+      indexes = [
+        { columns = ["email"], unique = true },
+        { columns = ["created_at"] },
+        { columns = ["last_name", "first_name"] }
+      ]
+      partitioning = {
+        type     = "range"
+        column   = "created_at"
+        interval = "1 month"
+      }
+    }
+
+    # DynamoDB (high-scale operations)
+    dynamodb = {
+      table_name    = "ecommerce-customers"
+      partition_key = "id"
+      sort_key      = "email"
+      billing_mode  = "ON_DEMAND"
+      global_secondary_indexes = [
+        {
+          name            = "EmailIndex"
+          partition_key   = "email"
+          projection_type = "ALL"
+        },
+        {
+          name            = "NameIndex"
+          partition_key   = "last_name"
+          sort_key        = "first_name"
+          projection_type = "KEYS_ONLY"
+        }
+      ]
+    }
+
+    # Kafka (streaming events)
+    kafka = {
+      topic              = "customer-events"
+      partitions         = 12
+      replication_factor = 3
+      config = {
+        "cleanup.policy" = "compact"
+        "retention.ms"   = "604800000" # 7 days
+      }
+      schema_registry = {
+        subject       = "customer-events-value"
+        compatibility = "BACKWARD"
+      }
+    }
+  }
+}
+
+create "kolumn_data_object" "product" {
+  description = "Universal product catalog model"
+
+  column "id" {
+    type            = "BIGINT"
+    primary_key     = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "sku" {
+    type            = "VARCHAR(50)"
+    unique          = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "name" {
+    type            = "VARCHAR(200)"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "description" {
+    type            = "TEXT"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "price" {
+    type            = "DECIMAL(10,2)"
+    classifications = [kolumn_classification.financial]
+  }
+
+  column "category" {
+    type            = "VARCHAR(100)"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "inventory_count" {
+    type            = "INTEGER"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMPTZ"
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  config = {
+    postgres = {
+      schema     = "ecommerce"
+      table_name = "products"
+      indexes = [
+        { columns = ["sku"], unique = true },
+        { columns = ["category"] },
+        { columns = ["price"] },
+        { columns = ["name"], type = "gin", ops_class = "gin_trgm_ops" } # Full-text search
+      ]
+    }
+
+    dynamodb = {
+      table_name    = "ecommerce-products"
+      partition_key = "id"
+      global_secondary_indexes = [
+        {
+          name            = "SKUIndex"
+          partition_key   = "sku"
+          projection_type = "ALL"
+        },
+        {
+          name            = "CategoryIndex"
+          partition_key   = "category"
+          sort_key        = "price"
+          projection_type = "ALL"
+        }
+      ]
+    }
+
+    kafka = {
+      topic      = "product-events"
+      partitions = 6
+      config = {
+        "cleanup.policy" = "compact"
+      }
+    }
+  }
+}
+
+create "kolumn_data_object" "order" {
+  description = "Universal order transaction model"
+
+  column "id" {
+    type            = "BIGINT"
+    primary_key     = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "customer_id" {
+    type            = "BIGINT"
+    foreign_key     = "customer.id"
+    classifications = [kolumn_classification.pii_low]
+  }
+
+  column "status" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.public]
+    validation = {
+      enum = ["pending", "processing", "shipped", "delivered", "cancelled"]
+    }
+  }
+
+  column "total_amount" {
+    type            = "DECIMAL(12,2)"
+    classifications = [kolumn_classification.financial]
+  }
+
+  column "payment_status" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.financial]
+  }
+
+  column "shipping_address" {
+    type            = "JSONB"
+    classifications = [kolumn_classification.pii_low]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMPTZ"
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  config = {
+    postgres = {
+      schema     = "ecommerce"
+      table_name = "orders"
+      indexes = [
+        { columns = ["customer_id"] },
+        { columns = ["status"] },
+        { columns = ["created_at"] },
+        { columns = ["total_amount"] }
+      ]
+      partitioning = {
+        type     = "range"
+        column   = "created_at"
+        interval = "1 month"
+      }
+    }
+
+    dynamodb = {
+      table_name    = "ecommerce-orders"
+      partition_key = "id"
+      global_secondary_indexes = [
+        {
+          name            = "CustomerIndex"
+          partition_key   = "customer_id"
+          sort_key        = "created_at"
+          projection_type = "ALL"
+        },
+        {
+          name            = "StatusIndex"
+          partition_key   = "status"
+          sort_key        = "created_at"
+          projection_type = "KEYS_ONLY"
+        }
+      ]
+    }
+
+    kafka = {
+      topic      = "order-events"
+      partitions = 24 # High-volume events
+      config = {
+        "cleanup.policy" = "delete"
+        "retention.ms"   = "2592000000" # 30 days
+      }
+    }
+  }
+}
+
+# Real-time Analytics Data Objects
+create "kolumn_data_object" "user_event" {
+  description = "High-volume user interaction events"
+
+  column "event_id" {
+    type            = "UUID"
+    primary_key     = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "user_id" {
+    type            = "BIGINT"
+    classifications = [kolumn_classification.pii_low]
+  }
+
+  column "event_type" {
+    type            = "VARCHAR(50)"
+    classifications = [kolumn_classification.event_data]
+    validation = {
+      enum = ["page_view", "product_view", "add_to_cart", "purchase", "search"]
+    }
+  }
+
+  column "properties" {
+    type            = "JSONB"
+    classifications = [kolumn_classification.event_data]
+  }
+
+  column "timestamp" {
+    type            = "TIMESTAMPTZ"
+    default         = "NOW()"
+    classifications = [kolumn_classification.public]
+  }
+
+  config = {
+    postgres = {
+      schema     = "analytics"
+      table_name = "user_events"
+      # Optimized for time-series analytics
+      indexes = [
+        { columns = ["timestamp"] },
+        { columns = ["user_id", "timestamp"] },
+        { columns = ["event_type", "timestamp"] },
+        { columns = ["properties"], type = "gin" }
+      ]
+      partitioning = {
+        type     = "range"
+        column   = "timestamp"
+        interval = "1 day"
+      }
+    }
+
+    kafka = {
+      topic      = "user-events"
+      partitions = 48 # Very high throughput
+      config = {
+        "cleanup.policy"   = "delete"
+        "retention.ms"     = "604800000" # 7 days (short for high volume)
+        "compression.type" = "lz4"
+      }
+    }
+  }
+}
+
+# RBAC System
+create "kolumn_role" "ecommerce_admin" {
+  name        = "E-commerce Administrator"
+  description = "Full access to e-commerce platform"
+
+  permissions = [
+    kolumn_permission.customer_full_access,
+    kolumn_permission.product_management,
+    kolumn_permission.order_management,
+    kolumn_permission.analytics_read,
+    kolumn_permission.financial_audit
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 10
+    can_export_data        = true
+    can_modify_schema      = true
+    can_access_audit_logs  = true
+  }
+}
+
+create "kolumn_role" "customer_service" {
+  name        = "Customer Service Representative"
+  description = "Customer support with masked PII access"
+
+  permissions = [
+    kolumn_permission.customer_masked_access,
+    kolumn_permission.order_read,
+    kolumn_permission.product_read
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 5
+    can_export_data        = false
+    session_timeout        = "4h"
+  }
+}
+
+create "kolumn_role" "data_analyst" {
+  name        = "Data Analyst"
+  description = "Analytics access with no PII"
+
+  permissions = [
+    kolumn_permission.analytics_read,
+    kolumn_permission.aggregated_metrics,
+    kolumn_permission.product_analytics
+  ]
+
+  capabilities = {
+    max_concurrent_queries = 20
+    can_export_data        = true
+    can_create_reports     = true
+  }
+}
+
+create "kolumn_role" "streaming_engineer" {
+  name        = "Streaming Data Engineer"
+  description = "Real-time data pipeline management"
+
+  permissions = [
+    kolumn_permission.kafka_admin,
+    kolumn_permission.streaming_monitoring,
+    kolumn_permission.pipeline_management
+  ]
+
+  capabilities = {
+    can_manage_topics          = true
+    can_reset_offsets          = true
+    can_access_schema_registry = true
+  }
+}
+
+# Permissions with provider-specific transformations
+create "kolumn_permission" "customer_full_access" {
+  actions = { select = true, insert = true, update = true, delete = true }
+  applies_to_classifications = [
+    kolumn_classification.pii_low,
+    kolumn_classification.pii_high,
+    kolumn_classification.financial
+  ]
+
+  # No transformations - full access
+}
+
+create "kolumn_permission" "customer_masked_access" {
+  actions = { select = true, update = true }
+  applies_to_classifications = [
+    kolumn_classification.pii_low,
+    kolumn_classification.pii_high
+  ]
+
+  transformations = {
+    type = "masking"
+    provider_functions = {
+      postgres = {
+        email             = "mask_email(email, '*', 3)"
+        phone             = "mask_phone(phone)"
+        payment_method_id = "mask_payment(payment_method_id, 'XXXX-XXXX-XXXX-', -4)"
+      }
+      kafka = {
+        filter = "PII_MASKING_INTERCEPTOR"
+      }
+      s3 = {
+        redaction = "PII_REDACTION_POLICY"
+      }
+    }
+  }
+}
+
+create "kolumn_permission" "analytics_read" {
+  actions = { select = true }
+  applies_to_classifications = [
+    kolumn_classification.event_data,
+    kolumn_classification.public
+  ]
+
+  transformations = {
+    type = "aggregation_only"
+    provider_functions = {
+      postgres = {
+        require_group_by = true
+        min_group_size   = 100
+      }
+    }
+  }
+}
+
+# =============================================================================
+# EXTERNAL PROVIDER RESOURCES (from separate repositories)
+# =============================================================================
+# The following resources use external providers that integrate with Kolumn's
+# governance layer. Each provider is developed in a separate repository using
+# Kolumn's revolutionary SDK with either 4-method or 11-method Terraform patterns.
+
+# PostgreSQL Provider - Transactional Database
+create "postgres_database" "ecommerce_transactional" {
+  name = "ecommerce"
+
+  # Use data object configurations
+  schemas = {
+    ecommerce = "Transactional e-commerce data"
+    analytics = "Real-time analytics aggregations"
+  }
+
+  connection_pooling = {
+    max_connections = 100
+    pool_size       = 20
+    pool_timeout    = "30s"
+  }
+
+  backup_config = {
+    retention_days         = 30
+    point_in_time_recovery = true
+    automated_backups      = true
+  }
+}
+
+# Create PostgreSQL tables from data objects
+create "postgres_table" "customers" {
+  database   = postgres_database.ecommerce_transactional.name
+  columns    = kolumn_data_object.customer.columns
+  schema     = kolumn_data_object.customer.config.postgres.schema
+  table_name = kolumn_data_object.customer.config.postgres.table_name
+
+  # Apply data object indexes
+  dynamic "index" {
+    for_each = kolumn_data_object.customer.config.postgres.indexes
+    content {
+      columns = index.value.columns
+      unique  = try(index.value.unique, false)
+      type    = try(index.value.type, "btree")
+    }
+  }
+
+  # Apply partitioning
+  partitioning = kolumn_data_object.customer.config.postgres.partitioning
+}
+
+create "postgres_table" "products" {
+  database   = postgres_database.ecommerce_transactional.name
+  columns    = kolumn_data_object.product.columns
+  schema     = kolumn_data_object.product.config.postgres.schema
+  table_name = kolumn_data_object.product.config.postgres.table_name
+
+  dynamic "index" {
+    for_each = kolumn_data_object.product.config.postgres.indexes
+    content {
+      columns   = index.value.columns
+      unique    = try(index.value.unique, false)
+      type      = try(index.value.type, "btree")
+      ops_class = try(index.value.ops_class, null)
+    }
+  }
+}
+
+create "postgres_table" "orders" {
+  database   = postgres_database.ecommerce_transactional.name
+  columns    = kolumn_data_object.order.columns
+  schema     = kolumn_data_object.order.config.postgres.schema
+  table_name = kolumn_data_object.order.config.postgres.table_name
+
+  dynamic "index" {
+    for_each = kolumn_data_object.order.config.postgres.indexes
+    content {
+      columns = index.value.columns
+      unique  = try(index.value.unique, false)
+    }
+  }
+
+  partitioning = kolumn_data_object.order.config.postgres.partitioning
+}
+
+# Analytics table for real-time events
+create "postgres_table" "user_events" {
+  database   = postgres_database.ecommerce_transactional.name
+  columns    = kolumn_data_object.user_event.columns
+  schema     = kolumn_data_object.user_event.config.postgres.schema
+  table_name = kolumn_data_object.user_event.config.postgres.table_name
+
+  dynamic "index" {
+    for_each = kolumn_data_object.user_event.config.postgres.indexes
+    content {
+      columns = index.value.columns
+      type    = try(index.value.type, "btree")
+    }
+  }
+
+  partitioning = kolumn_data_object.user_event.config.postgres.partitioning
+}
+
+# DynamoDB Provider - High-Scale NoSQL Operations  
+create "dynamodb_table" "customers" {
+  table_name    = kolumn_data_object.customer.config.dynamodb.table_name
+  partition_key = kolumn_data_object.customer.config.dynamodb.partition_key
+  sort_key      = kolumn_data_object.customer.config.dynamodb.sort_key
+  billing_mode  = kolumn_data_object.customer.config.dynamodb.billing_mode
+
+  # Apply data object GSI configuration
+  dynamic "global_secondary_index" {
+    for_each = kolumn_data_object.customer.config.dynamodb.global_secondary_indexes
+    content {
+      name            = global_secondary_index.value.name
+      partition_key   = global_secondary_index.value.partition_key
+      sort_key        = try(global_secondary_index.value.sort_key, null)
+      projection_type = global_secondary_index.value.projection_type
+    }
+  }
+
+  # Operational features
+  point_in_time_recovery = true
+
+  backup_policy = {
+    backup_enabled          = true
+    backup_retention_period = 30
+  }
+
+  contributor_insights = {
+    enabled = true
+    rules   = ["RequestMetrics"]
+  }
+}
+
+create "dynamodb_table" "products" {
+  table_name    = kolumn_data_object.product.config.dynamodb.table_name
+  partition_key = kolumn_data_object.product.config.dynamodb.partition_key
+
+  dynamic "global_secondary_index" {
+    for_each = kolumn_data_object.product.config.dynamodb.global_secondary_indexes
+    content {
+      name            = global_secondary_index.value.name
+      partition_key   = global_secondary_index.value.partition_key
+      sort_key        = try(global_secondary_index.value.sort_key, null)
+      projection_type = global_secondary_index.value.projection_type
+    }
+  }
+
+  contributor_insights = {
+    enabled = true
+    rules   = ["RequestMetrics", "PartitionKeyMetrics"]
+  }
+}
+
+create "dynamodb_table" "orders" {
+  table_name    = kolumn_data_object.order.config.dynamodb.table_name
+  partition_key = kolumn_data_object.order.config.dynamodb.partition_key
+
+  dynamic "global_secondary_index" {
+    for_each = kolumn_data_object.order.config.dynamodb.global_secondary_indexes
+    content {
+      name            = global_secondary_index.value.name
+      partition_key   = global_secondary_index.value.partition_key
+      sort_key        = try(global_secondary_index.value.sort_key, null)
+      projection_type = global_secondary_index.value.projection_type
+    }
+  }
+
+  # DynamoDB Streams for real-time processing
+  stream_specification = {
+    stream_enabled   = true
+    stream_view_type = "NEW_AND_OLD_IMAGES"
+  }
+}
+
+# Kafka Provider - Streaming Data Platform  
+create "kafka_cluster" "ecommerce_streaming" {
+  name    = "ecommerce-streaming"
+  version = "2.8.0"
+
+  broker_config = {
+    instance_type = "kafka.m5.xlarge"
+    broker_count  = 6
+    storage_size  = 1000
+  }
+
+  client_authentication = {
+    sasl = {
+      scram = true
+    }
+    tls = true
+  }
+
+  monitoring = {
+    prometheus = true
+    jmx        = true
+    cloudwatch = true
+  }
+}
+
+# Create Kafka topics from data objects
+create "kafka_topic" "customer_events" {
+  cluster            = kafka_cluster.ecommerce_streaming.name
+  topic_name         = kolumn_data_object.customer.config.kafka.topic
+  partitions         = kolumn_data_object.customer.config.kafka.partitions
+  replication_factor = kolumn_data_object.customer.config.kafka.replication_factor
+
+  # Apply data object topic configuration
+  config = kolumn_data_object.customer.config.kafka.config
+}
+
+create "kafka_topic" "product_events" {
+  cluster    = kafka_cluster.ecommerce_streaming.name
+  topic_name = kolumn_data_object.product.config.kafka.topic
+  partitions = kolumn_data_object.product.config.kafka.partitions
+  config     = kolumn_data_object.product.config.kafka.config
+}
+
+create "kafka_topic" "order_events" {
+  cluster    = kafka_cluster.ecommerce_streaming.name
+  topic_name = kolumn_data_object.order.config.kafka.topic
+  partitions = kolumn_data_object.order.config.kafka.partitions
+  config     = kolumn_data_object.order.config.kafka.config
+}
+
+create "kafka_topic" "user_events" {
+  cluster    = kafka_cluster.ecommerce_streaming.name
+  topic_name = kolumn_data_object.user_event.config.kafka.topic
+  partitions = kolumn_data_object.user_event.config.kafka.partitions
+  config     = kolumn_data_object.user_event.config.kafka.config
+}
+
+# S3 Provider - Long-term Data Storage
+create "s3_bucket" "ecommerce_data_lake" {
+  bucket_name = "ecommerce-data-lake-${var.environment}"
+
+  versioning = {
+    enabled = true
+  }
+
+  encryption = {
+    sse_algorithm = "aws:kms"
+    kms_key_id    = "alias/ecommerce-data"
+  }
+
+  lifecycle_rules = [
+    {
+      id     = "analytics_data"
+      status = "Enabled"
+      filter = {
+        prefix = "analytics/"
+      }
+      transitions = [
+        {
+          days          = 30
+          storage_class = "STANDARD_IA"
+        },
+        {
+          days          = 90
+          storage_class = "GLACIER"
+        },
+        {
+          days          = 365
+          storage_class = "DEEP_ARCHIVE"
+        }
+      ]
+    },
+    {
+      id     = "transaction_data"
+      status = "Enabled"
+      filter = {
+        prefix = "transactions/"
+      }
+      transitions = [
+        {
+          days          = 90
+          storage_class = "STANDARD_IA"
+        },
+        {
+          days          = 2555 # 7 years for compliance
+          storage_class = "GLACIER"
+        }
+      ]
+    }
+  ]
+}
+
+# Dagster Provider - Data Pipeline Orchestration
+create "dagster_workspace" "ecommerce_pipelines" {
+  workspace_name = "ecommerce"
+
+  code_locations = [
+    {
+      name              = "ecommerce_etl"
+      module_name       = "ecommerce_pipelines.etl"
+      working_directory = "/opt/dagster/app"
+    },
+    {
+      name              = "analytics_jobs"
+      module_name       = "ecommerce_pipelines.analytics"
+      working_directory = "/opt/dagster/app"
+    }
+  ]
+
+  run_storage = {
+    postgres = {
+      hostname = postgres_database.ecommerce_transactional.hostname
+      port     = postgres_database.ecommerce_transactional.port
+      database = "dagster"
+      username = "dagster"
+    }
+  }
+
+  event_log_storage = {
+    postgres = {
+      hostname = postgres_database.ecommerce_transactional.hostname
+      port     = postgres_database.ecommerce_transactional.port
+      database = "dagster"
+      username = "dagster"
+    }
+  }
+}
+
+create "dagster_job" "customer_data_pipeline" {
+  workspace = dagster_workspace.ecommerce_pipelines.workspace_name
+  job_name  = "customer_data_pipeline"
+
+  description = "Customer data processing pipeline"
+
+  # Reference data objects for type safety
+  config = {
+    resources = {
+      postgres = {
+        config = {
+          host     = postgres_database.ecommerce_transactional.hostname
+          port     = postgres_database.ecommerce_transactional.port
+          database = postgres_database.ecommerce_transactional.name
+        }
+      }
+      kafka = {
+        config = {
+          bootstrap_servers = kafka_cluster.ecommerce_streaming.bootstrap_servers
+        }
+      }
+      s3 = {
+        config = {
+          bucket_name = s3_bucket.ecommerce_data_lake.bucket_name
+        }
+      }
+    }
+
+    # Use data object schema for validation
+    ops = {
+      extract_customers = {
+        config = {
+          source_table = postgres_table.customers.full_name
+          columns      = kolumn_data_object.customer.columns
+        }
+      }
+      validate_customer_data = {
+        config = {
+          schema          = kolumn_data_object.customer.validation_schema
+          classifications = kolumn_data_object.customer.classifications
+        }
+      }
+    }
+  }
+
+  schedule = {
+    cron_schedule = "0 2 * * *" # Daily at 2 AM
+    timezone      = "UTC"
+  }
+}
+
+# =============================================================================
+# OUTPUTS: DEMONSTRATE CROSS-PROVIDER COORDINATION
+# =============================================================================
+
+output "data_platform_summary" {
+  description = "Complete data platform architecture summary"
+  value = {
+    # Transactional Layer
+    transactional_database = {
+      endpoint = postgres_database.ecommerce_transactional.hostname
+      port     = postgres_database.ecommerce_transactional.port
+      database = postgres_database.ecommerce_transactional.name
+      tables_created = [
+        postgres_table.customers.full_name,
+        postgres_table.products.full_name,
+        postgres_table.orders.full_name,
+        postgres_table.user_events.full_name
+      ]
+    }
+
+    # NoSQL Layer
+    nosql_tables = {
+      customers = dynamodb_table.customers.table_name
+      products  = dynamodb_table.products.table_name
+      orders    = dynamodb_table.orders.table_name
+    }
+
+    # Streaming Layer
+    streaming_platform = {
+      cluster_name      = kafka_cluster.ecommerce_streaming.name
+      bootstrap_servers = kafka_cluster.ecommerce_streaming.bootstrap_servers
+      topics = [
+        kafka_topic.customer_events.topic_name,
+        kafka_topic.product_events.topic_name,
+        kafka_topic.order_events.topic_name,
+        kafka_topic.user_events.topic_name
+      ]
+    }
+
+    # Storage Layer
+    data_lake = {
+      bucket             = s3_bucket.ecommerce_data_lake.bucket_name
+      encryption         = "AWS-KMS"
+      lifecycle_policies = "Enabled"
+    }
+
+    # Orchestration Layer
+    pipeline_orchestration = {
+      workspace = dagster_workspace.ecommerce_pipelines.workspace_name
+      jobs = [
+        dagster_job.customer_data_pipeline.job_name
+      ]
+    }
+  }
+}
+
+output "governance_summary" {
+  description = "Data governance and security configuration"
+  sensitive   = false
+  value = {
+    classifications_defined = [
+      kolumn_classification.pii_low.name,
+      kolumn_classification.pii_high.name,
+      kolumn_classification.financial.name,
+      kolumn_classification.event_data.name,
+      kolumn_classification.public.name
+    ]
+
+    # NOTE: Compliance frameworks enforced through classification requirements
+
+    data_objects = [
+      {
+        name                 = "customer"
+        table_count          = 2 # PostgreSQL + DynamoDB
+        stream_count         = 1 # Kafka
+        classifications_used = 4
+      },
+      {
+        name                 = "product"
+        table_count          = 2
+        stream_count         = 1
+        classifications_used = 2
+      },
+      {
+        name                 = "order"
+        table_count          = 2
+        stream_count         = 1
+        classifications_used = 3
+      },
+      {
+        name                 = "user_event"
+        table_count          = 1
+        stream_count         = 1
+        classifications_used = 2
+      }
+    ]
+
+    roles_configured = [
+      kolumn_role.ecommerce_admin.name,
+      kolumn_role.customer_service.name,
+      kolumn_role.data_analyst.name,
+      kolumn_role.streaming_engineer.name
+    ]
+  }
+}
+
+output "connection_strings" {
+  description = "Connection information for applications"
+  sensitive   = true
+  value = {
+    postgres_transactional  = "postgres://${postgres_database.ecommerce_transactional.username}:${postgres_database.ecommerce_transactional.password}@${postgres_database.ecommerce_transactional.hostname}:${postgres_database.ecommerce_transactional.port}/${postgres_database.ecommerce_transactional.name}"
+    kafka_bootstrap_servers = kafka_cluster.ecommerce_streaming.bootstrap_servers
+    s3_data_bucket          = "s3://${s3_bucket.ecommerce_data_lake.bucket_name}"
+    dagster_webserver       = "http://${dagster_workspace.ecommerce_pipelines.webserver_host}:3000"
+  }
+}

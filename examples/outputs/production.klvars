@@ -1,0 +1,25 @@
+# Production Variables for Complete Output Example
+# This demonstrates how variables flow through to outputs
+
+# Environment Configuration
+environment = "production"
+
+# Database Configuration
+database_port = 5432
+enable_ssl = true
+
+# Additional production settings that could be used in outputs
+database_host = "prod-db.company.com"
+database_name = "production_app"
+
+# Security settings
+ssl_mode = "require"
+ssl_cert_path = "/etc/ssl/certs/postgresql.crt"
+
+# Performance settings
+max_connections = 100
+connection_timeout = "5s"
+
+# Monitoring settings
+enable_monitoring = true
+metrics_port = 9090

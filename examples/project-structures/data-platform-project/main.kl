@@ -1,0 +1,327 @@
+# Data Platform - Main Resource Configuration
+# Core data platform resources using universal data objects and governance
+
+# === POSTGRESQL ANALYTICAL DATABASE ===
+
+# Customer table using universal data object
+create "postgres_table" "customers" {
+  # Use the universal customer data object with all its governance
+  columns = kolumn_data_object.customer.columns
+  config  = kolumn_data_object.customer.config.postgres
+
+  # Additional PostgreSQL-specific configurations
+  constraints = {
+    unique_constraints = [
+      {
+        name    = "customers_email_unique"
+        columns = ["email"]
+      }
+    ]
+
+    check_constraints = [
+      {
+        name       = "customers_email_format"
+        expression = "email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'"
+      }
+    ]
+  }
+
+  # Row Level Security (RLS) based on classifications
+  row_level_security = {
+    enabled = true
+    policies = [
+      {
+        name       = "customer_pii_policy"
+        for_roles  = [kolumn_role.data_scientist.name]
+        expression = "true" # Allow access but data will be masked via permissions
+      },
+      {
+        name       = "customer_full_policy"
+        for_roles  = [kolumn_role.data_engineer.name]
+        expression = "true" # Full access for data engineers
+      }
+    ]
+  }
+}
+
+# Transaction table using universal data object
+create "postgres_table" "transactions" {
+  columns = kolumn_data_object.transaction.columns
+  config  = kolumn_data_object.transaction.config.postgres
+
+  # Time-series partitioning for performance
+  partitioning = {
+    type     = "range"
+    column   = "created_at"
+    interval = "1 month"
+  }
+
+  # Financial compliance constraints
+  constraints = {
+    check_constraints = [
+      {
+        name       = "transactions_amount_positive"
+        expression = "amount > 0"
+      },
+      {
+        name       = "transactions_currency_valid"
+        expression = "currency IN ('USD', 'EUR', 'GBP', 'CAD', 'AUD')"
+      }
+    ]
+  }
+}
+
+# Foreign key relationship with cascading updates
+create "postgres_foreign_key" "transactions_customer_fk" {
+  table              = postgres_table.transactions
+  columns            = ["customer_id"]
+  referenced_table   = postgres_table.customers
+  referenced_columns = ["customer_id"]
+  on_delete          = "RESTRICT" # Prevent customer deletion with transactions
+  on_update          = "CASCADE"
+}
+
+# Performance indexes
+create "postgres_index" "idx_customers_email_hash" {
+  table   = postgres_table.customers
+  columns = ["email"]
+  type    = "hash" # Fast equality lookups
+}
+
+create "postgres_index" "idx_transactions_customer_date" {
+  table   = postgres_table.transactions
+  columns = ["customer_id", "created_at"]
+  type    = "btree"
+}
+
+create "postgres_index" "idx_transactions_amount" {
+  table   = postgres_table.transactions
+  columns = ["amount"]
+  where   = "status = 'COMPLETED'" # Partial index for completed transactions
+}
+
+# === SNOWFLAKE DATA WAREHOUSE ===
+
+# Customers dimension table
+create "snowflake_table" "dim_customers" {
+  database = var.snowflake_database
+  schema   = "ANALYTICS"
+
+  # Use universal data object with Snowflake-specific transformations
+  columns = [
+    for column_name, column_def in kolumn_data_object.customer.columns : {
+      name     = upper(column_name) # Snowflake convention
+      type     = column_def.type
+      nullable = column_def.nullable != false
+
+      # Apply masking policies based on classification
+      masking_policy = contains(column_def.classifications, kolumn_classification.pii) ? "PII_MASKING_POLICY" : null
+    }
+  ]
+
+  # Snowflake clustering and time travel
+  cluster_by                  = ["CREATED_AT"]
+  data_retention_time_in_days = var.environment == "prod" ? 90 : 1
+}
+
+# Transactions fact table
+create "snowflake_table" "fact_transactions" {
+  database = var.snowflake_database
+  schema   = "ANALYTICS"
+
+  columns = [
+    for column_name, column_def in kolumn_data_object.transaction.columns : {
+      name     = upper(column_name)
+      type     = column_def.type
+      nullable = column_def.nullable != false
+
+      # Financial data masking
+      masking_policy = contains(column_def.classifications, kolumn_classification.financial) ? "FINANCIAL_MASKING_POLICY" : null
+    }
+  ]
+
+  # Optimized for analytical queries
+  cluster_by                  = ["CREATED_AT", "CUSTOMER_ID"]
+  data_retention_time_in_days = var.environment == "prod" ? 365 : 7
+}
+
+# === MONGODB DOCUMENT STORE ===
+
+# Customer profiles collection
+create "mongodb_collection" "customer_profiles" {
+  database = var.mongodb_database
+
+  # Document schema based on universal data object
+  schema = {
+    bsonType = "object"
+    required = ["customer_id", "created_at"]
+    properties = {
+      for column_name, column_def in kolumn_data_object.customer.columns :
+      column_name => {
+        bsonType = column_def.type == "UUID" ? "string" : column_def.type == "TIMESTAMP" ? "date" : column_def.type == "VARCHAR(255)" ? "string" : "string"
+
+        # PII fields get additional encryption
+        encrypt = contains(column_def.classifications, kolumn_classification.pii) ? {
+          keyId     = "pii_key_id"
+          algorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+        } : null
+      }
+    }
+  }
+
+  # Performance indexes
+  indexes = [
+    {
+      keys   = { customer_id = 1 }
+      unique = true
+    },
+    {
+      keys   = { email = 1 }
+      unique = true
+      sparse = true
+    },
+    {
+      keys = { created_at = -1 }
+    }
+  ]
+
+  # Sharding configuration for scalability
+  shard_key = { customer_id = 1 }
+}
+
+# Transaction events collection
+create "mongodb_collection" "transaction_events" {
+  database = var.mongodb_database
+
+  schema = {
+    bsonType = "object"
+    required = ["transaction_id", "customer_id", "amount", "created_at"]
+    properties = {
+      for column_name, column_def in kolumn_data_object.transaction.columns :
+      column_name => {
+        bsonType = column_def.type == "UUID" ? "string" : column_def.type == "DECIMAL(15,2)" ? "decimal" : column_def.type == "TIMESTAMP" ? "date" : "string"
+
+        # Financial data encryption
+        encrypt = contains(column_def.classifications, kolumn_classification.financial) ? {
+          keyId     = "financial_key_id"
+          algorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+        } : null
+      }
+    }
+  }
+
+  indexes = [
+    {
+      keys   = { transaction_id = 1 }
+      unique = true
+    },
+    {
+      keys = { customer_id = 1, created_at = -1 }
+    },
+    {
+      keys = { status = 1, created_at = -1 }
+    },
+    {
+      keys                 = { created_at = -1 }
+      expire_after_seconds = 2592000 # 30 days TTL
+    }
+  ]
+
+  shard_key = { customer_id = 1 }
+}
+
+# === S3 DATA LAKE ===
+
+# Raw data landing zone
+create "s3_bucket" "raw_data_lake" {
+  name   = "${var.s3_data_lake_bucket}-raw-${var.environment}"
+  region = var.aws_region
+
+  # Lifecycle policies for cost optimization
+  lifecycle_configuration = {
+    rules = [
+      {
+        id     = "raw_data_lifecycle"
+        status = "Enabled"
+
+        transitions = [
+          {
+            days          = 30
+            storage_class = "STANDARD_IA"
+          },
+          {
+            days          = 90
+            storage_class = "GLACIER"
+          },
+          {
+            days          = 365
+            storage_class = "DEEP_ARCHIVE"
+          }
+        ]
+
+        expiration = {
+          days = var.data_retention_days
+        }
+      }
+    ]
+  }
+
+  # Server-side encryption
+  server_side_encryption_configuration = {
+    rule = {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm     = "aws:kms"
+        kms_master_key_id = "arn:aws:kms:${var.aws_region}:account:key/data-lake-key"
+      }
+    }
+  }
+
+  # Versioning and logging
+  versioning = {
+    enabled = var.environment == "prod"
+  }
+
+  access_logging = {
+    target_bucket = "${var.s3_data_lake_bucket}-logs-${var.environment}"
+    target_prefix = "access-logs/"
+  }
+}
+
+# Curated data zone
+create "s3_bucket" "curated_data_lake" {
+  name   = "${var.s3_data_lake_bucket}-curated-${var.environment}"
+  region = var.aws_region
+
+  # Curated data has different lifecycle
+  lifecycle_configuration = {
+    rules = [
+      {
+        id     = "curated_data_lifecycle"
+        status = "Enabled"
+
+        transitions = [
+          {
+            days          = 90
+            storage_class = "STANDARD_IA"
+          },
+          {
+            days          = 365
+            storage_class = "GLACIER"
+          }
+        ]
+      }
+    ]
+  }
+
+  # Enhanced security for curated data
+  server_side_encryption_configuration = {
+    rule = {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm     = "aws:kms"
+        kms_master_key_id = "arn:aws:kms:${var.aws_region}:account:key/curated-data-key"
+      }
+    }
+  }
+
+  versioning = { enabled = true }
+}
