@@ -21,6 +21,11 @@ on:
         description: 'Source workflow run ID'
         required: true
         type: string
+      has_documentation:
+        description: 'Whether documentation was generated successfully'
+        required: false
+        type: string
+        default: 'false'
 
 env:
   DEPLOY_REPO: 'schemabounce/Kolumn-deploy'
