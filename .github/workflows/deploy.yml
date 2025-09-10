@@ -507,6 +507,23 @@ jobs:
           chmod +x install.sh
           cp install.sh scripts/
 
+      - name: Update website with new version
+        run: |
+          cd deploy
+          VERSION="${{ inputs.version }}"
+          TAG="${{ inputs.tag }}"
+          
+          echo "🌐 Updating website content with version ${VERSION}"
+          
+          # Update index.html with new version
+          sed -i "s/Kolumn [0-9]\+\.[0-9]\+\.[0-9]\+/Kolumn ${VERSION}/g" index.html
+          sed -i "s/Version: [0-9]\+\.[0-9]\+\.[0-9]\+/Version: ${VERSION}/g" index.html
+          
+          # Update any example files that reference specific versions
+          find examples/ -name "*.klvars" -type f -exec sed -i "s/default_version = \"[^\"]*\"/default_version = \"^${VERSION}\"/g" {} + 2>/dev/null || true
+          
+          echo "✅ Website content updated with version ${VERSION}"
+
       - name: Create GitHub release in public repo
         run: |
           cd deploy
