@@ -1,0 +1,374 @@
+name: Documentation Health Check
+
+on:
+  # Run daily at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      check_all_versions:
+        description: 'Check all available versions (not just latest)'
+        required: false
+        default: false
+        type: boolean
+
+  # Run after deployment
+  workflow_run:
+    workflows: ["Deploy Kolumn Release"]
+    types:
+      - completed
+
+env:
+  BASE_URL: https://schemabounce.github.io/Kolumn-deploy
+  DOCS_BASE_URL: https://schemabounce.github.io/Kolumn-deploy/docs
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  # 🔍 HEALTH CHECK - Validate documentation endpoints
+  health-check:
+    name: Documentation Health Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python for JSON validation
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Check main endpoints
+      id: check-main
+      run: |
+        echo "🔍 Checking main documentation endpoints..."
+        
+        ISSUES=0
+        WARNINGS=0
+        
+        # Check latest documentation
+        echo "📡 Checking latest documentation endpoint..."
+        if curl -sf "${DOCS_BASE_URL}/latest/docs.json" >/dev/null; then
+          echo "✅ Latest docs endpoint is accessible"
+          
+          # Download and validate JSON
+          if curl -s "${DOCS_BASE_URL}/latest/docs.json" -o latest-docs.json; then
+            if python3 -m json.tool latest-docs.json >/dev/null 2>&1; then
+              echo "✅ Latest docs JSON is valid"
+              
+              # Check for required fields
+              VERSION=$(python3 -c "import json; print(json.load(open('latest-docs.json')).get('kolumn_version', 'unknown'))")
+              TOTAL_COMMANDS=$(python3 -c "import json; print(json.load(open('latest-docs.json')).get('statistics', {}).get('total_commands', 0))")
+              
+              echo "📊 Latest docs stats:"
+              echo "   Version: ${VERSION}"
+              echo "   Total commands: ${TOTAL_COMMANDS}"
+              
+              if [ "${TOTAL_COMMANDS}" -eq 0 ]; then
+                echo "⚠️ Warning: No commands found in latest docs"
+                WARNINGS=$((WARNINGS + 1))
+              fi
+            else
+              echo "❌ Latest docs JSON is invalid"
+              ISSUES=$((ISSUES + 1))
+            fi
+          else
+            echo "❌ Failed to download latest docs"
+            ISSUES=$((ISSUES + 1))
+          fi
+        else
+          echo "❌ Latest docs endpoint is not accessible"
+          ISSUES=$((ISSUES + 1))
+        fi
+        
+        # Check metadata endpoint
+        echo "📋 Checking latest metadata endpoint..."
+        if curl -sf "${DOCS_BASE_URL}/latest/metadata.json" >/dev/null; then
+          echo "✅ Latest metadata endpoint is accessible"
+          
+          if curl -s "${DOCS_BASE_URL}/latest/metadata.json" | python3 -m json.tool >/dev/null 2>&1; then
+            echo "✅ Latest metadata JSON is valid"
+          else
+            echo "⚠️ Latest metadata JSON is invalid"
+            WARNINGS=$((WARNINGS + 1))
+          fi
+        else
+          echo "⚠️ Latest metadata endpoint is not accessible"
+          WARNINGS=$((WARNINGS + 1))
+        fi
+        
+        # Check documentation index
+        echo "📚 Checking documentation index..."
+        if curl -sf "${DOCS_BASE_URL}/" >/dev/null || curl -sf "${DOCS_BASE_URL}/index.html" >/dev/null; then
+          echo "✅ Documentation index is accessible"
+        else
+          echo "⚠️ Documentation index is not accessible"
+          WARNINGS=$((WARNINGS + 1))
+        fi
+        
+        echo "issues=${ISSUES}" >> $GITHUB_OUTPUT
+        echo "warnings=${WARNINGS}" >> $GITHUB_OUTPUT
+
+    - name: Discover available versions
+      id: discover-versions
+      run: |
+        echo "🔍 Discovering available documentation versions..."
+        
+        # Get available versions by checking the docs directory structure
+        # This is a best-effort attempt since we can't easily list directories via HTTP
+        
+        VERSIONS=""
+        
+        # Try to get version from latest docs
+        if [ -f "latest-docs.json" ]; then
+          VERSION=$(python3 -c "import json; print(json.load(open('latest-docs.json')).get('kolumn_version', ''))" 2>/dev/null || echo "")
+          if [ -n "$VERSION" ]; then
+            VERSIONS="${VERSION}"
+            echo "📋 Found version from latest docs: ${VERSION}"
+          fi
+        fi
+        
+        # Try common version patterns if we have a base version
+        if [ -n "$VERSION" ]; then
+          # Extract major.minor and try recent patch versions
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d'.' -f1-2)
+          for patch in 0 1 2 3 4 5; do
+            TEST_VERSION="${MAJOR_MINOR}.${patch}"
+            if curl -sf "${DOCS_BASE_URL}/v${TEST_VERSION}/docs.json" >/dev/null 2>&1; then
+              if [ "$VERSIONS" != *"$TEST_VERSION"* ]; then
+                VERSIONS="${VERSIONS} ${TEST_VERSION}"
+                echo "📋 Found version: ${TEST_VERSION}"
+              fi
+            fi
+          done
+        fi
+        
+        echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
+        echo "📋 Discovered versions: ${VERSIONS}"
+
+    - name: Check versioned endpoints
+      if: github.event.inputs.check_all_versions == 'true' || github.event_name == 'schedule'
+      run: |
+        VERSIONS="${{ steps.discover-versions.outputs.versions }}"
+        ISSUES=${{ steps.check-main.outputs.issues }}
+        WARNINGS=${{ steps.check-main.outputs.warnings }}
+        
+        echo "🔍 Checking versioned documentation endpoints..."
+        
+        if [ -n "$VERSIONS" ]; then
+          for VERSION in $VERSIONS; do
+            echo "📋 Checking version ${VERSION}..."
+            
+            # Check versioned docs
+            if curl -sf "${DOCS_BASE_URL}/v${VERSION}/docs.json" >/dev/null; then
+              echo "✅ Version ${VERSION} docs endpoint is accessible"
+              
+              # Validate JSON
+              if curl -s "${DOCS_BASE_URL}/v${VERSION}/docs.json" | python3 -m json.tool >/dev/null 2>&1; then
+                echo "✅ Version ${VERSION} docs JSON is valid"
+              else
+                echo "❌ Version ${VERSION} docs JSON is invalid"
+                ISSUES=$((ISSUES + 1))
+              fi
+            else
+              echo "⚠️ Version ${VERSION} docs endpoint is not accessible"
+              WARNINGS=$((WARNINGS + 1))
+            fi
+            
+            # Check versioned metadata
+            if curl -sf "${DOCS_BASE_URL}/v${VERSION}/metadata.json" >/dev/null; then
+              echo "✅ Version ${VERSION} metadata endpoint is accessible"
+            else
+              echo "⚠️ Version ${VERSION} metadata endpoint is not accessible"
+              WARNINGS=$((WARNINGS + 1))
+            fi
+          done
+        else
+          echo "📝 No versions to check"
+        fi
+        
+        echo "FINAL_ISSUES=${ISSUES}" >> $GITHUB_ENV
+        echo "FINAL_WARNINGS=${WARNINGS}" >> $GITHUB_ENV
+
+    - name: Check CORS headers
+      run: |
+        echo "🔍 Checking CORS headers for API endpoints..."
+        
+        # Check latest docs CORS
+        CORS_HEADER=$(curl -sI "${DOCS_BASE_URL}/latest/docs.json" | grep -i "access-control-allow-origin" || echo "")
+        if [ -n "$CORS_HEADER" ]; then
+          echo "✅ CORS headers present for latest docs"
+          echo "   ${CORS_HEADER}"
+        else
+          echo "⚠️ No CORS headers found for latest docs (may limit browser usage)"
+        fi
+        
+        # Check content type
+        CONTENT_TYPE=$(curl -sI "${DOCS_BASE_URL}/latest/docs.json" | grep -i "content-type" || echo "")
+        if [ -n "$CONTENT_TYPE" ]; then
+          echo "📋 Content-Type header: ${CONTENT_TYPE}"
+          if echo "$CONTENT_TYPE" | grep -q "application/json"; then
+            echo "✅ Correct JSON content type"
+          else
+            echo "⚠️ Content type may not be optimal for JSON"
+          fi
+        fi
+
+    - name: Performance check
+      run: |
+        echo "⚡ Checking documentation endpoint performance..."
+        
+        # Time the latest docs endpoint
+        START_TIME=$(date +%s%N)
+        if curl -sf "${DOCS_BASE_URL}/latest/docs.json" >/dev/null; then
+          END_TIME=$(date +%s%N)
+          DURATION=$((($END_TIME - $START_TIME) / 1000000))  # Convert to milliseconds
+          
+          echo "📊 Latest docs response time: ${DURATION}ms"
+          
+          if [ $DURATION -lt 1000 ]; then
+            echo "✅ Response time is excellent (< 1s)"
+          elif [ $DURATION -lt 3000 ]; then
+            echo "✅ Response time is good (< 3s)"
+          else
+            echo "⚠️ Response time is slow (> 3s)"
+          fi
+          
+          # Check file size
+          if [ -f "latest-docs.json" ]; then
+            SIZE=$(wc -c < latest-docs.json)
+            SIZE_KB=$((SIZE / 1024))
+            echo "📦 Latest docs size: ${SIZE_KB}KB"
+            
+            if [ $SIZE_KB -lt 100 ]; then
+              echo "✅ Documentation size is optimal"
+            elif [ $SIZE_KB -lt 500 ]; then
+              echo "✅ Documentation size is reasonable"
+            else
+              echo "⚠️ Documentation size is large (${SIZE_KB}KB)"
+            fi
+          fi
+        else
+          echo "❌ Cannot check performance - endpoint not accessible"
+        fi
+
+    - name: Generate health report
+      run: |
+        ISSUES=${FINAL_ISSUES:-${{ steps.check-main.outputs.issues }}}
+        WARNINGS=${FINAL_WARNINGS:-${{ steps.check-main.outputs.warnings }}}
+        
+        echo "📊 Documentation Health Check Report"
+        echo "==================================="
+        echo ""
+        echo "📋 Summary:"
+        echo "   Issues (critical): ${ISSUES}"
+        echo "   Warnings (minor): ${WARNINGS}"
+        echo ""
+        
+        if [ "${ISSUES}" -eq 0 ] && [ "${WARNINGS}" -eq 0 ]; then
+          echo "✅ All documentation endpoints are healthy!"
+          echo "HEALTH_STATUS=healthy" >> $GITHUB_ENV
+        elif [ "${ISSUES}" -eq 0 ]; then
+          echo "⚠️ Documentation endpoints have minor warnings"
+          echo "HEALTH_STATUS=warnings" >> $GITHUB_ENV
+        else
+          echo "❌ Documentation endpoints have critical issues"
+          echo "HEALTH_STATUS=issues" >> $GITHUB_ENV
+        fi
+        
+        # Create GitHub Step Summary
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        # 📚 Documentation Health Check
+        
+        ## 📊 Summary
+        - **Critical Issues**: ${ISSUES}
+        - **Warnings**: ${WARNINGS}
+        - **Status**: $([ "${ISSUES}" -eq 0 ] && echo "✅ Healthy" || echo "❌ Issues Found")
+        
+        ## 📡 Checked Endpoints
+        - \`${DOCS_BASE_URL}/latest/docs.json\`
+        - \`${DOCS_BASE_URL}/latest/metadata.json\`
+        - Documentation index page
+        
+        ## 🔄 Next Steps
+        $(if [ "${ISSUES}" -gt 0 ]; then
+          echo "- Review critical issues and fix deployment problems"
+          echo "- Check GitHub Pages deployment status"
+        elif [ "${WARNINGS}" -gt 0 ]; then
+          echo "- Review warnings for potential improvements"  
+          echo "- Consider optimizing documentation size or response times"
+        else
+          echo "- No action needed - all endpoints are healthy!"
+        fi)
+        EOF
+
+    - name: Create issue for critical problems
+      if: env.HEALTH_STATUS == 'issues'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issues = ${{ env.FINAL_ISSUES || steps.check-main.outputs.issues }};
+          const warnings = ${{ env.FINAL_WARNINGS || steps.check-main.outputs.warnings }};
+          
+          const title = `🚨 Documentation Health Check Failed - ${issues} Critical Issues`;
+          const body = `
+          ## 📚 Documentation Health Check Alert
+          
+          The automated health check for Kolumn documentation endpoints has detected critical issues.
+          
+          **📊 Summary:**
+          - Critical Issues: ${issues}
+          - Warnings: ${warnings}
+          - Check Date: ${new Date().toISOString()}
+          
+          **🔍 Affected Endpoints:**
+          - Latest Docs: \`https://schemabounce.github.io/Kolumn-deploy/docs/latest/docs.json\`
+          - Documentation Index: \`https://schemabounce.github.io/Kolumn-deploy/docs/\`
+          
+          **🔧 Possible Causes:**
+          - GitHub Pages deployment failure
+          - Invalid JSON in documentation manifests
+          - Missing or corrupted documentation files
+          - Repository permission issues
+          
+          **🚀 Next Steps:**
+          1. Check the latest deployment workflow run
+          2. Verify GitHub Pages settings are correct
+          3. Manually test the documentation endpoints
+          4. Re-run the health check after fixes
+          
+          **📋 Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          _This issue was automatically created by the documentation health check workflow._
+          `;
+          
+          // Check if a similar issue already exists
+          const { data: existingIssues } = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: 'documentation,health-check,bug',
+            state: 'open'
+          });
+          
+          if (existingIssues.length === 0) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['documentation', 'health-check', 'bug', 'automated']
+            });
+            
+            console.log('Created new health check issue');
+          } else {
+            console.log('Existing health check issue found, skipping creation');
+          }
+
+    - name: Cleanup
+      run: |
+        rm -f latest-docs.json
+        echo "✅ Health check completed"

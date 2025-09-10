@@ -147,6 +147,28 @@ jobs:
           git config --global user.name "Kolumn Release Bot"
           git config --global user.email "bot@kolumn.com"
 
+      - name: Clone source repository for examples
+        run: |
+          # Clone source repository with minimal depth and only fetch examples
+          git clone --depth=1 --filter=blob:none --sparse https://$SOURCE_REPO_TOKEN@github.com/${{ inputs.source_repo }}.git source
+          cd source
+          
+          # Configure sparse checkout to ONLY include examples directory
+          git sparse-checkout init --cone
+          git sparse-checkout set examples
+          
+          # Verify examples directory exists and has content
+          if [ ! -d "examples" ]; then
+            echo "❌ Examples directory not found"
+            exit 1
+          fi
+          
+          # Silent verification - no file listing or content exposure
+          if [ -z "$(find examples -type f)" ]; then
+            echo "❌ Examples directory is empty"
+            exit 1
+          fi
+
       - name: Clone public deploy repository
         run: |
           echo "📂 Cloning ${{ env.DEPLOY_REPO }}"
@@ -157,6 +179,180 @@ jobs:
           mkdir -p releases/v${{ inputs.version }}
           mkdir -p binaries
           mkdir -p scripts
+          mkdir -p examples
+
+      - name: Deploy examples to public repo
+        run: |
+          cd deploy
+          
+          # Copy ONLY examples directory content - no source code exposure
+          cp -r ../source/examples/* examples/ 2>/dev/null || true
+          
+          # Create examples index for easy browsing
+          cat > examples/README.md << 'EOF'
+          # Kolumn Examples
+          
+          This directory contains comprehensive examples for using Kolumn CLI.
+          
+          ## Quick Start
+          
+          ### Basic Project Templates
+          - [`project-structures/minimal-project/`](project-structures/minimal-project/) - Simple single-file project
+          - [`project-structures/standard-project/`](project-structures/standard-project/) - Multi-file organized project
+          - [`project-structures/data-platform-project/`](project-structures/data-platform-project/) - Data platform with governance
+          - [`project-structures/enterprise-project/`](project-structures/enterprise-project/) - Complete enterprise setup
+          
+          ### Configuration Examples
+          - [`backends/`](backends/) - Backend configuration examples (SchemaBounce, S3, etc.)
+          - [`config/`](config/) - API and application configuration files
+          
+          ### Demo Files
+          - [`demo-step1-baseline.kl`](demo-step1-baseline.kl) - Step 1: Basic table creation
+          - [`demo-step2-add-column.kl`](demo-step2-add-column.kl) - Step 2: Schema evolution
+          - [`demo-step3-add-pii.kl`](demo-step3-add-pii.kl) - Step 3: Adding PII columns
+          - [`demo-step4-complex-evolution.kl`](demo-step4-complex-evolution.kl) - Step 4: Complex changes
+          
+          ### Enterprise Examples
+          - [`enterprise/`](enterprise/) - Enterprise-grade configurations
+            - [`governance-lineage-complete.kl`](enterprise/governance-lineage-complete.kl) - Complete governance setup
+            - [`sso-rbac-complete.kl`](enterprise/sso-rbac-complete.kl) - SSO and RBAC configuration
+            - [`hsm-encryption-advanced.kl`](enterprise/hsm-encryption-advanced.kl) - HSM encryption setup
+          
+          ### Multi-Provider Examples
+          - [`multi-provider-ecommerce.kl`](multi-provider-ecommerce.kl) - E-commerce platform spanning multiple providers
+          - [`universal-file-processing.kl`](universal-file-processing.kl) - File processing across providers
+          
+          ### File Processing Examples
+          - [`files/`](files/) - SQL, Python, and configuration files
+          - [`sql/`](sql/) - SQL file examples for discovery
+          - [`python/`](python/) - Python file examples for discovery
+          
+          ### Variable Configuration
+          - [`variables.klvars`](variables.klvars) - Development variables
+          - [`production.klvars`](production.klvars) - Production variables
+          - [`staging.klvars`](staging.klvars) - Staging variables
+          - [`variables-README.md`](variables-README.md) - Variables documentation
+          
+          ### Kubernetes and DAGs
+          - [`k8s/`](k8s/) - Kubernetes deployment examples
+          - [`dags/`](dags/) - Airflow DAG examples
+          
+          ### Documentation
+          - [`DEMO_INSTRUCTIONS.md`](DEMO_INSTRUCTIONS.md) - Step-by-step demo instructions
+          - [`FILE_DISCOVERY_README.md`](FILE_DISCOVERY_README.md) - File discovery system documentation
+          - [`AUTONOMOUS_COLUMN_PROPAGATION.md`](AUTONOMOUS_COLUMN_PROPAGATION.md) - Advanced column propagation
+          
+          ## Getting Started
+          
+          1. **Choose a template** from [`project-structures/`](project-structures/)
+          2. **Copy the template** to your local machine
+          3. **Customize variables** using the `.klvars` files
+          4. **Run Kolumn commands**:
+             ```bash
+             kolumn init
+             kolumn plan
+             kolumn apply
+             ```
+          
+          ## Browse Online
+          
+          You can browse these examples online at: https://github.com/schemabounce/Kolumn-deploy/tree/main/examples
+          
+          ## Download
+          
+          Download the complete examples archive:
+          ```bash
+          curl -L https://github.com/schemabounce/Kolumn-deploy/archive/refs/heads/main.zip -o kolumn-examples.zip
+          unzip kolumn-examples.zip
+          cd Kolumn-deploy-main/examples
+          ```
+          EOF
+          
+          # Create index.html for web browsing
+          cat > examples/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Kolumn Examples</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+                  h1 { color: #D4AF37; border-bottom: 3px solid #D4AF37; }
+                  h2 { color: #333; margin-top: 2em; }
+                  .category { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; }
+                  .example-link { display: inline-block; background: #D4AF37; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; margin: 5px; }
+                  .example-link:hover { background: #B8941F; }
+                  .description { color: #666; font-style: italic; }
+              </style>
+          </head>
+          <body>
+              <h1>🚀 Kolumn Examples</h1>
+              <p>Comprehensive examples for using Kolumn CLI - the infrastructure-as-code tool for the modern data stack.</p>
+              
+              <div class="category">
+                  <h2>📁 Project Templates</h2>
+                  <p class="description">Ready-to-use project structures for different use cases</p>
+                  <a href="project-structures/minimal-project/" class="example-link">Minimal Project</a>
+                  <a href="project-structures/standard-project/" class="example-link">Standard Project</a>
+                  <a href="project-structures/data-platform-project/" class="example-link">Data Platform</a>
+                  <a href="project-structures/enterprise-project/" class="example-link">Enterprise</a>
+              </div>
+              
+              <div class="category">
+                  <h2>🎯 Demo Files</h2>
+                  <p class="description">Step-by-step demo showing Kolumn capabilities</p>
+                  <a href="demo-step1-baseline.kl" class="example-link">Step 1: Baseline</a>
+                  <a href="demo-step2-add-column.kl" class="example-link">Step 2: Add Column</a>
+                  <a href="demo-step3-add-pii.kl" class="example-link">Step 3: Add PII</a>
+                  <a href="demo-step4-complex-evolution.kl" class="example-link">Step 4: Complex Evolution</a>
+              </div>
+              
+              <div class="category">
+                  <h2>🏢 Enterprise Examples</h2>
+                  <p class="description">Enterprise-grade configurations with governance</p>
+                  <a href="enterprise/governance-lineage-complete.kl" class="example-link">Governance & Lineage</a>
+                  <a href="enterprise/sso-rbac-complete.kl" class="example-link">SSO & RBAC</a>
+                  <a href="enterprise/hsm-encryption-advanced.kl" class="example-link">HSM Encryption</a>
+              </div>
+              
+              <div class="category">
+                  <h2>🔗 Multi-Provider</h2>
+                  <p class="description">Examples spanning multiple data providers</p>
+                  <a href="multi-provider-ecommerce.kl" class="example-link">E-commerce Platform</a>
+                  <a href="universal-file-processing.kl" class="example-link">Universal File Processing</a>
+              </div>
+              
+              <div class="category">
+                  <h2>📋 Configuration</h2>
+                  <p class="description">Backend and variable configuration examples</p>
+                  <a href="backends/" class="example-link">Backend Configs</a>
+                  <a href="config/" class="example-link">API Settings</a>
+                  <a href="variables.klvars" class="example-link">Development Variables</a>
+                  <a href="production.klvars" class="example-link">Production Variables</a>
+              </div>
+              
+              <div class="category">
+                  <h2>📄 Documentation</h2>
+                  <p class="description">Detailed documentation and guides</p>
+                  <a href="DEMO_INSTRUCTIONS.md" class="example-link">Demo Instructions</a>
+                  <a href="FILE_DISCOVERY_README.md" class="example-link">File Discovery Guide</a>
+                  <a href="variables-README.md" class="example-link">Variables Guide</a>
+              </div>
+              
+              <p style="margin-top: 3em; text-align: center; color: #666;">
+                  <a href="https://github.com/schemabounce/Kolumn-deploy">View on GitHub</a> | 
+                  <a href="https://schemabounce.github.io/Kolumn-deploy/">Install Kolumn</a>
+              </p>
+          </body>
+          </html>
+          EOF
+          
+          # Silent verification that examples were copied
+          if [ ! -d "examples" ] || [ -z "$(find examples -type f)" ]; then
+            echo "❌ Examples deployment failed"
+            exit 1
+          fi
 
       - name: Deploy binaries to public repo
         run: |
@@ -312,77 +508,8 @@ jobs:
           VERSION="${{ inputs.version }}"
           TAG="${{ inputs.tag }}"
           
-          # Create release notes with beta detection
-          if [[ "$VERSION" == *"beta"* ]]; then
-            cat > release-notes.md << EOF
-          # Kolumn ${VERSION} 🚧 BETA RELEASE
-          
-          > **⚠️ BETA SOFTWARE**: This is a pre-release beta version of Kolumn. While functional, it may contain bugs and breaking changes. Not recommended for production use.
-          
-          Infrastructure-as-code tool for the modern data stack with enterprise governance.
-          
-          ## 🚧 Beta Notice
-          
-          **This is beta software in active development:**
-          - ✅ Core functionality is working and tested
-          - ⚠️ APIs may change between beta releases  
-          - 🐛 Some features may have bugs or limitations
-          - 📝 Documentation is still being completed
-          - 🔄 Breaking changes possible until v1.0.0
-          
-          **Production Readiness**: This beta is suitable for:
-          - ✅ Development and testing environments
-          - ✅ Proof-of-concept projects
-          - ✅ Feature evaluation and feedback  
-          - ❌ Critical production workloads (wait for v1.0.0)
-          
-          ## 🚀 Installation
-          
-          ### Quick Install (Recommended)
-          \`\`\`bash
-          curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash
-          \`\`\`
-          
-          ### Manual Download
-          Download the appropriate package for your platform:
-          - Linux AMD64: [kolumn-${VERSION}-linux-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-linux-amd64.tar.gz)
-          - Linux ARM64: [kolumn-${VERSION}-linux-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-linux-arm64.tar.gz)
-          - macOS AMD64: [kolumn-${VERSION}-darwin-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-darwin-amd64.tar.gz)
-          - macOS ARM64: [kolumn-${VERSION}-darwin-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-darwin-arm64.tar.gz)
-          - Windows AMD64: [kolumn-${VERSION}-windows-amd64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-windows-amd64.zip)
-          - Windows ARM64: [kolumn-${VERSION}-windows-arm64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/${TAG}/kolumn-${VERSION}-windows-arm64.zip)
-          
-          ## ✨ What's Included
-          - **kolumn**: Main CLI binary
-          - **kolumn-provider-kolumn**: Governance provider binary
-          - Multi-platform support (Linux, macOS, Windows)
-          - Both AMD64 and ARM64 architectures
-          
-          ## 🎯 Getting Started
-          \`\`\`bash
-          # Verify installation
-          kolumn version
-          
-          # Create a new project
-          kolumn init
-          
-          # See available commands
-          kolumn --help
-          \`\`\`
-          
-          ## 🔗 Links
-          - 📖 [Documentation](https://schemabounce.github.io/Kolumn-deploy)
-          - 💬 [Support](https://github.com/schemabounce/Kolumn-deploy/issues)
-          
-          ## 💬 Beta Feedback
-          We'd love your feedback on this beta release:
-          - 🐛 [Report bugs](https://github.com/schemabounce/Kolumn-deploy/issues)
-          - 💡 [Request features](https://github.com/schemabounce/Kolumn-deploy/issues)
-          - 💬 [Join discussions](https://github.com/schemabounce/Kolumn-deploy/discussions)
-          EOF
-          else
-            # Standard release notes for stable versions
-            cat > release-notes.md << EOF
+          # Create release notes
+          cat > release-notes.md << EOF
           # Kolumn ${VERSION}
           
           Infrastructure-as-code tool for the modern data stack with enterprise governance.
@@ -408,24 +535,41 @@ jobs:
           - **kolumn-provider-kolumn**: Governance provider binary
           - Multi-platform support (Linux, macOS, Windows)
           - Both AMD64 and ARM64 architectures
+          - **📚 Complete examples directory** with project templates, demos, and documentation
           
           ## 🎯 Getting Started
           \`\`\`bash
           # Verify installation
           kolumn version
           
-          # Create a new project
-          kolumn init
+          # Browse examples online or download them
+          curl -L https://github.com/schemabounce/Kolumn-deploy/archive/refs/heads/main.zip -o kolumn-examples.zip
+          unzip kolumn-examples.zip
+          cd Kolumn-deploy-main/examples
           
-          # See available commands
-          kolumn --help
+          # Create a new project from template
+          cp -r project-structures/minimal-project/ my-project
+          cd my-project
+          
+          # Initialize and apply
+          kolumn init
+          kolumn plan
+          kolumn apply
           \`\`\`
+          
+          ## 📚 Examples & Documentation
+          - **🌐 Browse Examples**: [https://github.com/schemabounce/Kolumn-deploy/tree/main/examples](https://github.com/schemabounce/Kolumn-deploy/tree/main/examples)
+          - **📁 Project Templates**: Ready-to-use project structures (minimal, standard, data-platform, enterprise)
+          - **🎯 Step-by-Step Demos**: Progressive examples showing Kolumn capabilities
+          - **🏢 Enterprise Examples**: Governance, RBAC, encryption, and compliance configurations
+          - **🔗 Multi-Provider**: Examples spanning databases, streaming, ETL, and orchestration
+          - **📋 Configuration**: Backend configs, variables, and deployment patterns
           
           ## 🔗 Links
           - 📖 [Documentation](https://schemabounce.github.io/Kolumn-deploy)
+          - 📚 [Examples](https://github.com/schemabounce/Kolumn-deploy/tree/main/examples)
           - 💬 [Support](https://github.com/schemabounce/Kolumn-deploy/issues)
           EOF
-          fi
 
       - name: Commit and push to deploy repo
         run: |
@@ -441,7 +585,13 @@ jobs:
           - Added binaries for all platforms (Linux, macOS, Windows)
           - Updated install script
           - Updated version metadata
-          - Ready for GitHub release"
+          - Deployed examples directory from source repository
+          - Added examples README and HTML index for easy browsing
+          - Ready for GitHub release
+          
+          📚 Examples now publicly available at:
+          - https://github.com/schemabounce/Kolumn-deploy/tree/main/examples
+          - Project templates, demos, enterprise configs, and documentation"
               
               git push origin main
               echo "✅ Changes pushed to deploy repository"
@@ -489,3 +639,9 @@ jobs:
           echo "🎉 Successfully deployed Kolumn ${{ inputs.version }} to public repository!"
           echo "📦 Release: https://github.com/${{ env.DEPLOY_REPO }}/releases/tag/${{ inputs.tag }}"
           echo "🔗 Install: curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash"
+          echo "📚 Examples: https://github.com/${{ env.DEPLOY_REPO }}/tree/main/examples"
+          echo ""
+          echo "✅ Deployment includes:"
+          echo "   • Multi-platform binaries (Linux, macOS, Windows)"
+          echo "   • Updated install script and metadata"  
+          echo "   • Examples directory for getting started"

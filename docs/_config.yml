@@ -1,0 +1,21 @@
+# GitHub Pages Jekyll configuration for docs API
+# This ensures proper MIME types and allows direct JSON access
+
+include:
+  - "*.json"
+
+# Set proper MIME types for JSON files
+plugins:
+  - jekyll-optional-front-matter
+
+defaults:
+  - scope:
+      path: "**/*.json"
+    values:
+      layout: null
+
+# Enable direct access to JSON files
+keep_files:
+  - "*.json"
+  - "v*/docs.json" 
+  - "latest/docs.json"
