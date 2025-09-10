@@ -1,0 +1,252 @@
+# Enterprise Project - Main Configuration
+# Core enterprise data platform with module integration and governance
+
+# === DATA-CENTRIC MODULE INTEGRATION (AUTO-DISCOVERED) ===
+# Modules are automatically discovered from modules/ directory
+# - data-warehouse: Snowflake databases, analytical tables, OLAP cubes, stored procedures
+# - streaming: Kafka topics, real-time processing, stream analytics, data connectors
+# - governance: Universal data classifications, RBAC, compliance policies
+
+# Reference auto-discovered data-centric modules (these will be found automatically)
+module "data_warehouse" {
+  # Auto-discovered from modules/data-warehouse/
+  # Provides: snowflake_databases, analytical_tables, views, procedures, tasks
+
+  environment           = var.environment
+  project_name          = var.project_name
+  snowflake_config      = var.snowflake_config
+  data_retention_policy = var.data_retention_policy
+}
+
+module "streaming" {
+  # Auto-discovered from modules/streaming/
+  # Provides: kafka_topics, stream_processing, data_connectors, schema_registry
+
+  environment   = var.environment
+  project_name  = var.project_name
+  kafka_config  = var.kafka_config
+  feature_flags = var.feature_flags
+}
+
+module "governance" {
+  # Auto-discovered from modules/governance/
+  # Provides: data_classifications, universal_data_objects, rbac_roles, compliance_policies
+
+  environment           = var.environment
+  organization          = var.organization
+  compliance_level      = var.compliance_level
+  encryption_level      = var.encryption_level
+  data_retention_policy = var.data_retention_policy
+}
+
+# === ENTERPRISE GOVERNANCE FRAMEWORK ===
+
+# Load governance configuration from data directory
+# This will be loaded automatically by the DirectoryLoader
+
+# === CORE DATA PLATFORM RESOURCES ===
+
+# PostgreSQL Analytical Database using governance classifications
+create "postgres_table" "enterprise_customers" {
+  # Use universal customer data object with governance from modules
+  columns = module.governance.universal_data_objects.customer_profile.columns
+
+  # Apply enterprise table settings
+  schema = var.environment == "production" ? "public" : var.environment
+
+  # Use governance-driven encryption based on column classifications
+  encryption_config = {
+    method = var.encryption_level == "maximum" ? "column_level" : "table_level"
+    classifications_encrypted = [
+      "HIGHLY_SENSITIVE_PII",
+      "FINANCIAL_DATA"
+    ]
+  }
+
+  # Performance optimizations
+  partitioning = {
+    type     = "range"
+    column   = "created_at"
+    interval = var.environment == "production" ? "1 month" : "1 year"
+  }
+
+  indexes = [
+    {
+      name    = "idx_customer_email_hash"
+      columns = ["email"]
+      type    = "hash"
+      where   = var.encryption_level != "basic" ? "email IS NOT NULL" : null
+    },
+    {
+      name    = "idx_customer_segment_created"
+      columns = ["customer_segment", "created_at"]
+      type    = "btree"
+    }
+  ]
+
+  # Row Level Security based on governance roles
+  row_level_security = {
+    enabled = contains(["strict", "maximum"], var.compliance_level)
+
+    policies = [
+      {
+        name       = "customer_data_scientist_policy"
+        for_roles  = [module.governance.rbac_roles.data_scientist.name]
+        expression = "true" # Access allowed but data will be masked via governance
+      },
+      {
+        name       = "customer_financial_analyst_policy"
+        for_roles  = [module.governance.rbac_roles.financial_analyst.name]
+        expression = "customer_segment IN ('PREMIUM', 'GOLD')" # Limited customer access
+      }
+    ]
+  }
+}
+
+# Financial transaction table using governance
+create "postgres_table" "enterprise_transactions" {
+  # Use universal transaction data object with governance from modules
+  columns = module.governance.universal_data_objects.financial_transaction.columns
+
+  # Apply financial data governance settings
+  schema = "transactions"
+
+  # Financial-grade encryption and compliance
+  encryption_config = {
+    method                    = "column_level" # Always use column-level for financial data
+    classifications_encrypted = ["FINANCIAL_DATA", "BUSINESS_CONFIDENTIAL"]
+    key_rotation_days         = 90
+  }
+
+  # Time-series partitioning for financial data
+  partitioning = {
+    type             = "range"
+    column           = "created_at"
+    interval         = "1 month"
+    retention_months = var.data_retention_policy.financial_retention_days / 30
+  }
+
+  # Financial compliance indexes
+  indexes = [
+    {
+      name    = "idx_transaction_customer_date"
+      columns = ["customer_id", "created_at"]
+      type    = "btree"
+    },
+    {
+      name    = "idx_transaction_amount_type"
+      columns = ["transaction_amount", "transaction_type"]
+      type    = "btree"
+      where   = "transaction_amount > 10000" # Large transactions
+    },
+    {
+      name    = "idx_transaction_fraud_score"
+      columns = ["fraud_score"]
+      type    = "btree"
+      where   = "fraud_score > 0.5" # Suspicious transactions
+    }
+  ]
+
+  # Enhanced auditing for financial compliance
+  audit_config = {
+    enabled       = contains(["strict", "maximum"], var.compliance_level)
+    audit_columns = ["transaction_amount", "fraud_score", "risk_category"]
+    immutable_log = var.data_retention_policy.financial_retention_days > 2000
+  }
+}
+
+# Cross-provider data integration using streaming modules
+create "kafka_topic" "enterprise_integration" {
+  name = "enterprise-data-integration-${var.environment}"
+
+  # Reference streaming module configuration
+  partitions         = module.streaming.streaming_topics.customer_events.partitions
+  replication_factor = var.environment == "production" ? 3 : 1
+
+  # Use governance-aware schema
+  schema = {
+    key_schema = "entity_id:STRING"
+    value_schema = {
+      entity_type         = "STRING"
+      entity_id           = "STRING"
+      data_classification = "STRING"
+      encrypted_payload   = "BYTES"
+      governance_metadata = "MAP<STRING,STRING>"
+      timestamp           = "TIMESTAMP"
+    }
+  }
+
+  config = {
+    "retention.ms"        = "2592000000" # 30 days
+    "cleanup.policy"      = "delete"
+    "min.insync.replicas" = var.environment == "production" ? "2" : "1"
+  }
+}
+
+# Data quality monitoring using governance classifications
+create "kolumn_data_quality_monitor" "enterprise_quality" {
+  name = "enterprise-data-quality-${var.environment}"
+
+  # Monitor all tables with governance classifications
+  monitored_resources = [
+    postgres_table.enterprise_customers,
+    postgres_table.enterprise_transactions
+  ]
+
+  # Quality rules based on data classifications
+  quality_rules = [
+    {
+      classification = "HIGHLY_SENSITIVE_PII"
+      rules = [
+        "null_percentage < 0.01",     # Less than 1% null values
+        "format_compliance > 0.99",   # 99% format compliance
+        "encryption_compliance = 1.0" # 100% encryption compliance
+      ]
+    },
+    {
+      classification = "FINANCIAL_DATA"
+      rules = [
+        "null_percentage < 0.001",       # Less than 0.1% null values
+        "range_compliance > 0.999",      # 99.9% range compliance
+        "audit_trail_completeness = 1.0" # 100% audit trail
+      ]
+    }
+  ]
+
+  # Alert on quality issues
+  alerting = {
+    enabled            = true
+    severity_threshold = var.environment == "production" ? "warning" : "error"
+    notification_channels = [
+      var.monitoring_config.alert_email,
+      var.monitoring_config.slack_webhook_url
+    ]
+  }
+}
+
+# === ENTERPRISE RESOURCE TAGGING ===
+
+# Universal tagging strategy applied to all resources
+locals {
+  common_tags = {
+    Environment  = var.environment
+    Project      = var.project_name
+    Organization = var.organization
+    Team         = var.team
+    CostCenter   = var.cost_center
+    Compliance   = var.compliance_level
+    ManagedBy    = "kolumn"
+    CreatedBy    = "enterprise-data-platform"
+    LastModified = timestamp()
+  }
+}
+
+# Apply common tags to all resources
+resource "null_resource" "apply_common_tags" {
+  triggers = {
+    tags = jsonencode(local.common_tags)
+  }
+}
+
+# === ENTERPRISE OUTPUTS ===
+# Outputs will be defined in outputs.kl following the multi-file structure

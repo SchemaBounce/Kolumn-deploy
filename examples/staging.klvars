@@ -1,0 +1,162 @@
+# Staging Environment Variables
+# This file demonstrates staging environment configurations that mirror production
+# but with reduced scale and relaxed settings for testing
+
+# Staging Database Settings (Production-like but scaled down)
+database_host = "staging-db.company.internal"
+database_port = 5432
+database_name = "staging_application"
+database_ssl_mode = "require"
+database_ssl_cert = "/etc/ssl/certs/staging-postgresql.crt"
+database_ssl_key = "/etc/ssl/private/staging-postgresql.key"
+
+# Staging Environment Configuration
+environment = "staging"
+debug_enabled = false  # Production-like
+log_level = "info"
+metrics_enabled = true
+performance_testing_mode = true
+
+# Moderate Connection Pool for Staging
+max_connections = 50
+connection_timeout = "10s"
+idle_timeout = "15m"
+pool_max_idle_conns = 15
+pool_max_open_conns = 50
+
+# Staging Security (Production-like but with testing accommodations)
+enable_encryption = true
+encryption_algorithm = "AES-256-GCM"
+key_rotation_enabled = false  # Disabled for testing consistency
+audit_logging = true
+audit_retention_days = 90  # Shorter than production
+access_logging = true
+sensitive_data_masking = true
+test_account_access = true  # Allow test accounts
+
+# Application Configuration
+app_name = "Staging Application"
+app_version = "2.1.4-staging"
+release_candidate = true
+pre_production_testing = true
+
+# Staging Network Configuration
+allowed_hosts = [
+  "*.staging.company.com",
+  "*.company.internal",
+  "staging-app-01.internal",
+  "staging-lb.company.internal",
+  "test-client.company.com"
+]
+
+# Staging Feature Flags (Mirror production + experimental)
+feature_flags = {
+  new_ui = true
+  advanced_analytics = true
+  beta_features = true  # Test upcoming features
+  experimental_features = true
+  a_b_testing = true
+  real_time_notifications = true
+  load_testing_mode = true
+  chaos_engineering = false  # Enable for resilience testing
+}
+
+# Staging Database Configuration (Scaled-down production)
+postgres_staging_config = {
+  # Memory settings (scaled down from production)
+  shared_buffers = "1GB"
+  effective_cache_size = "3GB"
+  work_mem = "32MB"
+  maintenance_work_mem = "256MB"
+  
+  # WAL settings
+  max_wal_size = "2GB"
+  min_wal_size = "512MB"
+  checkpoint_completion_target = 0.9
+  
+  # Connection settings
+  max_connections = 100
+  
+  # Monitoring and performance extensions
+  shared_preload_libraries = "pg_stat_statements,auto_explain,pg_cron"
+  
+  # Logging (more verbose than production for testing)
+  log_statement = "ddl"  # Log schema changes
+  log_min_duration_statement = 500  # Log queries > 500ms
+  log_connections = true
+  log_disconnections = true
+  log_checkpoints = true
+}
+
+# Staging Resource Tags
+resource_tags = {
+  project = "core-platform"
+  owner = "qa-team"
+  environment = "staging"
+  cost_center = "quality-assurance"
+  backup_required = "true"
+  monitoring_tier = "important"
+  compliance = "testing"
+  data_classification = "test-data"
+  disaster_recovery = "tier2"
+  auto_refresh = "weekly"
+}
+
+# Staging Backup Configuration (Regular but not as critical)
+backup_settings = {
+  enabled = true
+  schedule = "0 3 * * *"  # Daily at 3 AM (after production backup)
+  retention_days = 30
+  encryption_enabled = true
+  cross_region_replication = false
+  point_in_time_recovery = true
+  restore_testing = true  # Regular restore tests
+}
+
+# Staging Monitoring (Production-like)
+monitoring = {
+  enabled = true
+  cpu_alert_threshold = 85
+  memory_alert_threshold = 90
+  disk_alert_threshold = 85
+  connection_alert_threshold = 80
+  query_performance_monitoring = true
+  slow_query_threshold_ms = 500
+  synthetic_monitoring = true
+  load_testing_alerts = true
+}
+
+# Staging Testing Configuration
+testing = {
+  automated_testing_enabled = true
+  performance_testing_enabled = true
+  security_testing_enabled = true
+  chaos_engineering_enabled = false
+  load_testing_schedule = "0 4 * * 0"  # Weekly load tests
+  data_refresh_schedule = "0 2 * * 0"  # Weekly data refresh from production
+  test_data_anonymization = true
+}
+
+# Staging Data Management
+data_management = {
+  refresh_from_production = true
+  data_masking_enabled = true
+  subset_size_percent = 50  # 50% of production data size
+  anonymization_rules = {
+    email_addresses = "faker"
+    phone_numbers = "faker"
+    ssn = "mask"
+    credit_cards = "mask"
+  }
+}
+
+# Staging Performance Testing
+performance_testing = {
+  enabled = true
+  concurrent_users_max = 500
+  ramp_up_duration = "5m"
+  test_duration = "30m"
+  target_rps = 1000
+  acceptable_latency_p95 = "200ms"
+  acceptable_error_rate = "0.1%"
+}

@@ -1,0 +1,784 @@
+# Advanced HSM and Encryption Configuration
+# Demonstrates enterprise-grade key management and encryption
+
+# =====================================
+# MULTI-CLOUD HSM CONFIGURATION
+# =====================================
+
+# AWS CloudHSM Configuration
+create "kolumn_hsm_provider" "aws_cloudhsm" {
+  name          = "AWS CloudHSM Production"
+  provider_type = "aws_cloudhsm"
+
+  configuration {
+    cluster_id      = var.aws_cloudhsm_cluster_id
+    region          = var.aws_region
+    crypto_user     = var.cloudhsm_crypto_user
+    crypto_password = var.cloudhsm_crypto_password
+
+    # High availability configuration
+    availability_zones    = ["us-west-2a", "us-west-2b", "us-west-2c"]
+    backup_retention_days = 30
+
+    # Performance tuning
+    connection_pool_size = 20
+    session_timeout      = "30m"
+    retry_attempts       = 3
+  }
+
+  key_management {
+    auto_generate_keys = true
+    key_types          = ["AES-256", "RSA-4096", "ECC-P384"]
+
+    # Automated key lifecycle
+    key_rotation_schedule = "0 2 1 * *" # Monthly on 1st at 2 AM
+    key_retirement_policy = "90d"
+    key_archival_policy   = "7y"
+
+    # Key naming convention
+    key_naming_pattern = "kolumn-${environment}-${classification}-${timestamp}"
+
+    # Key usage policies
+    key_usage_policies = {
+      aes_256 = {
+        max_encryptions       = 1000000
+        max_age_days          = 90
+        rotation_warning_days = 7
+      }
+      rsa_4096 = {
+        max_signatures        = 100000
+        max_age_days          = 365
+        rotation_warning_days = 30
+      }
+    }
+  }
+
+  performance_optimization {
+    connection_pooling = true
+    max_connections    = 25
+    cache_keys         = true
+    cache_ttl          = "4h"
+
+    # Load balancing across HSM instances
+    load_balancing        = "round_robin"
+    health_check_interval = "30s"
+
+    # Performance monitoring
+    metrics_collection = true
+    performance_alerts = {
+      latency_threshold_ms = 100
+      error_rate_threshold = 0.01
+      throughput_threshold = 1000
+    }
+  }
+
+  compliance {
+    fips_140_2_level_3        = true
+    common_criteria_eal4_plus = true
+    audit_logging             = true
+    tamper_detection          = true
+
+    # Compliance reporting
+    compliance_reports = {
+      soc2               = true
+      pci_dss            = true
+      fips_certification = true
+    }
+  }
+
+  security {
+    # Multi-factor authentication for HSM access
+    mfa_required           = true
+    authentication_methods = ["smart_card", "biometric"]
+
+    # Role separation
+    crypto_officer_role   = "hsm_crypto_officer"
+    security_officer_role = "hsm_security_officer"
+
+    # Network security
+    vpc_endpoints_only  = true
+    tls_version         = "1.3"
+    certificate_pinning = true
+  }
+}
+
+# Azure Dedicated HSM Configuration
+create "kolumn_hsm_provider" "azure_dedicated_hsm" {
+  name          = "Azure Dedicated HSM"
+  provider_type = "azure_dedicated_hsm"
+
+  configuration {
+    resource_group = var.azure_resource_group
+    location       = var.azure_location
+    hsm_name       = var.azure_hsm_name
+
+    # Network configuration
+    subnet_id          = var.azure_hsm_subnet_id
+    private_ip_address = var.azure_hsm_private_ip
+
+    # Authentication
+    tenant_id     = var.azure_tenant_id
+    client_id     = var.azure_client_id
+    client_secret = var.azure_client_secret
+  }
+
+  key_management {
+    auto_generate_keys    = true
+    key_types             = ["AES-256", "RSA-2048", "ECC-P256"]
+    key_rotation_schedule = "0 3 15 * *" # Mid-month at 3 AM
+  }
+
+  performance_optimization {
+    connection_pooling = true
+    max_connections    = 15
+    cache_keys         = true
+    cache_ttl          = "2h"
+  }
+
+  compliance {
+    fips_140_2_level_3 = true
+    common_criteria    = true
+    audit_logging      = true
+  }
+}
+
+# =====================================
+# COMPREHENSIVE KEY ROTATION STRATEGY
+# =====================================
+
+# Production Key Rotation Policy
+create "kolumn_key_rotation" "production_rotation" {
+  name = "Production Key Rotation Policy"
+
+  rotation_policy {
+    # Staggered rotation to minimize impact
+    frequency           = "monthly"
+    schedule            = "0 3 1 * *" # 1st of month at 3 AM
+    grace_period        = "14d"       # Two week grace period
+    notification_window = "72h"       # 3 day advance notice
+
+    # Emergency rotation procedures
+    emergency_rotation = {
+      enabled               = true
+      max_rotation_time     = "15m"
+      notification_channels = ["security-alerts", "pager-duty"]
+    }
+  }
+
+  # Key type specific rotation schedules
+  key_types = [
+    {
+      type               = "database_master_key"
+      providers          = ["postgres", "mysql", "mssql"]
+      rotation_frequency = "annually"
+      hsm_required       = true
+      backup_required    = true
+    },
+    {
+      type                         = "column_encryption_key"
+      providers                    = ["postgres", "mysql"]
+      rotation_frequency           = "quarterly"
+      derive_from_master           = true
+      performance_testing_required = true
+    },
+    {
+      type                   = "kafka_cluster_key"
+      providers              = ["kafka"]
+      rotation_frequency     = "monthly"
+      zero_downtime_required = true
+      canary_rollout         = true
+    },
+    {
+      type                = "application_encryption_key"
+      providers           = ["s3", "azure_blob"]
+      rotation_frequency  = "monthly"
+      envelope_encryption = true
+    },
+    {
+      type                    = "audit_signing_key"
+      providers               = ["kolumn"]
+      rotation_frequency      = "quarterly"
+      tamper_evident_required = true
+      dual_control_required   = true
+    }
+  ]
+
+  backup_strategy {
+    create_backup      = true
+    backup_location    = "s3://company-key-vault-backups/"
+    encryption_at_rest = true
+    retention_period   = "10y"
+
+    # Geographic distribution
+    backup_regions           = ["us-west-2", "us-east-1", "eu-west-1"]
+    cross_region_replication = true
+
+    # Backup verification
+    verify_backups        = true
+    verification_schedule = "weekly"
+    test_restore_monthly  = true
+  }
+
+  validation {
+    test_new_keys            = true
+    performance_benchmarking = true
+    rollback_on_failure      = true
+    health_checks            = true
+
+    # Comprehensive testing pipeline
+    testing_phases = [
+      {
+        phase    = "unit_test"
+        duration = "5m"
+        tests    = ["key_generation", "encryption_decryption", "signature_verification"]
+      },
+      {
+        phase    = "integration_test"
+        duration = "15m"
+        tests    = ["database_connectivity", "application_compatibility", "performance_baseline"]
+      },
+      {
+        phase    = "canary_test"
+        duration = "30m"
+        tests    = ["production_traffic_subset", "monitoring_validation", "rollback_test"]
+      }
+    ]
+
+    notification_endpoints = [
+      "security-team@company.com",
+      "infrastructure-team@company.com",
+      "compliance@company.com"
+    ]
+  }
+
+  compliance_integration {
+    audit_trail       = true
+    change_management = true
+    approval_workflow = true
+
+    # Regulatory compliance
+    frameworks          = ["SOC2", "PCI-DSS", "FIPS-140-2"]
+    evidence_collection = true
+    automated_reporting = true
+  }
+}
+
+# Development Environment Rotation (Less Frequent)
+create "kolumn_key_rotation" "development_rotation" {
+  name = "Development Key Rotation Policy"
+
+  rotation_policy {
+    frequency           = "quarterly"
+    schedule            = "0 2 15 */3 *" # 15th of every 3rd month at 2 AM
+    grace_period        = "30d"
+    notification_window = "48h"
+  }
+
+  key_types = [
+    {
+      type               = "development_master_key"
+      providers          = ["postgres", "mysql"]
+      rotation_frequency = "semi_annually"
+      hsm_required       = false
+    },
+    {
+      type                = "test_data_encryption"
+      providers           = ["postgres", "kafka"]
+      rotation_frequency  = "quarterly"
+      synthetic_data_only = true
+    }
+  ]
+
+  backup_strategy {
+    create_backup    = false # Development can regenerate
+    retention_period = "90d"
+  }
+
+  validation {
+    test_new_keys       = true
+    rollback_on_failure = true
+    health_checks       = false # Less critical for dev
+  }
+}
+
+# =====================================
+# ADVANCED ENCRYPTION POLICIES
+# =====================================
+
+# Enterprise-Wide Encryption Policy
+create "kolumn_encryption_policy" "enterprise_encryption_v2" {
+  name           = "Enterprise Encryption Policy v2.0"
+  version        = "2.0"
+  effective_date = "2024-01-01"
+
+  # Global encryption standards
+  default_encryption {
+    enabled         = true
+    algorithm       = "AES-256-GCM"
+    key_derivation  = "hsm_derived"
+    salt_generation = "cryptographically_secure"
+
+    # Performance optimizations
+    hardware_acceleration = true
+    batch_encryption      = true
+    parallel_processing   = true
+  }
+
+  # Classification-based encryption requirements
+  classification_policies = {
+    pii = {
+      encryption_required = true
+      key_rotation_days   = 90
+      algorithm           = "AES-256-GCM"
+      hsm_required        = true
+      backup_encryption   = true
+
+      # Advanced PII protection
+      tokenization_required        = true
+      format_preserving_encryption = true
+      searchable_encryption        = true
+
+      # Compliance requirements
+      gdpr_compliance  = true
+      right_to_erasure = true
+      data_portability = true
+    }
+
+    financial = {
+      encryption_required = true
+      key_rotation_days   = 30
+      algorithm           = "AES-256-GCM"
+      hsm_required        = true
+      backup_encryption   = true
+
+      # Financial data specific requirements
+      tokenization_required = true
+      dual_control_required = true
+      immutable_audit_trail = true
+
+      # PCI-DSS requirements
+      pci_dss_compliance         = true
+      cardholder_data_protection = true
+      secure_key_management      = true
+    }
+
+    healthcare = {
+      encryption_required = true
+      key_rotation_days   = 60
+      algorithm           = "AES-256-GCM"
+      hsm_required        = true
+      backup_encryption   = true
+
+      # HIPAA requirements
+      hipaa_compliance           = true
+      phi_protection             = true
+      minimum_necessary_standard = true
+
+      # Healthcare specific features
+      patient_consent_tracking = true
+      data_breach_notification = true
+    }
+
+    confidential = {
+      encryption_required = true
+      key_rotation_days   = 45
+      algorithm           = "AES-256-GCM"
+      hsm_required        = true
+      backup_encryption   = true
+
+      # Corporate confidential data
+      trade_secret_protection          = true
+      intellectual_property_protection = true
+      access_logging_required          = true
+    }
+
+    internal = {
+      encryption_required = true
+      key_rotation_days   = 180
+      algorithm           = "AES-256-GCM"
+      hsm_required        = false
+      backup_encryption   = true
+    }
+
+    public = {
+      encryption_required = false
+      algorithm           = "AES-128-GCM"
+      key_rotation_days   = 365
+      hsm_required        = false
+      backup_encryption   = false
+    }
+  }
+
+  # Provider-specific encryption configurations
+  provider_specific = {
+    postgres = {
+      # Database-level encryption
+      tde_enabled   = true
+      tde_algorithm = "AES-256-XTS"
+
+      # Column-level encryption
+      column_encryption           = true
+      column_encryption_algorithm = "AES-256-GCM"
+      deterministic_encryption    = true # For searchable encryption
+
+      # Tablespace encryption
+      tablespace_encryption = true
+      temp_file_encryption  = true
+
+      # Backup encryption
+      backup_encryption  = true
+      backup_compression = true
+
+      # Performance tuning
+      encryption_cache_size = "256MB"
+      parallel_encryption   = true
+    }
+
+    mysql = {
+      # InnoDB encryption
+      innodb_encryption       = true
+      encryption_key_rotation = true
+
+      # Binary log encryption
+      binlog_encryption              = true
+      binlog_transaction_compression = true
+
+      # Tablespace encryption
+      general_tablespace_encryption = true
+
+      # Performance optimization
+      innodb_encryption_threads = 8
+    }
+
+    kafka = {
+      # Encryption in transit
+      encryption_in_transit = true
+      ssl_protocol          = "TLSv1.3"
+      ssl_cipher_suites     = ["TLS_AES_256_GCM_SHA384"]
+
+      # Encryption at rest
+      encryption_at_rest     = true
+      log_segment_encryption = true
+
+      # Schema registry encryption
+      schema_registry_encryption = true
+      schema_registry_ssl        = true
+
+      # Message-level encryption
+      field_level_encryption = true
+      envelope_encryption    = true
+
+      # Key management
+      kafka_key_rotation    = true
+      ssl_key_rotation_days = 90
+    }
+
+    s3 = {
+      # Default encryption
+      default_encryption = "SSE-KMS"
+      kms_key_rotation   = true
+
+      # Bucket policies
+      enforce_encryption             = true
+      deny_unencrypted_uploads       = true
+      deny_unencrypted_object_access = true
+
+      # Object-level encryption
+      object_encryption    = "SSE-KMS"
+      multipart_encryption = true
+
+      # Cross-region replication encryption
+      replication_encryption = true
+
+      # Access logging encryption
+      access_log_encryption = true
+    }
+
+    azure_blob = {
+      # Storage service encryption
+      sse_enabled           = true
+      customer_managed_keys = true
+
+      # Blob encryption scope
+      encryption_scope_enabled = true
+      default_encryption_scope = "enterprise-scope"
+
+      # Infrastructure encryption
+      infrastructure_encryption = true
+    }
+
+    dagster = {
+      # Asset encryption
+      asset_encryption                = true
+      intermediate_storage_encryption = true
+
+      # Compute log encryption
+      compute_log_encryption = true
+
+      # Run storage encryption
+      run_storage_encryption = true
+      event_log_encryption   = true
+    }
+  }
+
+  # Compliance framework mappings
+  compliance_mapping = {
+    gdpr = {
+      requirements = [
+        "encryption_at_rest",
+        "encryption_in_transit",
+        "right_to_erasure_support",
+        "pseudonymization",
+        "data_minimization"
+      ]
+      applicable_classifications = ["pii"]
+    }
+
+    pci_dss = {
+      requirements = [
+        "hsm_for_financial",
+        "key_rotation",
+        "dual_control",
+        "cardholder_data_encryption",
+        "secure_key_management"
+      ]
+      applicable_classifications = ["financial"]
+    }
+
+    hipaa = {
+      requirements = [
+        "encryption_required",
+        "access_logging",
+        "audit_trail",
+        "phi_protection",
+        "minimum_necessary"
+      ]
+      applicable_classifications = ["healthcare"]
+    }
+
+    sox = {
+      requirements = [
+        "financial_data_encryption",
+        "immutable_audit_trail",
+        "dual_control",
+        "change_management"
+      ]
+      applicable_classifications = ["financial", "confidential"]
+    }
+
+    iso_27001 = {
+      requirements = [
+        "encryption_standards",
+        "key_management",
+        "access_control",
+        "incident_response"
+      ]
+      applicable_classifications = ["confidential", "internal"]
+    }
+  }
+
+  # Performance optimization settings
+  performance_optimization = {
+    # Hardware acceleration
+    aes_ni_instructions = true
+    avx2_instructions   = true
+
+    # Caching strategies
+    key_caching    = true
+    key_cache_size = "512MB"
+    key_cache_ttl  = "4h"
+
+    # Batch processing
+    batch_encryption = true
+    batch_size       = 10000
+    parallel_batches = 4
+
+    # Memory optimization
+    secure_memory_allocation = true
+    memory_zeroing           = true
+    stack_protection         = true
+  }
+
+  # Monitoring and alerting
+  monitoring = {
+    encryption_performance_metrics = true
+    key_usage_analytics            = true
+    compliance_dashboards          = true
+
+    alerts = {
+      key_rotation_failures              = true
+      encryption_performance_degradation = true
+      compliance_violations              = true
+      unauthorized_access_attempts       = true
+    }
+
+    reporting = {
+      monthly_compliance_reports     = true
+      quarterly_security_assessments = true
+      annual_encryption_audits       = true
+    }
+  }
+
+  # Emergency procedures
+  emergency_procedures = {
+    key_compromise_response = {
+      immediate_key_rotation       = true
+      affected_data_identification = true
+      incident_reporting           = true
+      regulatory_notification      = true
+    }
+
+    disaster_recovery = {
+      cross_region_key_backup = true
+      emergency_key_access    = true
+      backup_verification     = true
+      recovery_testing        = true
+    }
+  }
+}
+
+# =====================================
+# ENVELOPE ENCRYPTION CONFIGURATION
+# =====================================
+
+# Advanced Envelope Encryption Setup
+create "kolumn_encryption_policy" "envelope_encryption_policy" {
+  name = "Envelope Encryption Policy"
+
+  envelope_encryption = {
+    enabled = true
+
+    # Master key configuration
+    master_key_provider      = kolumn_hsm_provider.aws_cloudhsm.name
+    master_key_algorithm     = "AES-256-GCM"
+    master_key_rotation_days = 90
+
+    # Data encryption key (DEK) configuration
+    dek_algorithm          = "AES-256-GCM"
+    dek_size_bits          = 256
+    dek_rotation_frequency = "per_batch" # New DEK for each batch
+    dek_cache_enabled      = false       # Don't cache DEKs for security
+
+    # Key derivation function
+    kdf_algorithm = "HKDF-SHA256"
+    kdf_salt_size = 32
+    kdf_info      = "Kolumn-envelope-encryption-v1"
+
+    # Performance optimization
+    parallel_dek_generation   = true
+    dek_generation_batch_size = 100
+    hardware_acceleration     = true
+  }
+
+  # Provider-specific envelope encryption
+  provider_configurations = {
+    s3 = {
+      envelope_encryption = true
+      s3_kms_integration  = true
+      object_level_deks   = true
+
+      # S3-specific optimizations
+      multipart_encryption = true
+      encryption_context = {
+        purpose        = "data-lake-storage"
+        classification = "auto-detected"
+      }
+    }
+
+    kafka = {
+      envelope_encryption      = true
+      topic_level_deks         = true
+      message_level_encryption = true
+
+      # Kafka-specific settings
+      producer_encryption         = true
+      consumer_decryption         = true
+      schema_registry_integration = true
+    }
+
+    postgres = {
+      envelope_encryption      = true
+      tablespace_level_deks    = true
+      column_family_encryption = true
+
+      # PostgreSQL-specific settings
+      wal_encryption       = true
+      temp_file_encryption = true
+      backup_encryption    = true
+    }
+  }
+
+  # Security controls
+  security_controls = {
+    dek_secure_deletion      = true
+    memory_protection        = true
+    side_channel_protection  = true
+    timing_attack_protection = true
+
+    # Audit and monitoring
+    envelope_operation_logging  = true
+    dek_lifecycle_tracking      = true
+    master_key_usage_monitoring = true
+  }
+}
+
+# =====================================
+# ZERO-KNOWLEDGE ENCRYPTION
+# =====================================
+
+# Client-Side Encryption Configuration
+create "kolumn_encryption_policy" "client_side_encryption" {
+  name = "Client-Side Encryption Policy"
+
+  client_side_encryption = {
+    enabled = true
+
+    # Client key management
+    client_key_generation = true
+    client_key_storage    = "secure_enclave" # Hardware security
+    client_key_rotation   = "user_controlled"
+
+    # Encryption configuration
+    algorithm      = "AES-256-GCM"
+    key_derivation = "PBKDF2-SHA256"
+    iterations     = 100000
+    salt_size      = 32
+
+    # Zero-knowledge properties
+    server_side_decryption = false
+    key_escrow             = false
+    server_key_access      = false
+
+    # Performance considerations
+    streaming_encryption = true
+    chunked_processing   = true
+    chunk_size           = "64KB"
+  }
+
+  # Application integration
+  application_integration = {
+    transparent_encryption = false # Explicit client control
+    sdk_integration        = true
+    api_encryption_headers = true
+
+    # Client libraries
+    supported_languages = ["go", "python", "java", "javascript"]
+    library_versions = {
+      go         = "v2.1.0"
+      python     = "v2.1.0"
+      java       = "v2.1.0"
+      javascript = "v2.1.0"
+    }
+  }
+
+  # Compliance considerations
+  compliance = {
+    gdpr_compliant          = true
+    hipaa_compliant         = true
+    zero_trust_architecture = true
+
+    # Data sovereignty
+    cross_border_encryption   = true
+    jurisdictional_compliance = true
+  }
+}
