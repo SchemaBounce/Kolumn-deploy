@@ -1,0 +1,349 @@
+# Data Warehouse Module - Auto-discovered from modules/data-warehouse/
+# Provides enterprise data warehousing with Snowflake, analytical tables, and OLAP cubes
+
+# === MODULE VARIABLES ===
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+}
+
+variable "snowflake_config" {
+  description = "Snowflake configuration from parent"
+  type        = any
+}
+
+variable "data_retention_policy" {
+  description = "Data retention policy configuration"
+  type        = any
+}
+
+# === SNOWFLAKE DATABASES ===
+
+create "snowflake_database" "analytics_db" {
+  name    = upper("${var.project_name}_ANALYTICS_${var.environment}")
+  comment = "Primary analytics database for ${var.environment} environment"
+
+  # Data retention based on environment
+  data_retention_time_in_days = var.environment == "production" ? 90 : var.environment == "staging" ? 30 : 7
+}
+
+create "snowflake_database" "raw_data_db" {
+  name    = upper("${var.project_name}_RAW_${var.environment}")
+  comment = "Raw data ingestion database for ${var.environment} environment"
+
+  data_retention_time_in_days = var.environment == "production" ? 30 : 7
+}
+
+create "snowflake_database" "curated_db" {
+  name    = upper("${var.project_name}_CURATED_${var.environment}")
+  comment = "Curated and processed data for ${var.environment} environment"
+
+  data_retention_time_in_days = var.environment == "production" ? 180 : 14
+}
+
+# === SNOWFLAKE SCHEMAS ===
+
+create "snowflake_schema" "customer_analytics" {
+  database = snowflake_database.analytics_db.name
+  name     = "CUSTOMER_ANALYTICS"
+  comment  = "Customer analytics and segmentation data"
+}
+
+create "snowflake_schema" "financial_reporting" {
+  database = snowflake_database.analytics_db.name
+  name     = "FINANCIAL_REPORTING"
+  comment  = "Financial metrics and reporting data"
+}
+
+create "snowflake_schema" "operational_metrics" {
+  database = snowflake_database.analytics_db.name
+  name     = "OPERATIONAL_METRICS"
+  comment  = "Operational KPIs and performance metrics"
+}
+
+create "snowflake_schema" "raw_ingestion" {
+  database = snowflake_database.raw_data_db.name
+  name     = "INGESTION"
+  comment  = "Raw data landing zone"
+}
+
+# === ANALYTICAL TABLES ===
+
+create "snowflake_table" "customer_dimensions" {
+  database = snowflake_database.analytics_db.name
+  schema   = snowflake_schema.customer_analytics.name
+  name     = "DIM_CUSTOMERS"
+
+  column {
+    name     = "CUSTOMER_KEY"
+    type     = "NUMBER(38,0)"
+    nullable = false
+  }
+
+  column {
+    name     = "CUSTOMER_ID"
+    type     = "VARCHAR(50)"
+    nullable = false
+  }
+
+  column {
+    name     = "CUSTOMER_NAME"
+    type     = "VARCHAR(200)"
+    nullable = false
+  }
+
+  column {
+    name = "CUSTOMER_SEGMENT"
+    type = "VARCHAR(50)"
+  }
+
+  column {
+    name = "REGISTRATION_DATE"
+    type = "DATE"
+  }
+
+  column {
+    name = "LIFETIME_VALUE"
+    type = "NUMBER(15,2)"
+  }
+
+  column {
+    name     = "EFFECTIVE_DATE"
+    type     = "TIMESTAMP_NTZ"
+    nullable = false
+  }
+
+  column {
+    name = "EXPIRY_DATE"
+    type = "TIMESTAMP_NTZ"
+  }
+
+  column {
+    name    = "IS_CURRENT"
+    type    = "BOOLEAN"
+    default = "TRUE"
+  }
+
+  # Clustering for performance
+  cluster_by = ["CUSTOMER_SEGMENT", "REGISTRATION_DATE"]
+
+  comment = "Type 2 slowly changing dimension for customer data"
+}
+
+create "snowflake_table" "transaction_facts" {
+  database = snowflake_database.analytics_db.name
+  schema   = snowflake_schema.financial_reporting.name
+  name     = "FACT_TRANSACTIONS"
+
+  column {
+    name     = "TRANSACTION_KEY"
+    type     = "NUMBER(38,0)"
+    nullable = false
+  }
+
+  column {
+    name     = "CUSTOMER_KEY"
+    type     = "NUMBER(38,0)"
+    nullable = false
+  }
+
+  column {
+    name     = "TRANSACTION_DATE"
+    type     = "DATE"
+    nullable = false
+  }
+
+  column {
+    name     = "TRANSACTION_AMOUNT"
+    type     = "NUMBER(15,2)"
+    nullable = false
+  }
+
+  column {
+    name     = "TRANSACTION_TYPE"
+    type     = "VARCHAR(50)"
+    nullable = false
+  }
+
+  column {
+    name = "PAYMENT_METHOD"
+    type = "VARCHAR(50)"
+  }
+
+  column {
+    name    = "CURRENCY_CODE"
+    type    = "CHAR(3)"
+    default = "'USD'"
+  }
+
+  column {
+    name     = "CREATED_TIMESTAMP"
+    type     = "TIMESTAMP_NTZ"
+    nullable = false
+  }
+
+  # Partitioning and clustering for big data performance
+  cluster_by = ["TRANSACTION_DATE", "CUSTOMER_KEY"]
+
+  comment = "Transaction facts table with daily partitioning"
+}
+
+# === DATA WAREHOUSE VIEWS ===
+
+create "snowflake_view" "customer_summary" {
+  database = snowflake_database.analytics_db.name
+  schema   = snowflake_schema.customer_analytics.name
+  name     = "CUSTOMER_SUMMARY"
+
+  statement = <<-SQL
+    SELECT 
+        c.CUSTOMER_ID,
+        c.CUSTOMER_NAME,
+        c.CUSTOMER_SEGMENT,
+        c.REGISTRATION_DATE,
+        c.LIFETIME_VALUE,
+        COUNT(t.TRANSACTION_KEY) as TRANSACTION_COUNT,
+        SUM(t.TRANSACTION_AMOUNT) as TOTAL_SPENT,
+        MAX(t.TRANSACTION_DATE) as LAST_TRANSACTION_DATE
+    FROM ${snowflake_table.customer_dimensions.database}.${snowflake_table.customer_dimensions.schema}.${snowflake_table.customer_dimensions.name} c
+    LEFT JOIN ${snowflake_table.transaction_facts.database}.${snowflake_table.transaction_facts.schema}.${snowflake_table.transaction_facts.name} t
+        ON c.CUSTOMER_KEY = t.CUSTOMER_KEY
+    WHERE c.IS_CURRENT = TRUE
+    GROUP BY 
+        c.CUSTOMER_ID, c.CUSTOMER_NAME, c.CUSTOMER_SEGMENT, 
+        c.REGISTRATION_DATE, c.LIFETIME_VALUE
+  SQL
+
+  comment = "Customer analytics summary view with transaction aggregations"
+}
+
+create "snowflake_view" "monthly_revenue" {
+  database = snowflake_database.analytics_db.name
+  schema   = snowflake_schema.financial_reporting.name
+  name     = "MONTHLY_REVENUE"
+
+  statement = <<-SQL
+    SELECT 
+        DATE_TRUNC('MONTH', TRANSACTION_DATE) as MONTH,
+        TRANSACTION_TYPE,
+        PAYMENT_METHOD,
+        COUNT(*) as TRANSACTION_COUNT,
+        SUM(TRANSACTION_AMOUNT) as TOTAL_REVENUE,
+        AVG(TRANSACTION_AMOUNT) as AVERAGE_TRANSACTION
+    FROM ${snowflake_table.transaction_facts.database}.${snowflake_table.transaction_facts.schema}.${snowflake_table.transaction_facts.name}
+    GROUP BY DATE_TRUNC('MONTH', TRANSACTION_DATE), TRANSACTION_TYPE, PAYMENT_METHOD
+    ORDER BY MONTH DESC, TOTAL_REVENUE DESC
+  SQL
+
+  comment = "Monthly revenue breakdown by transaction type and payment method"
+}
+
+# === STORED PROCEDURES ===
+
+create "snowflake_procedure" "refresh_customer_segments" {
+  database = snowflake_database.analytics_db.name
+  schema   = snowflake_schema.customer_analytics.name
+  name     = "REFRESH_CUSTOMER_SEGMENTS"
+  language = "SQL"
+
+  return_type = "STRING"
+  execute_as  = "CALLER"
+
+  statement = <<-SQL
+    DECLARE
+        update_count INTEGER DEFAULT 0;
+    BEGIN
+        -- Update customer segments based on lifetime value
+        UPDATE ${snowflake_table.customer_dimensions.database}.${snowflake_table.customer_dimensions.schema}.${snowflake_table.customer_dimensions.name}
+        SET CUSTOMER_SEGMENT = CASE
+            WHEN LIFETIME_VALUE > 10000 THEN 'PREMIUM'
+            WHEN LIFETIME_VALUE > 5000 THEN 'GOLD'
+            WHEN LIFETIME_VALUE > 1000 THEN 'SILVER'
+            ELSE 'BRONZE'
+        END
+        WHERE IS_CURRENT = TRUE;
+        
+        update_count := SQLROWCOUNT;
+        
+        RETURN 'Updated ' || update_count || ' customer segments';
+    EXCEPTION
+        WHEN OTHER THEN
+            RETURN 'Error updating customer segments: ' || SQLERRM;
+    END;
+  SQL
+
+  comment = "Procedure to refresh customer segments based on lifetime value"
+}
+
+# === TASKS FOR AUTOMATION ===
+
+create "snowflake_task" "daily_customer_refresh" {
+  database = snowflake_database.analytics_db.name
+  schema   = snowflake_schema.customer_analytics.name
+  name     = "DAILY_CUSTOMER_REFRESH"
+
+  schedule  = "USING CRON 0 2 * * * UTC" # Daily at 2 AM UTC
+  warehouse = var.snowflake_config.warehouse
+
+  sql_statement = "CALL REFRESH_CUSTOMER_SEGMENTS();"
+
+  enabled = var.environment == "production"
+
+  comment = "Daily task to refresh customer segmentation"
+}
+
+# === MODULE OUTPUTS ===
+
+output "analytics_database" {
+  description = "Analytics database information"
+  value = {
+    name = snowflake_database.analytics_db.name
+    schemas = {
+      customer_analytics  = snowflake_schema.customer_analytics.name
+      financial_reporting = snowflake_schema.financial_reporting.name
+      operational_metrics = snowflake_schema.operational_metrics.name
+    }
+  }
+}
+
+output "data_warehouse_tables" {
+  description = "Data warehouse table information"
+  value = {
+    customer_dimensions = {
+      database     = snowflake_table.customer_dimensions.database
+      schema       = snowflake_table.customer_dimensions.schema
+      name         = snowflake_table.customer_dimensions.name
+      clustered_by = snowflake_table.customer_dimensions.cluster_by
+    }
+    transaction_facts = {
+      database     = snowflake_table.transaction_facts.database
+      schema       = snowflake_table.transaction_facts.schema
+      name         = snowflake_table.transaction_facts.name
+      clustered_by = snowflake_table.transaction_facts.cluster_by
+    }
+  }
+}
+
+output "analytical_views" {
+  description = "Analytical views for reporting"
+  value = {
+    customer_summary = "${snowflake_view.customer_summary.database}.${snowflake_view.customer_summary.schema}.${snowflake_view.customer_summary.name}"
+    monthly_revenue  = "${snowflake_view.monthly_revenue.database}.${snowflake_view.monthly_revenue.schema}.${snowflake_view.monthly_revenue.name}"
+  }
+}
+
+output "automation_tasks" {
+  description = "Automated data warehouse tasks"
+  value = {
+    daily_refresh = {
+      name     = snowflake_task.daily_customer_refresh.name
+      schedule = snowflake_task.daily_customer_refresh.schedule
+      enabled  = snowflake_task.daily_customer_refresh.enabled
+    }
+  }
+}

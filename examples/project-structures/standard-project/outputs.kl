@@ -1,0 +1,55 @@
+# Standard Project - Output Configuration
+# All outputs are defined here for consumption by other projects or applications
+
+output "database_connection_string" {
+  description = "PostgreSQL connection string for applications"
+  value       = "postgresql://${var.database_user}@${var.database_host}:${var.database_port}/${var.database_name}"
+  sensitive   = true
+}
+
+output "database_host" {
+  description = "PostgreSQL database host"
+  value       = var.database_host
+}
+
+output "database_name" {
+  description = "PostgreSQL database name"
+  value       = var.database_name
+}
+
+output "redis_connection_string" {
+  description = "Redis connection string for applications"
+  value       = "redis://${var.redis_host}:${var.redis_port}/${var.redis_database}"
+}
+
+output "table_names" {
+  description = "List of created table names"
+  value = [
+    postgres_table.users.name,
+    postgres_table.posts.name
+  ]
+}
+
+output "user_table_columns" {
+  description = "User table column information"
+  value = {
+    table_name = postgres_table.users.name
+    columns = [
+      "id (UUID, PRIMARY KEY)",
+      "username (VARCHAR(50), UNIQUE)",
+      "email (VARCHAR(255), UNIQUE)",
+      "password_hash (VARCHAR(255))",
+      "created_at (TIMESTAMP)",
+      "updated_at (TIMESTAMP)"
+    ]
+  }
+}
+
+output "environment_info" {
+  description = "Current environment configuration"
+  value = {
+    environment = var.environment
+    app_name    = var.app_name
+    schema      = var.environment == "prod" ? "public" : var.environment
+  }
+}

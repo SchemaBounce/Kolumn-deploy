@@ -1,0 +1,21 @@
+# Standard Project - Provider Configuration
+# All provider declarations are centralized in this file
+
+provider "postgres" {
+  host     = var.database_host
+  port     = var.database_port
+  database = var.database_name
+  username = var.database_user
+  password = var.database_password
+
+  # Connection pooling
+  max_connections = var.max_database_connections
+  ssl_mode        = var.database_ssl_mode
+}
+
+provider "redis" {
+  host     = var.redis_host
+  port     = var.redis_port
+  password = var.redis_password
+  db       = var.redis_database
+}

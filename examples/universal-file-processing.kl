@@ -1,0 +1,989 @@
+# Universal File Processing with Kolumn File Discovery
+# This example demonstrates Kolumn's revolutionary file discovery system that bridges
+# HCL configurations with existing file-based workflows across multiple languages.
+#
+# ARCHITECTURE OVERVIEW:
+# - Kolumn Provider (this repo): Provides kolumn_data_object, kolumn_classification, 
+#   kolumn_role, kolumn_permission, and kolumn_file resources for universal governance
+# - External Providers: Database (postgres, bigquery), storage (s3), orchestration 
+#   (airflow, dagster), and Kubernetes resources from separate provider repositories
+#
+# Key Features:
+# - Unidirectional file reading and interpolation
+# - Cross-language resource references  
+# - File-type smart formatting (SQL, Python, YAML, JSON)
+# - Advanced dependency tracking
+# - Universal governance across all file types
+
+# =============================================================================
+# KOLUMN PROVIDER: UNIVERSAL DATA GOVERNANCE (this repository)
+# =============================================================================
+
+create "kolumn_data_object" "users" {
+  description = "User data model shared across SQL, Python, and Java"
+
+  column "id" {
+    type           = "BIGSERIAL"
+    primary_key    = true
+    auto_increment = true
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    unique          = true
+    nullable        = false
+    classifications = ["pii"]
+    validation = {
+      format   = "email"
+      required = true
+    }
+  }
+
+  column "name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = ["pii"]
+  }
+
+  column "department" {
+    type     = "VARCHAR(50)"
+    nullable = true
+    validation = {
+      enum = ["engineering", "sales", "marketing", "hr", "finance"]
+    }
+  }
+
+  column "created_at" {
+    type     = "TIMESTAMPTZ"
+    default  = "NOW()"
+    nullable = false
+  }
+
+  column "last_login_at" {
+    type     = "TIMESTAMPTZ"
+    nullable = true
+  }
+
+  # Multi-provider configuration
+  config = {
+    postgres = {
+      schema     = "public"
+      table_name = "users"
+      indexes = [
+        { columns = ["email"], unique = true },
+        { columns = ["department"] },
+        { columns = ["created_at"] }
+      ]
+    }
+    bigquery = {
+      dataset    = "analytics"
+      table_name = "users_warehouse"
+      clustering = ["department", "created_at"]
+      partitioning = {
+        field = "created_at"
+        type  = "DAY"
+      }
+    }
+  }
+
+  # Expose structured metadata for file discovery
+  metadata = {
+    version      = "1.2.0"
+    owner        = "data-platform-team"
+    column_count = 6
+    pii_columns  = ["email", "name"]
+    business_key = "email"
+    primary_key  = "id"
+  }
+}
+
+create "kolumn_data_object" "orders" {
+  description = "Order transactions with financial data"
+
+  column "id" {
+    type        = "BIGSERIAL"
+    primary_key = true
+  }
+
+  column "user_id" {
+    type        = "BIGINT"
+    foreign_key = "users.id"
+    nullable    = false
+  }
+
+  column "amount" {
+    type            = "DECIMAL(12,2)"
+    nullable        = false
+    classifications = ["financial"]
+  }
+
+  column "status" {
+    type     = "VARCHAR(20)"
+    nullable = false
+    default  = "pending"
+    validation = {
+      enum = ["pending", "processing", "completed", "failed", "refunded"]
+    }
+  }
+
+  column "created_at" {
+    type     = "TIMESTAMPTZ"
+    default  = "NOW()"
+    nullable = false
+  }
+
+  config = {
+    postgres = {
+      schema     = "public"
+      table_name = "orders"
+      indexes = [
+        { columns = ["user_id"] },
+        { columns = ["status"] },
+        { columns = ["created_at"] }
+      ]
+    }
+    bigquery = {
+      dataset    = "analytics"
+      table_name = "orders_warehouse"
+    }
+  }
+}
+
+# =============================================================================
+# EXTERNAL PROVIDER RESOURCES (from separate repositories)
+# =============================================================================
+# The following resources use external providers developed in separate repositories.
+# These demonstrate how external providers integrate with Kolumn's governance layer.
+
+create "postgres_database" "main" {
+  name = "kolumn_demo"
+
+  connection_settings = {
+    max_connections          = 100
+    shared_preload_libraries = ["pg_stat_statements"]
+  }
+
+  backup_config = {
+    automated_backups       = true
+    backup_retention_period = 7
+  }
+}
+
+create "postgres_table" "users" {
+  database   = postgres_database.main.name
+  columns    = kolumn_data_object.users.columns
+  schema     = kolumn_data_object.users.config.postgres.schema
+  table_name = kolumn_data_object.users.config.postgres.table_name
+
+  dynamic "index" {
+    for_each = kolumn_data_object.users.config.postgres.indexes
+    content {
+      columns = index.value.columns
+      unique  = try(index.value.unique, false)
+    }
+  }
+}
+
+create "postgres_table" "orders" {
+  database   = postgres_database.main.name
+  columns    = kolumn_data_object.orders.columns
+  schema     = kolumn_data_object.orders.config.postgres.schema
+  table_name = kolumn_data_object.orders.config.postgres.table_name
+
+  dynamic "index" {
+    for_each = kolumn_data_object.orders.config.postgres.indexes
+    content {
+      columns = index.value.columns
+    }
+  }
+}
+
+create "bigquery_table" "users_warehouse" {
+  dataset    = kolumn_data_object.users.config.bigquery.dataset
+  table_name = kolumn_data_object.users.config.bigquery.table_name
+  columns    = kolumn_data_object.users.columns
+
+  clustering_fields = kolumn_data_object.users.config.bigquery.clustering
+  partitioning      = kolumn_data_object.users.config.bigquery.partitioning
+}
+
+create "bigquery_table" "orders_warehouse" {
+  dataset    = kolumn_data_object.orders.config.bigquery.dataset
+  table_name = kolumn_data_object.orders.config.bigquery.table_name
+  columns    = kolumn_data_object.orders.columns
+}
+
+# =============================================================================
+# KOLUMN FILE DISCOVERY: INPUT → FILES → OUTPUT EXTRACTION (this repository)
+# =============================================================================
+# These kolumn_file resources demonstrate Kolumn's revolutionary file discovery
+# system with bidirectional processing capabilities.
+
+# Example 1: SQL file discovery with OUTPUT EXTRACTION
+discover "kolumn_file" "analytics_schema_complete" {
+  location = "./sql/analytics_schema.sql"
+  inputs = {
+    schema_name   = "analytics"
+    database_name = "production"
+    environment   = var.environment
+
+    # 🆕 BIDIRECTIONAL ENHANCEMENT: Configure what to extract FROM the file
+    extractor_config = {
+      tables    = "true" # Extract CREATE TABLE statements and schemas
+      views     = "true" # Extract CREATE VIEW definitions  
+      functions = "true" # Extract CREATE FUNCTION statements
+      indexes   = "true" # Extract CREATE INDEX statements
+      schema    = "true" # Extract schema information
+    }
+  }
+}
+
+# 🆕 BIDIRECTIONAL: Use extracted outputs to create PostgreSQL resources
+create "postgres_table" "customers_from_discovered_schema" {
+  # Use table definition extracted FROM the SQL file
+  name   = "customers"
+  schema = "analytics"
+
+  # Dynamic columns based on extracted table schema
+  dynamic "column" {
+    # Find the customers table from extracted outputs
+    for_each = {
+      for table in discover.analytics_schema_complete.outputs.tables :
+      table.name => table.columns if table.name == "customers"
+    }
+    content {
+      dynamic "col" {
+        for_each = column.value
+        content {
+          name        = col.value.name
+          type        = col.value.type
+          nullable    = !contains(col.value.constraints, "NOT")
+          primary_key = contains(col.value.constraints, "PRIMARY")
+        }
+      }
+    }
+  }
+}
+
+# 🆕 BIDIRECTIONAL: Python DAG discovery with function extraction
+discover "kolumn_file" "advanced_data_pipeline" {
+  location = "./dags/data_pipeline_advanced.py"
+  inputs = {
+    dag_name            = "analytics_etl_pipeline"
+    schedule            = "0 2 * * *" # Daily at 2 AM
+    max_retries         = 3
+    source_table        = postgres_table.users.full_name
+    target_schema       = "analytics"
+    postgres_connection = "postgres_prod"
+
+    # 🆕 Configure Python output extraction
+    extractor_config = {
+      functions = "true" # Extract function definitions
+      classes   = "true" # Extract class definitions  
+      imports   = "true" # Extract import statements
+      variables = "true" # Extract global variables
+      dag       = "true" # Extract Airflow DAG configuration
+      pipelines = "true" # Extract data processing patterns
+    }
+  }
+}
+
+# 🆕 BIDIRECTIONAL: Use extracted DAG configuration to create monitoring
+output "dag_monitoring_info" {
+  description = "Monitoring information extracted from DAG code"
+  value = {
+    dag_id         = discover.advanced_data_pipeline.outputs.dag_config.dag_id
+    schedule       = discover.advanced_data_pipeline.outputs.dag_config.schedule_interval
+    function_count = length(discover.advanced_data_pipeline.outputs.functions)
+    has_quality_checks = length([
+      for func in discover.advanced_data_pipeline.outputs.functions :
+      func if contains(func.name, "quality")
+    ]) > 0
+    extracted_imports = discover.advanced_data_pipeline.outputs.imports
+  }
+}
+
+# =============================================================================
+# TRADITIONAL FILE DISCOVERY: SQL FILES WITH INTERPOLATION (Kolumn Provider)
+# =============================================================================
+
+discover "kolumn_file" "user_summary_view" {
+  location = "./sql/user_summary.sql"
+  inputs = {
+    # Basic variables
+    schema_name  = "public"
+    table_prefix = "app_"
+    environment  = var.environment
+
+    # Data object references
+    user_columns  = kolumn_data_object.users.columns
+    user_metadata = kolumn_data_object.users.metadata
+
+    # Resource references  
+    source_table = postgres_table.users.full_name
+    orders_table = postgres_table.orders.full_name
+
+    # Complex nested data
+    table_config = {
+      materialization  = "view"
+      refresh_schedule = "0 6 * * *"
+      owner            = "analytics-team"
+    }
+  }
+}
+
+discover "kolumn_file" "data_quality_checks" {
+  location = "./sql/data_quality_checks.sql"
+  inputs = {
+    # Cross-provider references
+    postgres_users_table = postgres_table.users.full_name
+    bigquery_users_table = bigquery_table.users_warehouse.full_name
+
+    # Data object validation rules
+    user_validation_rules = kolumn_data_object.users.validation
+    required_columns      = kolumn_data_object.users.metadata.pii_columns
+
+    # Environment-specific thresholds
+    quality_thresholds = {
+      min_row_count       = var.environment == "production" ? 10000 : 100
+      max_null_percentage = 0.05
+      duplicate_threshold = 0.01
+    }
+  }
+}
+
+# =============================================================================
+# FILE DISCOVERY: PYTHON ETL SCRIPTS (Kolumn Provider)
+# =============================================================================
+
+discover "kolumn_file" "user_etl_dag" {
+  location = "./dags/user_etl.py"
+  inputs = {
+    # Database connections
+    source_db_connection = postgres_database.main.connection_string
+    target_dataset       = bigquery_table.users_warehouse.dataset
+    target_table         = bigquery_table.users_warehouse.full_name
+
+    # Data object schema information
+    source_schema = kolumn_data_object.users.columns
+    target_schema = kolumn_data_object.users.columns
+    business_key  = kolumn_data_object.users.metadata.business_key
+
+    # ETL configuration  
+    batch_size     = var.environment == "production" ? 10000 : 1000
+    parallelism    = 4
+    retry_attempts = 3
+
+    # Schedule and monitoring
+    schedule_interval = "0 2 * * *" # Daily at 2 AM
+    slack_webhook     = var.slack_webhook_url
+
+    # Data lineage  
+    upstream_dependencies = [
+      postgres_table.users.full_name,
+      postgres_table.orders.full_name
+    ]
+    downstream_dependencies = [
+      bigquery_table.users_warehouse.full_name
+    ]
+  }
+}
+
+discover "kolumn_file" "data_validation_scripts" {
+  location = "./python/data_validation.py"
+  inputs = {
+    # Multi-provider connections
+    postgres_config = {
+      host     = postgres_database.main.host
+      port     = postgres_database.main.port
+      database = postgres_database.main.name
+      schema   = "public"
+    }
+
+    bigquery_config = {
+      project_id = var.gcp_project_id
+      dataset    = "analytics"
+    }
+
+    # Validation rules from data objects
+    validation_rules = {
+      users = {
+        schema          = kolumn_data_object.users.columns
+        validation      = kolumn_data_object.users.validation
+        row_count_min   = 1000
+        freshness_hours = 24
+      }
+      orders = {
+        schema          = kolumn_data_object.orders.columns
+        validation      = kolumn_data_object.orders.validation
+        row_count_min   = 5000
+        freshness_hours = 1 # More frequent for transactional data
+      }
+    }
+
+    # Alerting configuration
+    alert_config = {
+      email_recipients = ["data-team@company.com"]
+      slack_channel    = "#data-alerts"
+      severity_levels  = ["critical", "warning", "info"]
+    }
+  }
+}
+
+# =============================================================================
+# FILE DISCOVERY: YAML CONFIGURATIONS (Kolumn Provider)
+# =============================================================================
+
+discover "kolumn_file" "kubernetes_deployment" {
+  location = "./k8s/app-deployment.yaml"
+  inputs = {
+    # Application configuration
+    app_name    = "data-processing-service"
+    app_version = var.app_version
+    environment = var.environment
+    namespace   = "data-platform"
+
+    # Scaling configuration
+    replicas = var.environment == "production" ? 5 : 2
+
+    # Database configuration from resources
+    database_config = {
+      host                 = postgres_database.main.host
+      port                 = postgres_database.main.port
+      database             = postgres_database.main.name
+      connection_pool_size = 10
+    }
+
+    # Secrets and ConfigMaps
+    database_secret_name = kubernetes_secret.database_credentials.name
+    app_config_name      = kubernetes_configmap.app_settings.name
+
+    # Resource limits
+    resource_limits = {
+      cpu    = var.environment == "production" ? "2" : "1"
+      memory = var.environment == "production" ? "4Gi" : "2Gi"
+    }
+
+    # Monitoring and observability
+    monitoring_config = {
+      metrics_enabled = true
+      tracing_enabled = var.environment == "production"
+      log_level       = var.environment == "production" ? "info" : "debug"
+    }
+  }
+}
+
+discover "kolumn_file" "dbt_project_config" {
+  location = "./dbt/dbt_project.yml"
+  inputs = {
+    # Project configuration
+    project_name = "kolumn_analytics"
+    version      = "1.0.0"
+
+    # Data warehouse configuration
+    target_database = bigquery_table.users_warehouse.project_id
+    target_schema   = bigquery_table.users_warehouse.dataset
+
+    # Model configuration  
+    model_config = {
+      materialized = "table"
+      partition_by = "created_at"
+      cluster_by   = ["department"]
+    }
+
+    # Testing and documentation
+    test_config = {
+      enabled        = true
+      severity       = "warn"
+      store_failures = true
+    }
+
+    # Data sources from Kolumn
+    data_sources = [
+      {
+        name    = "users"
+        table   = postgres_table.users.full_name
+        columns = kolumn_data_object.users.columns
+      },
+      {
+        name    = "orders"
+        table   = postgres_table.orders.full_name
+        columns = kolumn_data_object.orders.columns
+      }
+    ]
+  }
+}
+
+# =============================================================================
+# FILE DISCOVERY: JSON API CONFIGURATIONS (Kolumn Provider)
+# =============================================================================
+
+discover "kolumn_file" "api_settings" {
+  location = "./config/api-settings.json"
+  inputs = {
+    # API configuration
+    api_version = "v2"
+    port        = 8080
+    host        = "0.0.0.0"
+
+    # Environment-specific settings
+    environment = var.environment
+    debug_mode  = var.environment != "production"
+
+    # Database configuration
+    database_config = {
+      host            = postgres_database.main.host
+      port            = postgres_database.main.port
+      database        = postgres_database.main.name
+      pool_size       = var.environment == "production" ? 20 : 5
+      timeout_seconds = 30
+      ssl_mode        = var.environment == "production" ? "require" : "prefer"
+    }
+
+    # Data access configuration based on data objects
+    data_access_config = {
+      users_table  = postgres_table.users.full_name
+      orders_table = postgres_table.orders.full_name
+      allowed_columns = {
+        users  = kolumn_data_object.users.metadata.pii_columns
+        orders = ["id", "amount", "status", "created_at"]
+      }
+      rate_limits = {
+        requests_per_minute = var.environment == "production" ? 1000 : 100
+        burst_limit         = 50
+      }
+    }
+
+    # Caching and performance
+    cache_config = {
+      enabled     = true
+      ttl_seconds = 300
+      max_entries = 10000
+    }
+
+    # Security configuration
+    security_config = {
+      cors_enabled   = true
+      auth_required  = var.environment == "production"
+      encryption_key = var.api_encryption_key
+    }
+  }
+}
+
+discover "kolumn_file" "monitoring_config" {
+  location = "./config/monitoring.json"
+  inputs = {
+    # Monitoring targets from infrastructure
+    monitoring_targets = [
+      {
+        name         = "postgres_database"
+        endpoint     = "${postgres_database.main.host}:${postgres_database.main.port}"
+        type         = "database"
+        health_check = "/health"
+      },
+      {
+        name    = "bigquery_dataset"
+        project = bigquery_table.users_warehouse.project_id
+        dataset = bigquery_table.users_warehouse.dataset
+        type    = "bigquery"
+      }
+    ]
+
+    # Data quality monitoring from data objects
+    data_quality_monitors = [
+      {
+        name       = "users_data_quality"
+        table      = postgres_table.users.full_name
+        columns    = kolumn_data_object.users.columns
+        checks     = ["row_count", "null_check", "duplicate_check"]
+        thresholds = kolumn_data_object.users.validation
+      },
+      {
+        name       = "orders_data_quality"
+        table      = postgres_table.orders.full_name
+        columns    = kolumn_data_object.orders.columns
+        checks     = ["row_count", "null_check", "referential_integrity"]
+        thresholds = kolumn_data_object.orders.validation
+      }
+    ]
+
+    # Alerting configuration
+    alert_config = {
+      email_enabled = true
+      slack_enabled = var.environment == "production"
+      webhook_url   = var.monitoring_webhook_url
+      escalation_policy = {
+        critical = ["immediate_email", "slack", "pager"]
+        warning  = ["email"]
+        info     = ["slack"]
+      }
+    }
+  }
+}
+
+# =============================================================================
+# FILE DISCOVERY: CHAINED CONFIGURATION (Kolumn Provider)
+# =============================================================================
+
+# Base configuration that other files reference
+discover "kolumn_file" "base_environment_config" {
+  location = "./config/base.json"
+  inputs = {
+    environment      = var.environment
+    region           = var.aws_region
+    project_id       = var.gcp_project_id
+    application_name = "kolumn-demo"
+    version          = "2.1.0"
+
+    # Infrastructure references
+    primary_database    = postgres_database.main.name
+    analytics_warehouse = bigquery_table.users_warehouse.dataset
+  }
+}
+
+# Environment-specific config that references the base config
+discover "kolumn_file" "environment_config" {
+  location = "./config/${var.environment}.json"
+  inputs = {
+    # Reference another discovered file
+    base_config = discover.base_environment_config.interpolated_content
+
+    # Environment-specific overrides
+    database_url = postgres_database.main.connection_string
+    log_level    = var.environment == "production" ? "info" : "debug"
+    feature_flags = {
+      new_user_onboarding   = var.environment != "production"
+      advanced_analytics    = true
+      experimental_features = var.environment == "development"
+    }
+
+    # Resource scaling based on environment
+    scaling_config = {
+      min_instances          = var.environment == "production" ? 3 : 1
+      max_instances          = var.environment == "production" ? 10 : 3
+      target_cpu_utilization = 70
+    }
+  }
+}
+
+# =============================================================================
+# USE DISCOVERED FILES TO CREATE EXTERNAL PROVIDER RESOURCES
+# =============================================================================
+# These resources demonstrate how external providers consume the content
+# discovered and processed by Kolumn's file discovery system.
+
+# Create PostgreSQL views from discovered SQL
+create "postgres_view" "user_summary" {
+  database  = postgres_database.main.name
+  schema    = "public"
+  view_name = "user_summary"
+
+  # Use interpolated SQL content from discovered file
+  definition = discover.user_summary_view.interpolated_content
+
+  depends_on = [
+    postgres_table.users,
+    postgres_table.orders,
+    discover.user_summary_view
+  ]
+}
+
+# Create data quality monitoring using discovered SQL
+create "postgres_function" "data_quality_checks" {
+  database      = postgres_database.main.name
+  schema        = "public"
+  function_name = "run_data_quality_checks"
+
+  # Use interpolated SQL from discovered file
+  definition = discover.data_quality_checks.interpolated_content
+
+  return_type = "jsonb"
+  language    = "plpgsql"
+
+  depends_on = [
+    postgres_table.users,
+    postgres_table.orders,
+    discover.data_quality_checks
+  ]
+}
+
+# Create Airflow DAG using discovered Python
+create "airflow_dag" "user_etl_pipeline" {
+  dag_id = "user_etl_pipeline"
+
+  # Use interpolated Python content from discovered file
+  dag_file_content = discover.user_etl_dag.interpolated_content
+
+  # DAG configuration
+  schedule_interval = "0 2 * * *"
+  start_date        = "2024-01-01"
+  catchup           = false
+
+  depends_on = [
+    postgres_table.users,
+    postgres_table.orders,
+    bigquery_table.users_warehouse,
+    discover.user_etl_dag
+  ]
+}
+
+# Create Kubernetes resources using discovered YAML
+create "kubernetes_deployment" "data_processing_app" {
+  # Use interpolated YAML content from discovered file
+  manifest = discover.kubernetes_deployment.interpolated_content
+
+  namespace = "data-platform"
+
+  depends_on = [
+    postgres_database.main,
+    kubernetes_secret.database_credentials,
+    discover.kubernetes_deployment
+  ]
+}
+
+# Create API service using discovered JSON configuration
+create "api_service" "data_api" {
+  name = "kolumn-data-api"
+
+  # Use interpolated JSON configuration
+  configuration = discover.api_settings.interpolated_content
+
+  # Additional service configuration
+  port              = 8080
+  health_check_path = "/health"
+
+  depends_on = [
+    postgres_database.main,
+    postgres_table.users,
+    postgres_table.orders,
+    discover.api_settings
+  ]
+}
+
+# =============================================================================
+# SUPPORTING RESOURCES FOR EXAMPLES
+# =============================================================================
+
+# Kubernetes secrets for database access
+create "kubernetes_secret" "database_credentials" {
+  name      = "postgres-credentials"
+  namespace = "data-platform"
+
+  data = {
+    host     = postgres_database.main.host
+    port     = tostring(postgres_database.main.port)
+    database = postgres_database.main.name
+    username = postgres_database.main.username
+    password = postgres_database.main.password
+  }
+}
+
+create "kubernetes_configmap" "app_settings" {
+  name      = "app-settings"
+  namespace = "data-platform"
+
+  data = {
+    environment = var.environment
+    log_level   = var.environment == "production" ? "info" : "debug"
+    feature_flags = jsonencode({
+      analytics_enabled  = true
+      monitoring_enabled = true
+    })
+  }
+}
+
+# =============================================================================
+# OUTPUTS: DEMONSTRATE FILE DISCOVERY CAPABILITIES
+# =============================================================================
+
+output "file_discovery_summary" {
+  description = "Summary of all discovered files and their interpolation"
+  value = {
+    sql_files = [
+      {
+        name         = "user_summary_view"
+        location     = discover.user_summary_view.location
+        file_type    = discover.user_summary_view.file_type
+        dependencies = discover.user_summary_view.dependencies
+        interpolated = length(discover.user_summary_view.interpolated_content) > 0
+      },
+      {
+        name         = "data_quality_checks"
+        location     = discover.data_quality_checks.location
+        file_type    = discover.data_quality_checks.file_type
+        dependencies = discover.data_quality_checks.dependencies
+        interpolated = length(discover.data_quality_checks.interpolated_content) > 0
+      }
+    ]
+
+    python_files = [
+      {
+        name         = "user_etl_dag"
+        location     = discover.user_etl_dag.location
+        file_type    = discover.user_etl_dag.file_type
+        dependencies = discover.user_etl_dag.dependencies
+        interpolated = length(discover.user_etl_dag.interpolated_content) > 0
+      },
+      {
+        name         = "data_validation_scripts"
+        location     = discover.data_validation_scripts.location
+        file_type    = discover.data_validation_scripts.file_type
+        dependencies = discover.data_validation_scripts.dependencies
+        interpolated = length(discover.data_validation_scripts.interpolated_content) > 0
+      }
+    ]
+
+    yaml_files = [
+      {
+        name         = "kubernetes_deployment"
+        location     = discover.kubernetes_deployment.location
+        file_type    = discover.kubernetes_deployment.file_type
+        dependencies = discover.kubernetes_deployment.dependencies
+        interpolated = length(discover.kubernetes_deployment.interpolated_content) > 0
+      },
+      {
+        name         = "dbt_project_config"
+        location     = discover.dbt_project_config.location
+        file_type    = discover.dbt_project_config.file_type
+        dependencies = discover.dbt_project_config.dependencies
+        interpolated = length(discover.dbt_project_config.interpolated_content) > 0
+      }
+    ]
+
+    json_files = [
+      {
+        name         = "api_settings"
+        location     = discover.api_settings.location
+        file_type    = discover.api_settings.file_type
+        dependencies = discover.api_settings.dependencies
+        interpolated = length(discover.api_settings.interpolated_content) > 0
+      },
+      {
+        name         = "monitoring_config"
+        location     = discover.monitoring_config.location
+        file_type    = discover.monitoring_config.file_type
+        dependencies = discover.monitoring_config.dependencies
+        interpolated = length(discover.monitoring_config.interpolated_content) > 0
+      }
+    ]
+
+    chained_discovery = [
+      {
+        name          = "base_environment_config"
+        location      = discover.base_environment_config.location
+        referenced_by = ["environment_config"]
+      },
+      {
+        name       = "environment_config"
+        location   = discover.environment_config.location
+        references = ["base_environment_config"]
+      }
+    ]
+  }
+}
+
+output "cross_language_references" {
+  description = "Demonstrate cross-language resource references"
+  value = {
+    # Show how data objects are referenced across file types
+    user_data_object_usage = {
+      sql_files    = ["user_summary_view", "data_quality_checks"]
+      python_files = ["user_etl_dag", "data_validation_scripts"]
+      yaml_files   = ["dbt_project_config"]
+      json_files   = ["api_settings", "monitoring_config"]
+    }
+
+    # Show database resources referenced across languages
+    postgres_table_references = {
+      discovered_files_count = 8
+      languages              = ["sql", "python", "yaml", "json"]
+      resource_name          = postgres_table.users.full_name
+    }
+
+    # Show BigQuery references
+    bigquery_references = {
+      discovered_files_count = 4
+      languages              = ["python", "yaml", "json"]
+      resource_name          = bigquery_table.users_warehouse.full_name
+    }
+  }
+}
+
+output "interpolation_patterns" {
+  description = "Examples of interpolation patterns used across file types"
+  value = {
+    variable_patterns = [
+      "${var.environment}",
+      "${var.app_version}",
+      "${var.gcp_project_id}"
+    ]
+
+    input_patterns = [
+      "${input.schema_name}",
+      "${input.batch_size}",
+      "${input.database_config}"
+    ]
+
+    resource_patterns = [
+      "${postgres_database.main.host}",
+      "${postgres_table.users.full_name}",
+      "${bigquery_table.users_warehouse.dataset}"
+    ]
+
+    data_object_patterns = [
+      "${kolumn_data_object.users.columns}",
+      "${kolumn_data_object.users.metadata.pii_columns}",
+      "${kolumn_data_object.users.validation}"
+    ]
+
+    discovery_patterns = [
+      "${discover.base_environment_config.interpolated_content}",
+      "${discover.user_summary_view.dependencies}",
+      "${discover.api_settings.file_type}"
+    ]
+  }
+}
+
+output "created_resources_from_discovery" {
+  description = "Resources created using discovered and interpolated files"
+  value = {
+    postgres_resources = [
+      {
+        type        = "postgres_view"
+        name        = postgres_view.user_summary.view_name
+        source_file = discover.user_summary_view.location
+      },
+      {
+        type        = "postgres_function"
+        name        = postgres_function.data_quality_checks.function_name
+        source_file = discover.data_quality_checks.location
+      }
+    ]
+
+    orchestration_resources = [
+      {
+        type        = "airflow_dag"
+        name        = airflow_dag.user_etl_pipeline.dag_id
+        source_file = discover.user_etl_dag.location
+      }
+    ]
+
+    kubernetes_resources = [
+      {
+        type        = "kubernetes_deployment"
+        name        = "data_processing_app"
+        namespace   = kubernetes_deployment.data_processing_app.namespace
+        source_file = discover.kubernetes_deployment.location
+      }
+    ]
+
+    api_resources = [
+      {
+        type        = "api_service"
+        name        = api_service.data_api.name
+        port        = api_service.data_api.port
+        source_file = discover.api_settings.location
+      }
+    ]
+  }
+}

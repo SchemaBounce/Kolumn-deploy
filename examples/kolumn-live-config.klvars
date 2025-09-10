@@ -1,0 +1,120 @@
+# Live Kolumn Infrastructure Configuration
+# This file demonstrates how to connect to the live Kolumn infrastructure
+
+# Service Endpoints Configuration
+services = {
+  # Core API Service (for state management, governance, etc.)
+  api = {
+    base_url = "https://api.schemabounce.com"
+    timeout_seconds = 30
+    retries = 3
+    tls = {
+      insecure_skip_verify = false
+    }
+  }
+
+  # Provider Registry Service
+  registry = {
+    base_url = "https://registry.schemabounce.com"
+    cache_ttl_minutes = 60
+    offline_mode = false
+    fallback_to_static = true
+    health_check_interval_minutes = 15
+    tls = {
+      insecure_skip_verify = false
+    }
+  }
+
+  # Release/Download Service (CloudFront CDN)
+  releases = {
+    base_url = "https://releases.schemabounce.com"
+    verify_checksums = true
+    verify_signatures = false
+    parallel_downloads = 3
+    download_timeout_seconds = 300
+    retry_attempts = 3
+    tls = {
+      insecure_skip_verify = false
+    }
+  }
+
+  # Installation Service
+  install = {
+    base_url = "https://install.schemabounce.com"
+    tls = {
+      insecure_skip_verify = false
+    }
+  }
+}
+
+# Provider Configuration
+providers = {
+  auto_update = false
+  update_check_interval_hours = 24
+  allowed_sources = [
+    "registry.schemabounce.com",
+    "github.com/schemabounce"
+  ]
+
+  # Provider-specific configurations
+  provider_configs = {
+    postgres = {
+      default_version = "^0.1.0"
+      health_check_timeout = 10
+    }
+    mysql = {
+      default_version = "^0.1.0"
+      health_check_timeout = 10
+    }
+  }
+}
+
+# Environment-specific overrides
+environment = "production"
+
+# State Backend Configuration (using Schema Bounce SaaS)
+state = {
+  backend = "schemabounce"
+  config = {
+    # These would be set via environment variables in practice
+    # api_key = "${KOLUMN_API_KEY}"
+    # api_secret = "${KOLUMN_API_SECRET}"
+    # project_id = "${KOLUMN_PROJECT_ID}"
+    # workspace = "${KOLUMN_WORKSPACE}"
+    
+    base_url = "https://api.schemabounce.com"
+    enable_versioning = true
+    enable_encryption = true
+    compression_level = 6
+    data_residency = "us"
+    retention_policy = "1y"
+    audit_logging = true
+    
+    tags = {
+      environment = "production"
+      project = "kolumn-live"
+      owner = "platform-team"
+    }
+  }
+}
+
+# Global settings
+debug = false
+log_level = "info"
+
+# Project configuration
+project = {
+  name = "kolumn-live"
+  environment = "production"
+}
+
+# Database formatting
+database = {
+  formatting = {
+    auto_format = true
+    keyword_case = "upper"
+    identifier_case = "snake"
+    log_changes = true
+    strict_mode = true
+  }
+}
