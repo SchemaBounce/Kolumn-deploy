@@ -1,7 +1,7 @@
 {
-  "version": "0.1.1-beta",
-  "tag": "v0.1.1-beta",
-  "released": "2025-09-10T06:16:51Z",
+  "version": "0.1.2-beta",
+  "tag": "v0.1.2-beta",
+  "released": "2025-09-10T06:31:03Z",
   "platforms": [
     "linux-amd64", "linux-arm64",
     "darwin-amd64", "darwin-arm64", 
