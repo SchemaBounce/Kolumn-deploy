@@ -1,0 +1,911 @@
+# Multi-Repository Federated Discovery Example
+# Demonstrates comprehensive federated schema management across multiple Git repositories
+# Perfect for microservices architectures and distributed development teams
+
+# Variables for multi-environment configuration
+variable "environment" {
+  description = "Environment (dev, staging, production)"
+  type        = string
+  default     = "dev"
+}
+
+variable "github_token" {
+  description = "GitHub personal access token for private repositories"
+  type        = string
+  sensitive   = true
+}
+
+variable "ssh_key_path" {
+  description = "Path to SSH private key for Git authentication"
+  type        = string
+  default     = "~/.ssh/id_rsa"
+}
+
+variable "ssh_passphrase" {
+  description = "SSH key passphrase"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "enable_cross_repo_relations" {
+  description = "Enable automatic cross-repository relationship detection"
+  type        = bool
+  default     = true
+}
+
+variable "company_domain" {
+  description = "Company domain for repository filtering"
+  type        = string
+  default     = "acme-corp"
+}
+
+# PostgreSQL provider for unified database
+provider "postgres" {
+  host     = "localhost"
+  port     = 5432
+  database = "federated_microservices"
+  username = "postgres"
+  password = var.postgres_password
+  sslmode  = "require"
+
+  # Connection pooling for multiple services
+  pool_config = {
+    max_connections     = 50
+    min_connections     = 10
+    connection_lifetime = "1h"
+  }
+}
+
+# Kafka provider for cross-service events
+provider "kafka" {
+  bootstrap_servers = ["localhost:9092"]
+  security_protocol = "SASL_SSL"
+  sasl_mechanism    = "SCRAM-SHA-512"
+
+  # Topic naming convention for federated services
+  topic_prefix = "${var.company_domain}-${var.environment}"
+}
+
+# Comprehensive multi-repository discovery with mixed authentication
+discover "multi_repo_federation" "microservices_ecosystem" {
+  # Global discovery settings
+  global_settings = {
+    clone_depth     = 1 # Shallow clone for performance
+    timeout         = "10m"
+    parallel_clones = 5
+    cache_duration  = "2h"
+
+    # Namespace strategy
+    namespace_strategy  = "repository_name"
+    conflict_resolution = "priority_based"
+  }
+
+  # Mixed authentication methods
+  authentication = {
+    # Default SSH authentication
+    method            = "ssh_key"
+    ssh_key_path      = var.ssh_key_path
+    ssh_passphrase    = var.ssh_passphrase
+    known_hosts_check = true
+  }
+
+  # Federated repository configuration
+  repositories = [
+    # Core platform services (TypeScript + Drizzle)
+    {
+      name      = "user-service"
+      url       = "git@github.com:${var.company_domain}/user-service.git"
+      branch    = var.environment == "production" ? "main" : "develop"
+      path      = "src/schema/"
+      framework = "drizzle"
+      namespace = "users"
+      priority  = 1 # Highest priority for conflict resolution
+
+      settings = {
+        required     = true
+        health_check = true
+        auto_sync    = var.environment == "dev"
+      }
+
+      include_patterns = ["**/*.ts", "**/*.sql"]
+      exclude_patterns = ["**/*.test.ts", "**/node_modules/**"]
+
+      # Per-repository authentication (GitHub token)
+      authentication = {
+        method     = "token"
+        token      = var.github_token
+        token_type = "github"
+      }
+    },
+
+    # Analytics service (TypeScript + Kysely)
+    {
+      name      = "analytics-service"
+      url       = "https://github.com/${var.company_domain}/analytics-service.git"
+      branch    = "main"
+      path      = "database/types/"
+      framework = "kysely"
+      namespace = "analytics"
+      priority  = 2
+
+      settings = {
+        update_frequency = "hourly"
+        validate_schema  = true
+        generate_docs    = true
+      }
+
+      # Environment-specific branches
+      environment_branches = {
+        development = "develop"
+        staging     = "staging"
+        production  = "main"
+      }
+
+      # TypeScript-specific configuration
+      typescript_config = {
+        config_path = "./tsconfig.json"
+        strict_mode = true
+      }
+    },
+
+    # Content management (EdgeDB)
+    {
+      name      = "content-service"
+      url       = "git@gitlab.com:${var.company_domain}/content-service.git"
+      branch    = "main"
+      path      = "edgedb/dbschema/"
+      framework = "edgedb"
+      namespace = "content"
+      priority  = 3
+
+      # GitLab-specific SSH authentication
+      authentication = {
+        method           = "ssh_key"
+        ssh_key_path     = "~/.ssh/gitlab_key"
+        known_hosts_file = "~/.ssh/known_hosts"
+      }
+
+      settings = {
+        ai_features_enabled   = true
+        graph_analysis        = true
+        performance_profiling = true
+      }
+    },
+
+    # Legacy order system (existing SQL)
+    {
+      name      = "order-service-legacy"
+      url       = "https://bitbucket.org/${var.company_domain}/order-service.git"
+      branch    = "master"
+      path      = "database/migrations/"
+      framework = "sql"
+      namespace = "orders"
+      priority  = 4
+
+      # Basic authentication for Bitbucket
+      authentication = {
+        method   = "basic"
+        username = var.bitbucket_username
+        password = var.bitbucket_password
+      }
+
+      settings = {
+        legacy_system         = true
+        migration_only        = true
+        require_manual_review = true
+      }
+
+      # SQL file processing
+      sql_processing = {
+        extract_ddl         = true
+        extract_constraints = true
+        infer_relationships = true
+      }
+    },
+
+    # Inventory microservice (Python + SQLAlchemy)
+    {
+      name      = "inventory-service"
+      url       = "git@github.com:${var.company_domain}/inventory-service.git"
+      branch    = "main"
+      path      = "app/models/"
+      framework = "sqlalchemy"
+      namespace = "inventory"
+      priority  = 5
+
+      # Python-specific configuration
+      python_config = {
+        models_module     = "app.models"
+        virtual_env       = "./venv"
+        requirements_file = "requirements.txt"
+      }
+
+      settings = {
+        auto_migrate           = false
+        validate_constraints   = true
+        track_schema_evolution = true
+      }
+    },
+
+    # Notification service (Go + GORM)
+    {
+      name      = "notification-service"
+      url       = "https://github.com/${var.company_domain}/notification-service.git"
+      branch    = "main"
+      path      = "internal/models/"
+      framework = "gorm"
+      namespace = "notifications"
+      priority  = 6
+
+      # Go-specific configuration
+      go_config = {
+        module_path = "github.com/${var.company_domain}/notification-service"
+        build_tags  = ["integration"]
+      }
+
+      # Conditional inclusion based on environment
+      enabled = contains(["staging", "production"], var.environment)
+    },
+
+    # Shared schemas repository
+    {
+      name      = "shared-schemas"
+      url       = "git@github.com:${var.company_domain}/shared-schemas.git"
+      branch    = "main"
+      path      = "schemas/"
+      framework = "mixed" # Contains multiple framework schemas
+      namespace = "shared"
+      priority  = 0 # Lowest priority, provides base schemas
+
+      # Multi-path discovery for mixed repository
+      multi_path_discovery = [
+        {
+          path      = "schemas/common/"
+          framework = "json_schema"
+          namespace = "shared.common"
+        },
+        {
+          path      = "schemas/events/"
+          framework = "avro"
+          namespace = "shared.events"
+        },
+        {
+          path      = "schemas/api/"
+          framework = "openapi"
+          namespace = "shared.api"
+        }
+      ]
+
+      settings = {
+        shared_repository         = true
+        version_controlled        = true
+        breaking_change_detection = true
+      }
+    }
+  ]
+
+  # Cross-repository relationship detection
+  cross_repo_relations = var.enable_cross_repo_relations
+
+  relationship_detection = {
+    # Automatic foreign key pattern detection
+    auto_detect_foreign_keys = true
+    foreign_key_patterns = [
+      "*_id",
+      "*_uuid",
+      "*_reference",
+      "ref_*"
+    ]
+
+    # Naming convention mapping across services
+    naming_conventions = {
+      "user_id" = {
+        target_namespace = "users"
+        target_table     = "users"
+        target_column    = "id"
+      }
+      "customer_id" = {
+        target_namespace = "users"
+        target_table     = "users"
+        target_column    = "id"
+        alias            = "user_id"
+      }
+      "content_id" = {
+        target_namespace = "content"
+        target_table     = "content"
+        target_column    = "id"
+      }
+      "order_id" = {
+        target_namespace = "orders"
+        target_table     = "orders"
+        target_column    = "id"
+      }
+    }
+
+    # Cross-service validation
+    validation = {
+      validate_referenced_tables = true
+      validate_column_types      = true
+      allow_soft_references      = true # For microservices
+      check_service_boundaries   = true
+    }
+  }
+
+  # Conflict resolution strategy
+  conflict_resolution = {
+    strategy       = "priority_based"
+    priority_order = ["user-service", "analytics-service", "content-service", "shared-schemas"]
+
+    merge_strategies = {
+      column_type_conflicts  = "strict_validation"
+      relationship_conflicts = "manual_review"
+      constraint_conflicts   = "priority_wins"
+      namespace_conflicts    = "prefix_with_repository"
+    }
+
+    validation = {
+      require_unique_table_names = false # Allow per-namespace tables
+      allow_namespace_overlap    = true
+      enforce_naming_conventions = true
+    }
+  }
+
+  # Synchronization configuration
+  sync_configuration = {
+    # Webhook endpoints for real-time updates
+    webhooks = {
+      github = {
+        endpoint = "/webhooks/github"
+        secret   = var.github_webhook_secret
+        events   = ["push", "pull_request"]
+        branches = ["main", "develop"]
+      }
+
+      gitlab = {
+        endpoint = "/webhooks/gitlab"
+        token    = var.gitlab_webhook_token
+        events   = ["push", "merge_request"]
+      }
+    }
+
+    # Automated sync schedule
+    schedule = {
+      frequency            = "6_hours"
+      stagger_repositories = true
+      max_concurrent_syncs = 3
+    }
+
+    # Update conditions
+    update_conditions = {
+      require_schema_changes    = true
+      ignore_formatting_changes = true
+      validate_syntax           = true
+      run_tests                 = var.environment != "production"
+    }
+  }
+
+  # Performance optimization
+  performance = {
+    parallel_processing  = true
+    max_concurrent_repos = 3
+    memory_limit         = "2GB"
+
+    # Caching strategy
+    cache_repositories = true
+    cache_duration     = "4h"
+    cache_location     = "/tmp/kolumn_federated_cache"
+
+    # Git optimization
+    shallow_clone   = true
+    clone_depth     = 1
+    sparse_checkout = true
+  }
+
+  # Security and compliance
+  security = {
+    allowed_repositories = [
+      "github.com/${var.company_domain}/*",
+      "gitlab.com/${var.company_domain}/*",
+      "bitbucket.org/${var.company_domain}/*"
+    ]
+
+    scan_for_secrets               = true
+    validate_repository_signatures = var.environment == "production"
+    audit_repository_access        = true
+
+    # Network security
+    allowed_ip_ranges = ["10.0.0.0/8", "192.168.0.0/16"]
+    require_vpn       = var.environment == "production"
+  }
+}
+
+# Create unified data objects from federated discovery
+create "kolumn_data_object" "federated_user" {
+  name        = "Unified User Schema"
+  description = "Consolidated user schema from multiple microservices"
+
+  # Merge schemas from different repositories
+  dynamic "column" {
+    for_each = merge(
+      discover.multi_repo_federation.microservices_ecosystem.users.tables.users.columns,
+      discover.multi_repo_federation.microservices_ecosystem.analytics.tables.user_profiles.columns
+    )
+    content {
+      name              = column.key
+      type              = normalize_type(column.value.type)
+      source_repository = column.value.source_repository
+      source_framework  = column.value.framework
+      nullable          = column.value.nullable
+
+      # Conflict resolution
+      primary_source = column.value.priority_source
+
+      # Cross-repository validation
+      consistent_across_repos = column.value.consistency_check
+
+      # Data governance
+      classifications = auto_classify_column(column.key, column.value.type)
+    }
+  }
+
+  # Cross-repository relationships
+  dynamic "relationship" {
+    for_each = discover.multi_repo_federation.microservices_ecosystem.cross_repo_relationships
+    content {
+      name              = relationship.key
+      type              = relationship.value.type
+      source_repository = relationship.value.source_repo
+      target_repository = relationship.value.target_repo
+      source_table      = relationship.value.source_table
+      target_table      = relationship.value.target_table
+
+      # Service boundary considerations
+      cross_service_boundary = relationship.value.crosses_service_boundary
+      api_mediated           = relationship.value.requires_api_call
+      eventual_consistency   = relationship.value.eventual_consistency
+    }
+  }
+
+  # Federated metadata
+  metadata = {
+    source_repositories = [
+      "user-service",
+      "analytics-service"
+    ]
+    frameworks_involved      = ["drizzle", "kysely"]
+    last_sync_timestamp      = discover.multi_repo_federation.microservices_ecosystem.last_sync
+    schema_consistency_score = discover.multi_repo_federation.microservices_ecosystem.consistency_score
+  }
+}
+
+# Create federated database schema
+create "postgres_schema" "federated_microservices" {
+  database    = postgres_database.federated_microservices.name
+  schema_name = "federated"
+
+  # Schema organization by namespace
+  comment = "Federated schema consolidating multiple microservice repositories"
+}
+
+# Create namespace-separated tables
+create "postgres_table" "users_federated" {
+  database   = postgres_database.federated_microservices.name
+  schema     = "federated"
+  table_name = "users"
+
+  # Use federated schema with source tracking
+  dynamic "column" {
+    for_each = kolumn_data_object.federated_user.columns
+    content {
+      name     = column.value.name
+      type     = postgres_type_mapping(column.value.type)
+      nullable = column.value.nullable
+
+      # Source tracking
+      comment = "Source: ${column.value.source_repository} (${column.value.source_framework})"
+    }
+  }
+
+  # Cross-repository foreign keys (logical only)
+  dynamic "foreign_key" {
+    for_each = [
+      for rel in kolumn_data_object.federated_user.relationships :
+      rel if !rel.cross_service_boundary
+    ]
+    content {
+      name               = foreign_key.value.name
+      columns            = [foreign_key.value.foreign_key]
+      references_table   = foreign_key.value.target_table
+      references_columns = [foreign_key.value.target_column]
+
+      # Mark as logical-only for cross-service references
+      enforce = !foreign_key.value.cross_service_boundary
+    }
+  }
+
+  # Governance policies from discovery
+  governance = {
+    source_repositories = kolumn_data_object.federated_user.metadata.source_repositories
+    pii_columns = [
+      for col in kolumn_data_object.federated_user.columns :
+      col.name if contains(col.classifications, "pii")
+    ]
+    audit_trail            = true
+    cross_service_tracking = true
+  }
+}
+
+# Create materialized view for cross-service analytics
+create "postgres_view" "federated_user_analytics" {
+  database     = postgres_database.federated_microservices.name
+  schema       = "federated"
+  view_name    = "user_analytics_360"
+  materialized = true
+
+  query = <<-SQL
+    SELECT 
+      u.id as user_id,
+      u.email,
+      u.created_at as user_created_at,
+      
+      -- Analytics data from analytics service
+      COALESCE(a.total_events, 0) as total_events,
+      COALESCE(a.last_activity, u.created_at) as last_activity,
+      
+      -- Content data from content service (if available)
+      COALESCE(c.content_count, 0) as content_created,
+      COALESCE(c.last_content_date, u.created_at) as last_content_date,
+      
+      -- Order data from order service (legacy)
+      COALESCE(o.order_count, 0) as total_orders,
+      COALESCE(o.total_spent, 0.00) as total_spent,
+      
+      -- Calculated user segment
+      CASE 
+        WHEN COALESCE(a.total_events, 0) > 1000 AND COALESCE(o.total_spent, 0) > 500 THEN 'power_user'
+        WHEN COALESCE(a.total_events, 0) > 100 OR COALESCE(o.order_count, 0) > 5 THEN 'regular_user'
+        ELSE 'casual_user'
+      END as user_segment,
+      
+      -- Cross-service consistency check
+      CASE 
+        WHEN u.updated_at = a.user_updated_at THEN 'consistent'
+        ELSE 'sync_needed'
+      END as cross_service_consistency
+      
+    FROM federated.users u
+    LEFT JOIN federated.user_analytics a ON u.id = a.user_id
+    LEFT JOIN federated.user_content c ON u.id = c.user_id  
+    LEFT JOIN federated.user_orders o ON u.id = o.user_id
+  SQL
+
+  # Refresh schedule coordinated with service sync
+  refresh_schedule = "0 */6 * * *" # Every 6 hours
+
+  indexes = [
+    {
+      columns = ["user_id"]
+      method  = "btree"
+      unique  = true
+    },
+    {
+      columns = ["user_segment"]
+      method  = "btree"
+    },
+    {
+      columns = ["cross_service_consistency"]
+      method  = "btree"
+    }
+  ]
+}
+
+# Cross-service event streaming
+create "kafka_topic" "federated_schema_changes" {
+  name               = "${var.company_domain}-${var.environment}-schema-changes"
+  partitions         = 6
+  replication_factor = 3
+
+  config = {
+    "cleanup.policy"   = "delete"
+    "retention.ms"     = "2592000000" # 30 days
+    "compression.type" = "snappy"
+  }
+
+  # Schema registry for cross-service events
+  schema_registry = {
+    enabled          = true
+    compatibility    = "FORWARD"
+    subject_strategy = "TopicNameStrategy"
+  }
+}
+
+# Automated schema change detection and notification
+create "kafka_producer" "schema_change_notifier" {
+  topic = kafka_topic.federated_schema_changes.name
+
+  # Trigger on repository sync events
+  triggers = [
+    {
+      event     = "repository_sync_completed"
+      source    = "multi_repo_federation"
+      condition = "schema_changes_detected = true"
+    }
+  ]
+
+  # Message format for schema changes
+  message_schema = {
+    key_field = "repository_name"
+    value_fields = [
+      "repository_name",
+      "namespace",
+      "framework",
+      "change_type",
+      "affected_tables",
+      "affected_columns",
+      "breaking_changes",
+      "sync_timestamp",
+      "environment"
+    ]
+  }
+
+  serialization = {
+    format          = "avro"
+    schema_registry = "http://localhost:8081"
+  }
+}
+
+# Cross-service data synchronization
+create "airbyte_connection" "federated_sync" {
+  name = "federated_microservices_sync"
+
+  # Multiple sources from different databases
+  multi_source_configuration = [
+    {
+      source_type = "postgres"
+      database    = "user_service_db"
+      tables      = discover.multi_repo_federation.microservices_ecosystem.users.tables
+      namespace   = "users"
+    },
+    {
+      source_type = "postgres"
+      database    = "analytics_service_db"
+      tables      = discover.multi_repo_federation.microservices_ecosystem.analytics.tables
+      namespace   = "analytics"
+    },
+    {
+      source_type = "edgedb"
+      instance    = "content_service"
+      queries     = discover.multi_repo_federation.microservices_ecosystem.content.extraction_queries
+      namespace   = "content"
+    }
+  ]
+
+  destination_configuration = {
+    type     = "postgres"
+    database = postgres_database.federated_microservices.name
+    schema   = "federated"
+
+    # Conflict resolution during sync
+    conflict_resolution    = "source_priority"
+    namespace_preservation = true
+  }
+
+  # Sync schedule coordinated with repository updates
+  schedule = {
+    frequency       = "6_hours"
+    start_time      = "02:00"
+    stagger_sources = true
+  }
+
+  # Data transformation for consistency
+  transformations = [
+    {
+      name = "normalize_user_ids"
+      sql  = <<-SQL
+        SELECT 
+          *,
+          '${source_namespace}' as source_service,
+          CURRENT_TIMESTAMP as federated_sync_timestamp
+        FROM ${source_table}
+      SQL
+    }
+  ]
+}
+
+# Automated testing for federated schema consistency
+create "schema_test_suite" "federated_consistency" {
+  name = "federated_schema_consistency_tests"
+
+  # Cross-repository consistency tests
+  tests = [
+    {
+      name            = "user_id_consistency"
+      description     = "Ensure user IDs are consistent across services"
+      query           = <<-SQL
+        SELECT 
+          COUNT(*) as total_users,
+          COUNT(DISTINCT user_id) as unique_users,
+          CASE WHEN COUNT(*) = COUNT(DISTINCT user_id) THEN 'PASS' ELSE 'FAIL' END as test_result
+        FROM (
+          SELECT user_id FROM federated.users
+          UNION ALL
+          SELECT user_id FROM federated.user_analytics
+          UNION ALL  
+          SELECT user_id FROM federated.user_orders
+        ) all_users
+      SQL
+      expected_result = "PASS"
+    },
+
+    {
+      name                  = "cross_service_referential_integrity"
+      description           = "Check referential integrity across service boundaries"
+      query                 = <<-SQL
+        SELECT 
+          'user_analytics' as table_name,
+          COUNT(*) as orphaned_records
+        FROM federated.user_analytics a
+        LEFT JOIN federated.users u ON a.user_id = u.id
+        WHERE u.id IS NULL
+        
+        UNION ALL
+        
+        SELECT 
+          'user_orders' as table_name,
+          COUNT(*) as orphaned_records
+        FROM federated.user_orders o
+        LEFT JOIN federated.users u ON o.user_id = u.id
+        WHERE u.id IS NULL
+      SQL
+      expected_max_orphaned = 0
+    },
+
+    {
+      name                      = "schema_evolution_compatibility"
+      description               = "Verify schema changes maintain backward compatibility"
+      validation_type           = "schema_diff"
+      baseline_schema           = discover.multi_repo_federation.microservices_ecosystem.baseline_schema
+      current_schema            = discover.multi_repo_federation.microservices_ecosystem.current_schema
+      breaking_change_tolerance = "none"
+    }
+  ]
+
+  # Test execution schedule
+  schedule = "0 4 * * *" # Daily at 4 AM
+
+  # Notification configuration
+  notifications = {
+    on_failure = {
+      channels         = ["#devops", "#data-team"]
+      escalation_after = 2
+    }
+    on_success = {
+      channels     = ["#data-team"]
+      summary_only = true
+    }
+  }
+}
+
+# Federated schema documentation generator
+create "schema_documentation" "federated_docs" {
+  name = "federated_microservices_documentation"
+
+  # Source repositories for documentation
+  sources = discover.multi_repo_federation.microservices_ecosystem.repositories
+
+  # Documentation generation
+  documentation_config = {
+    format                   = "markdown"
+    include_erd              = true
+    include_api_docs         = true
+    include_cross_references = true
+
+    # Sections to generate
+    sections = [
+      "overview",
+      "repository_mapping",
+      "schema_evolution",
+      "cross_service_relationships",
+      "data_flow_diagrams",
+      "api_contracts",
+      "governance_policies"
+    ]
+  }
+
+  # Output configuration
+  output = {
+    directory   = "./docs/federated-schema"
+    format      = "gitbook"
+    auto_deploy = true
+    versioning  = true
+  }
+
+  # Auto-update on schema changes
+  auto_update = {
+    triggers        = ["repository_sync", "schema_change"]
+    review_required = var.environment == "production"
+  }
+}
+
+# Outputs for federated system monitoring
+output "federated_discovery_summary" {
+  description = "Summary of federated multi-repository discovery"
+  value = {
+    repositories_discovered = length(discover.multi_repo_federation.microservices_ecosystem.repositories)
+    frameworks_integrated = length(distinct([
+      for repo in discover.multi_repo_federation.microservices_ecosystem.repositories :
+      repo.framework
+    ]))
+
+    total_tables = sum([
+      for namespace, data in discover.multi_repo_federation.microservices_ecosystem :
+      length(data.tables) if can(data.tables)
+    ])
+
+    cross_repo_relationships = length(discover.multi_repo_federation.microservices_ecosystem.cross_repo_relationships)
+
+    consistency_score   = discover.multi_repo_federation.microservices_ecosystem.consistency_score
+    last_sync_timestamp = discover.multi_repo_federation.microservices_ecosystem.last_sync
+
+    # Namespace breakdown
+    namespaces = {
+      for namespace, data in discover.multi_repo_federation.microservices_ecosystem :
+      namespace => {
+        repository   = data.repository_name
+        framework    = data.framework
+        table_count  = length(data.tables)
+        last_updated = data.last_updated
+      } if can(data.repository_name)
+    }
+  }
+}
+
+output "federated_integration_endpoints" {
+  description = "Integration endpoints and monitoring URLs"
+  value = {
+    federated_database  = "postgresql://${postgres_provider.host}:${postgres_provider.port}/federated_microservices"
+    analytics_view      = "SELECT * FROM federated.user_analytics_360"
+    schema_change_topic = kafka_topic.federated_schema_changes.name
+    documentation_url   = "file://./docs/federated-schema/index.html"
+
+    # Monitoring endpoints
+    sync_status          = "SELECT * FROM federated.sync_status"
+    consistency_tests    = "SELECT * FROM federated.consistency_test_results"
+    cross_service_health = "SELECT * FROM federated.cross_service_health_check"
+  }
+}
+
+output "cross_service_governance" {
+  description = "Cross-service data governance implementation"
+  value = {
+    # Data classification across services
+    pii_protection = {
+      enabled                   = true
+      cross_service_consistency = true
+      encryption_standardized   = true
+    }
+
+    # Schema governance
+    schema_evolution = {
+      breaking_change_detection       = true
+      backward_compatibility_enforced = true
+      automated_testing               = true
+    }
+
+    # Service boundary management
+    service_boundaries = {
+      logical_separation            = true
+      api_mediated_relationships    = true
+      eventual_consistency_patterns = true
+    }
+
+    # Compliance
+    compliance_features = {
+      audit_trails       = "cross_service"
+      data_lineage       = "federated"
+      retention_policies = "service_specific"
+      gdpr_compliance    = "coordinated"
+    }
+  }
+}

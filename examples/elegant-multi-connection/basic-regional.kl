@@ -1,0 +1,515 @@
+# Basic Multi-Region Database Deployment
+# Elegant approach using enhanced provider patterns
+
+# Variables for configuration
+variable "postgres_username" {
+  description = "PostgreSQL username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL password"
+  type        = string
+  sensitive   = true
+}
+
+variable "environment" {
+  description = "Environment (prod, staging, dev)"
+  type        = string
+  default     = "prod"
+
+  validation {
+    condition     = contains(["prod", "staging", "dev"], var.environment)
+    error_message = "Environment must be prod, staging, or dev."
+  }
+}
+
+# Enhanced Provider with Multi-Connection Pattern
+provider "postgres" "regional" {
+  # Pattern-based connection generation
+  connection_pattern = "app-{region}-{environment}-db.company.com"
+
+  # Variable expansion (creates 6 connections: 3 regions × 2 environments)
+  regions      = ["us-east", "us-west", "eu-west"]
+  environments = ["prod", "staging"]
+
+  # Base configuration applied to ALL connections
+  port     = 5432
+  database = "ecommerce"
+  ssl_mode = "require"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Enterprise safety features (embedded directly)
+  safety {
+    circuit_breaker {
+      failure_threshold = 3
+      recovery_time     = "30s"
+      min_requests      = 10
+    }
+
+    retry_policy {
+      max_attempts  = 3
+      backoff       = "exponential"
+      initial_delay = "1s"
+    }
+
+    rollback {
+      enable_snapshots   = true
+      retention_days     = 30
+      automatic_triggers = ["schema_error", "connection_failure"]
+    }
+  }
+
+  # Multi-connection orchestration
+  orchestration {
+    parallel_limit      = 3         # Max 3 connections at once
+    batch_size          = 2         # Process 2 at a time
+    failure_tolerance   = 10        # Continue if <10% fail
+    deployment_strategy = "rolling" # rolling, parallel, sequential
+  }
+
+  # Monitoring and alerts
+  monitoring {
+    progress_tracking = true
+    real_time_metrics = true
+
+    alerts = {
+      slack_webhook = var.slack_webhook_url
+      email         = ["ops@company.com"]
+    }
+  }
+}
+
+# ✅ CORRECT: Create data objects FIRST for schema definition
+create "kolumn_data_object" "user_schema" {
+  name        = "Regional User Schema"
+  description = "Universal user schema for multi-regional deployment"
+
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "username" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "updated_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+
+  metadata = {
+    domain          = "user_management"
+    owner           = "user-management-team"
+    compliance_tags = ["pii", "gdpr_applicable"]
+  }
+}
+
+create "kolumn_data_object" "product_schema" {
+  name        = "Regional Product Schema"
+  description = "Universal product schema for multi-regional deployment"
+
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "name" {
+    type            = "VARCHAR(255)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "description" {
+    type            = "TEXT"
+    nullable        = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "price" {
+    type            = "DECIMAL(10,2)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "currency" {
+    type            = "CHAR(3)"
+    nullable        = false
+    default         = "USD"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "status" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    default         = "active"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+}
+
+create "kolumn_data_object" "order_schema" {
+  name        = "Regional Order Schema"
+  description = "Universal order schema for multi-regional deployment"
+
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "user_id" {
+    type            = "BIGINT"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "order_number" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "total_amount" {
+    type            = "DECIMAL(10,2)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "currency" {
+    type            = "CHAR(3)"
+    nullable        = false
+    default         = "USD"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "status" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    default         = "pending"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+}
+
+# Classification definitions
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  requirements = {
+    encryption   = true
+    audit_access = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "Public"
+  description = "Public information"
+  requirements = {
+    encryption = false
+  }
+}
+
+create "kolumn_classification" "identifier" {
+  name        = "Identifier"
+  description = "Unique identifiers and keys"
+  requirements = {
+    indexed = true
+  }
+}
+
+# Auto-Scaling Table Creation
+create "postgres_table" "users" {
+  provider = postgres.regional # Automatically creates on ALL 6 connections
+
+  name   = "users"
+  schema = "public"
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMPTZ" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : column.value.default
+    }
+  }
+
+  # Regional compliance overrides using column functions
+  connection_overrides = {
+    "eu-west" = {
+      # ⚡ CORRECT: Use add_columns() to extend base schema for GDPR compliance
+      columns = add_columns(
+        kolumn_data_object.user_schema.columns,
+        {
+          "gdpr_consent" = {
+            name            = "gdpr_consent"
+            type            = "BOOLEAN"
+            nullable        = false
+            default         = "false"
+            comment         = "GDPR data processing consent"
+            classifications = [kolumn_classification.public]
+          }
+          "data_retention_policy" = {
+            name            = "data_retention_policy"
+            type            = "VARCHAR(50)"
+            nullable        = false
+            default         = "gdpr_compliant"
+            comment         = "Data retention policy identifier"
+            classifications = [kolumn_classification.public]
+          }
+        }
+      )
+    }
+
+    "prod" = {
+      # Production-specific optimizations
+      indexes = {
+        email_performance = {
+          columns = ["email"]
+          method  = "btree"
+          unique  = true
+        }
+        username_performance = {
+          columns = ["username"]
+          method  = "btree"
+          unique  = true
+        }
+        created_at_range = {
+          columns = ["created_at"]
+          method  = "btree"
+        }
+      }
+    }
+  }
+
+  # Table metadata
+  metadata = {
+    description     = "Core user accounts table"
+    owner           = "user-management-team"
+    compliance_tags = ["pii", "gdpr_applicable"]
+  }
+}
+
+# Auto-Scaling Products Table
+create "postgres_table" "products" {
+  provider = postgres.regional
+
+  name   = "products"
+  schema = "public"
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.product_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMPTZ" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : column.value.default
+    }
+  }
+
+  # Regional customizations using column functions
+  connection_overrides = {
+    "eu-west" = {
+      # ⚡ CORRECT: Use add_columns() to extend base schema for EU compliance
+      columns = add_columns(
+        kolumn_data_object.product_schema.columns,
+        {
+          "ce_marking" = {
+            name            = "ce_marking"
+            type            = "BOOLEAN"
+            nullable        = false
+            default         = "false"
+            comment         = "CE marking compliance"
+            classifications = [kolumn_classification.public]
+          }
+          "vat_rate" = {
+            name            = "vat_rate"
+            type            = "DECIMAL(5,2)"
+            nullable        = false
+            default         = "20.00"
+            comment         = "VAT rate percentage"
+            classifications = [kolumn_classification.public]
+          }
+        }
+      )
+    }
+
+    "us-east" = {
+      # ⚡ CORRECT: Use add_columns() to extend base schema for US requirements
+      columns = add_columns(
+        kolumn_data_object.product_schema.columns,
+        {
+          "sales_tax_exempt" = {
+            name            = "sales_tax_exempt"
+            type            = "BOOLEAN"
+            nullable        = false
+            default         = "false"
+            comment         = "US sales tax exemption status"
+            classifications = [kolumn_classification.public]
+          }
+        }
+      )
+    }
+  }
+}
+
+# Auto-Scaling Orders Table with Foreign Keys
+create "postgres_table" "orders" {
+  provider = postgres.regional
+
+  name   = "orders"
+  schema = "public"
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.order_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMPTZ" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : column.value.default
+    }
+  }
+
+  # Foreign key relationships (automatically created on all connections)
+  foreign_key "fk_orders_user" {
+    columns            = ["user_id"]
+    references_table   = "users"
+    references_columns = ["id"]
+    on_delete          = "CASCADE"
+    on_update          = "CASCADE"
+  }
+
+  # Global indexes
+  index "idx_orders_user_created" {
+    columns = ["user_id", "created_at"]
+    method  = "btree"
+  }
+
+  index "idx_orders_status" {
+    columns = ["status"]
+    method  = "btree"
+  }
+}
+
+# Auto-Scaling Analytics View
+create "postgres_view" "user_analytics" {
+  provider = postgres.regional
+
+  name   = "user_analytics"
+  schema = "public"
+
+  # Query with connection-aware variables
+  query = <<-SQL
+    SELECT 
+      u.id,
+      u.email,
+      u.username,
+      COUNT(o.id) as total_orders,
+      SUM(o.total_amount) as total_spent,
+      MAX(o.created_at) as last_order_date,
+      '${connection.region}' as region,
+      '${connection.environment}' as environment,
+      NOW() as calculated_at
+    FROM users u
+    LEFT JOIN orders o ON u.id = o.user_id
+    WHERE u.created_at > NOW() - INTERVAL '1 year'
+    GROUP BY u.id, u.email, u.username
+    ORDER BY total_spent DESC
+  SQL
+
+  # View-specific monitoring
+  monitoring = {
+    refresh_schedule     = "0 2 * * *" # Daily at 2 AM
+    performance_tracking = true
+    row_count_baseline   = true
+  }
+}
+
+# Output connection information
+output "deployment_summary" {
+  description = "Multi-connection deployment summary"
+  value = {
+    provider          = "postgres.regional"
+    total_connections = 6
+    regions           = ["us-east", "us-west", "eu-west"]
+    environments      = ["prod", "staging"]
+    tables_created    = 3
+    views_created     = 1
+    safety_features   = ["circuit_breaker", "retry_policy", "rollback"]
+    compliance = {
+      gdpr_enabled        = true
+      eu_specific_columns = true
+      audit_logging       = true
+    }
+  }
+}
+
+output "connection_map" {
+  description = "Map of all database connections"
+  value = {
+    "us-east-prod"    = "app-us-east-prod-db.company.com:5432/ecommerce"
+    "us-east-staging" = "app-us-east-staging-db.company.com:5432/ecommerce"
+    "us-west-prod"    = "app-us-west-prod-db.company.com:5432/ecommerce"
+    "us-west-staging" = "app-us-west-staging-db.company.com:5432/ecommerce"
+    "eu-west-prod"    = "app-eu-west-prod-db.company.com:5432/ecommerce"
+    "eu-west-staging" = "app-eu-west-staging-db.company.com:5432/ecommerce"
+  }
+}
+
+# Variable definitions for external configuration
+variable "slack_webhook_url" {
+  description = "Slack webhook URL for deployment alerts"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

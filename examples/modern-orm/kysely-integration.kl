@@ -1,0 +1,636 @@
+# Kysely Integration Example
+# Demonstrates complete Kysely TypeScript interface discovery and SQL optimization with Kolumn
+
+# Variables for configuration
+variable "database_url" {
+  description = "PostgreSQL database URL for analytics platform"
+  type        = string
+  default     = "postgresql://localhost:5432/analytics_platform"
+}
+
+variable "environment" {
+  description = "Environment (dev, staging, production)"
+  type        = string
+  default     = "dev"
+}
+
+variable "enable_query_optimization" {
+  description = "Enable advanced query optimization features"
+  type        = bool
+  default     = true
+}
+
+variable "connection_pool_size" {
+  description = "Database connection pool size"
+  type        = number
+  default     = 20
+}
+
+# PostgreSQL provider with performance tuning
+provider "postgres" {
+  host     = "localhost"
+  port     = 5432
+  database = "analytics_platform"
+  username = "analytics_user"
+  password = var.postgres_password
+  sslmode  = "require"
+
+  # Performance configuration
+  pool_config = {
+    max_connections     = var.connection_pool_size
+    min_connections     = 5
+    connection_lifetime = "30m"
+    idle_timeout        = "10m"
+  }
+
+  # Query optimization settings
+  query_config = {
+    statement_timeout  = "30s"
+    lock_timeout       = "10s"
+    enable_query_cache = var.enable_query_optimization
+  }
+}
+
+# Kysely interface discovery from TypeScript
+discover "kysely_schema" "analytics_platform" {
+  project_path = "./packages/analytics-backend"
+  interface_files = [
+    "src/types/database.ts",
+    "src/types/tables.ts",
+    "src/types/views.ts",
+    "src/types/materialized-views.ts"
+  ]
+
+  # Interface extraction options
+  extract_interfaces          = true
+  extract_type_definitions    = true
+  extract_function_signatures = true
+  extract_computed_columns    = true
+  extract_view_definitions    = true
+
+  # TypeScript configuration
+  typescript_config = {
+    config_path                   = "./tsconfig.json"
+    strict_null_checks            = true
+    exact_optional_property_types = true
+    include_generated_types       = true
+  }
+
+  # Query analysis and optimization
+  query_analysis = {
+    analyze_common_queries              = true
+    extract_query_patterns              = true
+    identify_optimization_opportunities = true
+    generate_index_recommendations      = true
+  }
+
+  # Migration integration with Kysely migrator
+  migration_integration = {
+    use_kysely_migrator       = true
+    migration_directory       = "src/migrations"
+    generate_migration_types  = true
+    validate_migration_safety = true
+  }
+
+  # Performance profiling
+  performance_analysis = {
+    track_query_performance     = var.enable_query_optimization
+    identify_n_plus_one_queries = true
+    analyze_join_efficiency     = true
+    detect_missing_indexes      = true
+  }
+}
+
+# Create Kolumn data objects from discovered Kysely interfaces
+create "kolumn_data_object" "users_from_kysely" {
+  name        = "Analytics Users from Kysely Interface"
+  description = "User analytics schema extracted from Kysely TypeScript interfaces"
+
+  dynamic "column" {
+    for_each = discover.kysely_schema.analytics_platform.interfaces.Database.UserTable.properties
+    content {
+      name      = column.key
+      type      = kysely_to_sql_type(column.value.type)
+      nullable  = column.value.nullable
+      generated = column.value.generated
+      computed  = column.value.computed
+
+      # Auto-generated field detection from Kysely Generated<T> type
+      auto_increment = column.value.generated && column.value.type == "number"
+      default        = column.value.generated ? "auto" : column.value.default
+
+      # Extract computed column logic
+      computation_logic = column.value.computed ? column.value.computation : null
+
+      # Type-safe constraints from Kysely
+      constraints = column.value.constraints
+
+      # Index recommendations from query analysis
+      index_recommended = contains(discover.kysely_schema.analytics_platform.index_recommendations, column.key)
+    }
+  }
+
+  # Extract relationships from Kysely interface patterns
+  dynamic "relationship" {
+    for_each = discover.kysely_schema.analytics_platform.interfaces.Database.UserTable.relationships
+    content {
+      name             = relationship.key
+      type             = relationship.value.type
+      target_interface = relationship.value.target
+      foreign_key      = relationship.value.foreign_key
+      cascade_rules    = relationship.value.cascade
+
+      # Performance optimization hints
+      join_strategy  = relationship.value.join_strategy
+      index_required = relationship.value.requires_index
+    }
+  }
+
+  # Kysely-specific metadata
+  metadata = {
+    source_framework         = "kysely"
+    interface_name           = "UserTable"
+    kysely_version           = discover.kysely_schema.analytics_platform.kysely_version
+    type_safe                = true
+    zero_runtime_overhead    = true
+    query_builder_compatible = true
+    generated_at             = timestamp()
+  }
+}
+
+# Create analytics events table with advanced Kysely features
+create "kolumn_data_object" "events_from_kysely" {
+  name        = "Analytics Events from Kysely Interface"
+  description = "Event tracking schema with optimized query patterns"
+
+  dynamic "column" {
+    for_each = discover.kysely_schema.analytics_platform.interfaces.Database.EventTable.properties
+    content {
+      name     = column.key
+      type     = kysely_to_sql_type(column.value.type)
+      nullable = column.value.nullable
+
+      # JSON field handling from Kysely
+      json_schema       = column.value.type == "json" ? column.value.json_schema : null
+      json_path_indexes = column.value.json_paths
+
+      # Time-series optimizations
+      time_series_column = column.value.name == "timestamp"
+      partition_key      = column.value.partition_key
+
+      # Query optimization metadata
+      frequently_queried = contains(discover.kysely_schema.analytics_platform.hot_columns, column.key)
+      cardinality        = column.value.estimated_cardinality
+    }
+  }
+
+  # Performance optimizations from query analysis
+  performance_optimizations = {
+    partition_strategy   = discover.kysely_schema.analytics_platform.partition_recommendations.EventTable
+    index_strategy       = discover.kysely_schema.analytics_platform.index_recommendations.EventTable
+    compression_strategy = "zstd" # For time-series data
+  }
+}
+
+# Create PostgreSQL tables with Kysely-optimized performance
+create "postgres_table" "users_analytics" {
+  database   = postgres_database.analytics.name
+  schema     = "analytics"
+  table_name = "users"
+
+  # Use discovered columns with type safety
+  dynamic "column" {
+    for_each = kolumn_data_object.users_from_kysely.columns
+    content {
+      name        = column.value.name
+      type        = postgres_type_mapping(column.value.type)
+      nullable    = column.value.nullable
+      default     = column.value.default
+      primary_key = column.value.primary_key
+
+      # Generated column support
+      generated             = column.value.computed
+      generation_expression = column.value.computation_logic
+      stored                = column.value.computed ? true : false
+    }
+  }
+
+  # Indexes from Kysely query analysis
+  dynamic "index" {
+    for_each = discover.kysely_schema.analytics_platform.index_recommendations.UserTable
+    content {
+      name         = index.value.name
+      columns      = index.value.columns
+      method       = index.value.method
+      unique       = index.value.unique
+      where_clause = index.value.partial_condition
+
+      # Performance metadata
+      estimated_improvement    = index.value.performance_improvement
+      query_patterns_optimized = index.value.optimized_patterns
+    }
+  }
+
+  # Table partitioning for analytics workloads
+  partitioning = {
+    type             = "range"
+    column           = "created_at"
+    interval         = "1 month"
+    retention_months = 24
+  }
+
+  # Compression for historical data
+  compression = {
+    method        = "lz4"
+    level         = 1
+    threshold_age = "30 days"
+  }
+}
+
+# Create high-performance events table
+create "postgres_table" "events_analytics" {
+  database   = postgres_database.analytics.name
+  schema     = "analytics"
+  table_name = "events"
+
+  # Event columns with time-series optimizations
+  dynamic "column" {
+    for_each = kolumn_data_object.events_from_kysely.columns
+    content {
+      name     = column.value.name
+      type     = postgres_type_mapping(column.value.type)
+      nullable = column.value.nullable
+      default  = column.value.default
+
+      # JSON field optimizations
+      gin_indexed = column.value.type == "jsonb"
+    }
+  }
+
+  # Time-series optimized indexes
+  index "idx_events_timestamp_brin" {
+    columns = ["timestamp"]
+    method  = "brin"
+    # BRIN indexes are perfect for time-series data
+    storage_parameters = {
+      pages_per_range = 128
+    }
+  }
+
+  index "idx_events_user_time" {
+    columns = ["user_id", "timestamp"]
+    method  = "btree"
+    # Optimized for user activity queries
+  }
+
+  index "idx_events_properties_gin" {
+    columns = ["properties"]
+    method  = "gin"
+    # Fast JSON queries
+  }
+
+  # Hypertable configuration for time-series workloads
+  hypertable = {
+    time_column         = "timestamp"
+    chunk_time_interval = "1 day"
+    compress_after      = "7 days"
+    drop_after          = "2 years"
+  }
+
+  # Automated partitioning by time
+  partitioning = {
+    type           = "range"
+    column         = "timestamp"
+    interval       = "1 day"
+    retention_days = 730 # 2 years
+  }
+}
+
+# Create materialized views for common analytics queries
+create "postgres_view" "user_activity_summary" {
+  database     = postgres_database.analytics.name
+  schema       = "analytics"
+  view_name    = "user_activity_summary"
+  materialized = true
+
+  # Optimized query based on Kysely patterns
+  query = <<-SQL
+    SELECT 
+      u.id as user_id,
+      u.email,
+      u.signup_date,
+      COUNT(e.id) as total_events,
+      COUNT(DISTINCT DATE(e.timestamp)) as active_days,
+      MAX(e.timestamp) as last_activity,
+      MIN(e.timestamp) as first_activity,
+      -- JSON aggregation for event properties
+      jsonb_agg(DISTINCT e.event_type) as event_types_used,
+      -- Window functions for analytics
+      PERCENT_RANK() OVER (ORDER BY COUNT(e.id)) as activity_percentile
+    FROM ${postgres_table.users_analytics.full_name} u
+    LEFT JOIN ${postgres_table.events_analytics.full_name} e ON u.id = e.user_id
+    WHERE u.created_at >= NOW() - INTERVAL '1 year'
+    GROUP BY u.id, u.email, u.signup_date
+  SQL
+
+  # Refresh schedule for materialized view
+  refresh_schedule = "0 */6 * * *" # Every 6 hours
+
+  # Indexes on materialized view
+  indexes = [
+    {
+      columns = ["user_id"]
+      method  = "btree"
+      unique  = true
+    },
+    {
+      columns = ["activity_percentile"]
+      method  = "btree"
+    },
+    {
+      columns = ["last_activity"]
+      method  = "brin"
+    }
+  ]
+}
+
+# Create real-time analytics view
+create "postgres_view" "real_time_metrics" {
+  database  = postgres_database.analytics.name
+  schema    = "analytics"
+  view_name = "real_time_metrics"
+
+  # Real-time query optimized by Kysely analysis
+  query = <<-SQL
+    WITH recent_events AS (
+      SELECT 
+        event_type,
+        user_id,
+        timestamp,
+        properties
+      FROM ${postgres_table.events_analytics.full_name}
+      WHERE timestamp >= NOW() - INTERVAL '1 hour'
+    ),
+    event_counts AS (
+      SELECT 
+        event_type,
+        COUNT(*) as event_count,
+        COUNT(DISTINCT user_id) as unique_users,
+        AVG(EXTRACT(EPOCH FROM (timestamp - LAG(timestamp) OVER (PARTITION BY user_id ORDER BY timestamp)))) as avg_time_between_events
+      FROM recent_events
+      GROUP BY event_type
+    )
+    SELECT 
+      event_type,
+      event_count,
+      unique_users,
+      ROUND(avg_time_between_events, 2) as avg_seconds_between_events,
+      ROUND(event_count::numeric / 60, 2) as events_per_minute
+    FROM event_counts
+    ORDER BY event_count DESC
+  SQL
+
+  # Security policy for real-time data
+  security_policies = [
+    {
+      name       = "real_time_access"
+      expression = "current_user IN ('analytics_reader', 'dashboard_user')"
+      command    = "SELECT"
+    }
+  ]
+}
+
+# Kysely query optimization stored procedures
+create "postgres_function" "optimize_kysely_queries" {
+  database      = postgres_database.analytics.name
+  schema        = "analytics"
+  function_name = "optimize_kysely_queries"
+  language      = "plpgsql"
+  returns       = "void"
+
+  body = <<-SQL
+    BEGIN
+      -- Update table statistics for query planner
+      ANALYZE analytics.users;
+      ANALYZE analytics.events;
+      
+      -- Refresh materialized views
+      REFRESH MATERIALIZED VIEW CONCURRENTLY analytics.user_activity_summary;
+      
+      -- Log optimization run
+      INSERT INTO analytics.optimization_log (
+        run_timestamp,
+        tables_analyzed,
+        materialized_views_refreshed,
+        performance_improvement
+      ) VALUES (
+        NOW(),
+        ARRAY['users', 'events'],
+        ARRAY['user_activity_summary'],
+        'Query plans updated'
+      );
+    END;
+  SQL
+
+  # Schedule optimization runs
+  schedule = "0 2 * * *" # Daily at 2 AM
+}
+
+# Cross-provider integration: Export to data warehouse
+create "airbyte_connection" "analytics_to_warehouse" {
+  source_type      = "postgres"
+  destination_type = "snowflake"
+
+  source_configuration = {
+    host     = postgres_provider.host
+    port     = postgres_provider.port
+    database = postgres_provider.database
+
+    # Use Kysely-optimized tables as sources
+    tables = [
+      postgres_table.users_analytics.full_name,
+      postgres_table.events_analytics.full_name
+    ]
+
+    # Incremental sync based on timestamp
+    incremental_sync = {
+      cursor_field    = "timestamp"
+      lookback_window = "1 hour"
+    }
+  }
+
+  destination_configuration = {
+    warehouse = var.snowflake_warehouse
+    database  = var.snowflake_database
+    schema    = "kysely_analytics"
+
+    # Optimized loading for analytics data
+    loading_method = "COPY"
+    file_format    = "PARQUET"
+    compression    = "GZIP"
+  }
+
+  # Transformation during sync
+  transformations = [
+    {
+      name = "enrich_user_data"
+      sql  = <<-SQL
+        SELECT 
+          *,
+          CASE 
+            WHEN total_events > 1000 THEN 'power_user'
+            WHEN total_events > 100 THEN 'regular_user'
+            ELSE 'casual_user'
+          END as user_segment
+        FROM ${source_table}
+      SQL
+    }
+  ]
+
+  # Sync schedule aligned with materialized view refresh
+  schedule = {
+    frequency  = "6_hours"
+    start_time = "02:00"
+  }
+}
+
+# Performance monitoring and alerting
+create "postgres_function" "kysely_performance_monitor" {
+  database      = postgres_database.analytics.name
+  schema        = "analytics"
+  function_name = "kysely_performance_monitor"
+  language      = "plpgsql"
+  returns       = "table(metric_name text, metric_value numeric, alert_level text)"
+
+  body = <<-SQL
+    BEGIN
+      RETURN QUERY
+      WITH performance_metrics AS (
+        SELECT 
+          'avg_query_time' as metric_name,
+          AVG(total_time) as metric_value,
+          CASE 
+            WHEN AVG(total_time) > 5000 THEN 'critical'
+            WHEN AVG(total_time) > 1000 THEN 'warning'
+            ELSE 'ok'
+          END as alert_level
+        FROM pg_stat_statements 
+        WHERE query LIKE '%analytics.%'
+        
+        UNION ALL
+        
+        SELECT 
+          'cache_hit_ratio' as metric_name,
+          (sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read))) * 100 as metric_value,
+          CASE 
+            WHEN (sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read))) * 100 < 95 THEN 'warning'
+            WHEN (sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read))) * 100 < 90 THEN 'critical'
+            ELSE 'ok'
+          END as alert_level
+        FROM pg_statio_user_tables
+        WHERE schemaname = 'analytics'
+      );
+    END;
+  SQL
+}
+
+# Kysely migration management
+create "schema_migration" "kysely_analytics_v1" {
+  name        = "kysely_analytics_platform_v1"
+  version     = "1.0.0"
+  description = "Initial Kysely analytics platform schema with performance optimizations"
+
+  # Source framework
+  source_framework  = "kysely"
+  source_interfaces = discover.kysely_schema.analytics_platform.interfaces
+
+  # Migration strategy
+  strategy = {
+    type                = "incremental"
+    backup_strategy     = "pg_dump_custom"
+    rollback_strategy   = "migration_files"
+    validation_strategy = "interface_compliance"
+  }
+
+  # Performance validation
+  performance_validation = {
+    query_performance_tests = [
+      {
+        name                  = "user_lookup_performance"
+        query                 = "SELECT * FROM analytics.users WHERE id = $1"
+        max_execution_time_ms = 50
+      },
+      {
+        name                  = "event_aggregation_performance"
+        query                 = "SELECT COUNT(*) FROM analytics.events WHERE timestamp >= NOW() - INTERVAL '1 hour'"
+        max_execution_time_ms = 1000
+      }
+    ]
+
+    index_effectiveness_tests      = true
+    table_bloat_checks             = true
+    vacuum_analyze_after_migration = true
+  }
+
+  # Generated files
+  migration_files = {
+    kysely_migration     = "./migrations/001_analytics_platform.ts"
+    sql_up               = "./migrations/001_analytics_platform_up.sql"
+    sql_down             = "./migrations/001_analytics_platform_down.sql"
+    interface_validation = "./migrations/001_interface_validation.ts"
+  }
+}
+
+# Output analytics dashboard information
+output "kysely_integration_summary" {
+  description = "Summary of Kysely integration with performance metrics"
+  value = {
+    # Discovery results
+    interfaces_discovered      = length(discover.kysely_schema.analytics_platform.interfaces)
+    tables_created             = 2
+    materialized_views_created = 1
+    real_time_views_created    = 1
+
+    # Performance optimizations
+    indexes_created = sum([
+      length(postgres_table.users_analytics.indexes),
+      length(postgres_table.events_analytics.indexes)
+    ])
+    partitioning_enabled = true
+    compression_enabled  = true
+
+    # Query optimization
+    query_patterns_analyzed      = length(discover.kysely_schema.analytics_platform.query_patterns)
+    optimization_recommendations = length(discover.kysely_schema.analytics_platform.optimization_recommendations)
+
+    # Integration features
+    data_warehouse_sync    = true
+    real_time_monitoring   = true
+    automated_optimization = true
+
+    # Type safety
+    zero_runtime_overhead   = true
+    compile_time_validation = true
+    interface_compliance    = true
+  }
+}
+
+output "performance_endpoints" {
+  description = "Performance monitoring and optimization endpoints"
+  value = {
+    real_time_metrics     = "SELECT * FROM analytics.real_time_metrics"
+    user_activity_summary = "SELECT * FROM analytics.user_activity_summary"
+    performance_monitor   = "SELECT * FROM analytics.kysely_performance_monitor()"
+    optimization_function = "CALL analytics.optimize_kysely_queries()"
+  }
+}
+
+output "data_pipeline_status" {
+  description = "Status of data pipeline integrations"
+  value = {
+    airbyte_connection_id = airbyte_connection.analytics_to_warehouse.id
+    sync_frequency        = airbyte_connection.analytics_to_warehouse.schedule.frequency
+    warehouse_schema      = "kysely_analytics"
+    transformation_count  = length(airbyte_connection.analytics_to_warehouse.transformations)
+  }
+}

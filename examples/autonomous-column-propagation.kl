@@ -369,3 +369,368 @@ create "kolumn_monitor" "schema_drift" {
 # 
 # This is Infrastructure-as-Code evolved into Schema-as-Code! 🚀
 # =============================================================================
+
+# -----------------------------------------------------------------------------
+# STEP 10: ADVANCED COLUMN MANIPULATION PATTERNS
+# -----------------------------------------------------------------------------
+# NEW: Demonstrate the pull-based column manipulation functions
+# These functions allow providers to selectively use and transform columns
+
+# Create a public-only analytics table (excluding PII)
+create "postgres_table" "user_analytics_public" {
+  # ⚡ NEW: Use select_columns to pull only non-PII columns
+  dynamic "column" {
+    for_each = select_columns(
+      kolumn_data_object.user_schema.columns,
+      [for col in kolumn_data_object.user_schema.columns : col.name
+      if !contains(col.classifications, kolumn_classification.pii)]
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+    }
+  }
+
+  # Add analytics columns
+  column "page_views" {
+    type    = "INTEGER"
+    default = 0
+  }
+
+  metadata = {
+    purpose        = "Public analytics without PII"
+    security_level = "public"
+  }
+}
+
+# Create a secure vault table with transformed PII columns
+create "postgres_table" "user_vault" {
+  # ⚡ NEW: Use transform_columns to add encryption to PII fields
+  dynamic "column" {
+    for_each = transform_columns(
+      kolumn_data_object.user_schema.columns,
+      {
+        # Transform PII columns to add encryption
+        for col_name, col in kolumn_data_object.user_schema.columns : col_name => {
+          encrypted      = contains(col.classifications, kolumn_classification.pii)
+          audit_required = contains(col.classifications, kolumn_classification.pii)
+          storage_type   = contains(col.classifications, kolumn_classification.pii) ? "encrypted_text" : col.type
+        } if contains(col.classifications, kolumn_classification.pii)
+      }
+    )
+    content {
+      name      = column.value.name
+      type      = lookup(column.value, "storage_type", column.value.type)
+      nullable  = column.value.nullable
+      encrypted = lookup(column.value, "encrypted", false)
+    }
+  }
+
+  metadata = {
+    purpose        = "Secure PII storage with encryption"
+    security_level = "maximum"
+  }
+}
+
+# Create a Kafka topic with renamed columns for external APIs
+create "kafka_topic" "user_events_external" {
+  name               = "user-events-external-api"
+  partitions         = 3
+  replication_factor = 2
+
+  # ⚡ NEW: Use rename_columns to create API-friendly field names
+  dynamic "schema_field" {
+    for_each = rename_columns(
+      exclude_columns(kolumn_data_object.user_schema.columns,
+        [for col in kolumn_data_object.user_schema.columns : col.name
+        if contains(col.classifications, kolumn_classification.pii)]
+      ),
+      {
+        "user_id"    = "id"
+        "first_name" = "firstName"
+        "last_name"  = "lastName"
+        "created_at" = "createdAt"
+        "updated_at" = "updatedAt"
+      }
+    )
+    content {
+      name     = schema_field.value.name
+      type     = schema_field.value.type == "VARCHAR" ? "string" : schema_field.value.type == "INTEGER" ? "int" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
+      nullable = schema_field.value.nullable
+    }
+  }
+
+  metadata = {
+    purpose     = "External API events with renamed fields"
+    api_version = "v1"
+  }
+}
+
+# Create a reporting table with additional computed columns
+create "postgres_table" "user_reporting" {
+  # ⚡ NEW: Use add_columns to extend the base schema with reporting fields
+  dynamic "column" {
+    for_each = add_columns(
+      kolumn_data_object.user_schema.columns,
+      {
+        "reporting_period" = {
+          name     = "reporting_period"
+          type     = "VARCHAR(10)"
+          nullable = false
+          default  = "current"
+        }
+        "calculated_age" = {
+          name     = "calculated_age"
+          type     = "INTEGER"
+          nullable = true
+          computed = true
+        }
+        "user_segment" = {
+          name     = "user_segment"
+          type     = "VARCHAR(20)"
+          nullable = false
+          default  = "standard"
+        }
+      }
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+      default  = lookup(column.value, "default", null)
+    }
+  }
+
+  metadata = {
+    purpose          = "Extended schema for business reporting"
+    refresh_schedule = "daily"
+  }
+}
+
+# Create a filtered development table (only specific columns)
+create "postgres_table" "user_development" {
+  # ⚡ NEW: Use filter_columns to include only development-safe columns
+  dynamic "column" {
+    for_each = filter_columns(
+      kolumn_data_object.user_schema.columns,
+      {
+        # Only include columns that are not classified as PII
+        "classifications" = [kolumn_classification.public]
+      }
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = true # Make all columns nullable for dev safety
+    }
+  }
+
+  # Add development-specific columns
+  column "dev_notes" {
+    type     = "TEXT"
+    nullable = true
+  }
+
+  metadata = {
+    purpose     = "Development-safe user data"
+    environment = "development"
+  }
+}
+
+# Create a data warehouse table with universal enhancements
+create "postgres_table" "user_warehouse" {
+  # ⚡ NEW: Use map_columns to apply warehouse-specific properties to all columns
+  dynamic "column" {
+    for_each = map_columns(
+      kolumn_data_object.user_schema.columns,
+      {
+        "indexed"             = true # Add indexing to all columns
+        "compressed"          = true # Enable compression
+        "warehouse_optimized" = true
+        "partition_candidate" = false # Can be overridden per column
+      }
+    )
+    content {
+      name       = column.value.name
+      type       = column.value.type
+      nullable   = column.value.nullable
+      indexed    = column.value.indexed
+      compressed = column.value.compressed
+    }
+  }
+
+  # Warehouse-specific columns
+  column "etl_batch_id" {
+    type     = "BIGINT"
+    nullable = false
+  }
+
+  column "warehouse_inserted_at" {
+    type    = "TIMESTAMP"
+    default = "CURRENT_TIMESTAMP"
+  }
+
+  metadata = {
+    purpose            = "Data warehouse optimized user data"
+    optimization_level = "maximum"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# STEP 11: COMPLEX CHAINED COLUMN OPERATIONS
+# -----------------------------------------------------------------------------
+# Demonstrate chaining multiple column operations for sophisticated transformations
+
+# Create an API response table with complex column manipulations
+create "postgres_table" "user_api_response" {
+  # ⚡ CHAINED OPERATIONS: Demonstrate multiple operations in sequence
+  dynamic "column" {
+    # Step 1: Start with base schema
+    # Step 2: Exclude PII columns
+    # Step 3: Rename for API compatibility  
+    # Step 4: Add API metadata to all columns
+    # Step 5: Transform specific columns for API format
+    for_each = transform_columns(
+      map_columns(
+        rename_columns(
+          exclude_columns(
+            kolumn_data_object.user_schema.columns,
+            [for col in kolumn_data_object.user_schema.columns : col.name
+            if contains(col.classifications, kolumn_classification.pii)]
+          ),
+          {
+            "user_id"    = "userId"
+            "first_name" = "firstName"
+            "last_name"  = "lastName"
+            "created_at" = "createdAt"
+            "updated_at" = "updatedAt"
+          }
+        ),
+        {
+          "api_exposed"       = true
+          "json_serializable" = true
+          "api_version"       = "v2"
+        }
+      ),
+      {
+        # Transform timestamp columns to Unix epoch for APIs
+        "createdAt" = {
+          type    = "BIGINT"
+          comment = "Unix timestamp in milliseconds"
+        }
+        "updatedAt" = {
+          type    = "BIGINT"
+          comment = "Unix timestamp in milliseconds"
+        }
+      }
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+      comment  = lookup(column.value, "comment", "API field derived from source schema")
+    }
+  }
+
+  # API-specific metadata
+  column "api_version" {
+    type    = "VARCHAR(10)"
+    default = "v2"
+  }
+
+  column "response_timestamp" {
+    type    = "BIGINT"
+    default = "extract(epoch from now()) * 1000"
+  }
+
+  metadata = {
+    purpose = "API response with chained column transformations"
+    example_operations = [
+      "exclude_columns (remove PII)",
+      "rename_columns (API-friendly names)",
+      "map_columns (add API metadata)",
+      "transform_columns (format for JSON)"
+    ]
+  }
+}
+
+# -----------------------------------------------------------------------------
+# STEP 12: COLUMN FUNCTION USAGE SUMMARY
+# -----------------------------------------------------------------------------
+
+output "column_manipulation_summary" {
+  value = {
+    available_functions = [
+      "select_columns - Choose specific columns from a schema",
+      "exclude_columns - Remove unwanted columns (alias for remove_columns)",
+      "add_columns - Extend schema with new column definitions",
+      "transform_columns - Apply transformations to existing columns",
+      "filter_columns - Filter columns based on criteria",
+      "map_columns - Apply properties to all columns",
+      "rename_columns - Rename columns and update internal names",
+      "merge_columns - Combine multiple column sets"
+    ]
+
+    pull_based_benefits = [
+      "Providers pull only the columns they need",
+      "No pre-configuration of what each provider will use",
+      "Dynamic column selection based on classifications",
+      "Chainable operations for complex transformations",
+      "Elegant multi-provider coordination"
+    ]
+
+    examples_demonstrated = {
+      "select_columns"     = "user_analytics_public (non-PII only)"
+      "exclude_columns"    = "user_events_external (remove PII)"
+      "add_columns"        = "user_reporting (extend with business fields)"
+      "transform_columns"  = "user_vault (add encryption metadata)"
+      "filter_columns"     = "user_development (filter by classification)"
+      "map_columns"        = "user_warehouse (apply optimizations to all)"
+      "rename_columns"     = "user_events_external (API-friendly names)"
+      "chained_operations" = "user_api_response (complex multi-step transformation)"
+    }
+
+    architecture_evolution = {
+      old_approach = "Data objects pre-determine which providers use which columns"
+      new_approach = "Providers pull from data objects and select columns as needed"
+      benefit      = "More elegant, flexible, and maintainable multi-provider designs"
+    }
+  }
+}
+
+# =============================================================================
+# COLUMN MANIPULATION REVOLUTION COMPLETE!
+# =============================================================================
+# 
+# This enhanced example now demonstrates:
+# 
+# 🎯 PULL-BASED ARCHITECTURE
+# • Providers reference data objects and selectively use columns
+# • No need to pre-configure which columns each provider uses
+# • Elegant separation between schema definition and usage
+# 
+# ⚡ POWERFUL COLUMN FUNCTIONS
+# • select_columns: Choose specific columns for targeted use cases
+# • exclude_columns: Remove sensitive or unnecessary columns
+# • add_columns: Extend schemas with provider-specific fields
+# • transform_columns: Apply modifications to column definitions
+# • filter_columns: Select columns based on metadata criteria
+# • map_columns: Apply properties universally across columns
+# • rename_columns: Create API-friendly or provider-specific names
+# • merge_columns: Combine column sets from multiple sources
+# 
+# 🔗 CHAINABLE OPERATIONS
+# • Multiple functions can be chained for complex transformations
+# • Clean, readable, and maintainable column manipulation patterns
+# • Perfect for API formatting, security filtering, and optimization
+# 
+# 🛡️ SECURITY & GOVERNANCE AWARE
+# • Column functions work seamlessly with classification systems
+# • PII filtering happens automatically based on classifications
+# • Full traceability from source schema to final usage
+# 
+# 🚀 RESULT: Elegant multi-provider architecture with sophisticated
+#    column manipulation capabilities that scale from simple selection
+#    to complex multi-step transformations!
+# =============================================================================

@@ -635,9 +635,24 @@ create "postgres_database" "ecommerce_transactional" {
 # Create PostgreSQL tables from data objects
 create "postgres_table" "customers" {
   database   = postgres_database.ecommerce_transactional.name
-  columns    = kolumn_data_object.customer.columns
   schema     = kolumn_data_object.customer.config.postgres.schema
   table_name = kolumn_data_object.customer.config.postgres.table_name
+
+  # ✅ CORRECT: Use dynamic blocks to pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.customer.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type
+      nullable    = !column.value.primary_key
+      primary_key = column.value.primary_key
+      unique      = try(column.value.unique, false)
+      default     = try(column.value.default, null)
+
+      # Apply encryption based on classifications
+      encrypted = contains(column.value.classifications, kolumn_classification.pii_high) || contains(column.value.classifications, kolumn_classification.financial)
+    }
+  }
 
   # Apply data object indexes
   dynamic "index" {
@@ -653,11 +668,119 @@ create "postgres_table" "customers" {
   partitioning = kolumn_data_object.customer.config.postgres.partitioning
 }
 
+# ⚡ ADVANCED: Customer analytics table with filtered columns (no high-sensitivity PII)
+create "postgres_table" "customer_analytics" {
+  database   = postgres_database.ecommerce_transactional.name
+  schema     = "analytics"
+  table_name = "customer_analytics"
+
+  # 🛡️ Use filter_columns() to exclude high-sensitivity PII for analytics
+  dynamic "column" {
+    for_each = filter_columns(
+      kolumn_data_object.customer.columns,
+      {
+        # Exclude high-sensitivity PII columns from analytics
+        classifications = [kolumn_classification.public, kolumn_classification.pii_low, kolumn_classification.financial]
+      }
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = true # Analytics tables allow nulls for flexibility
+      indexed  = contains(["id", "email", "created_at"], column.value.name)
+    }
+  }
+
+  # ⚡ Use add_columns() to add analytics-specific fields
+  dynamic "column" {
+    for_each = add_columns(
+      {},
+      {
+        "customer_segment" = {
+          name     = "customer_segment"
+          type     = "VARCHAR(50)"
+          nullable = true
+          comment  = "Customer segmentation for analytics"
+        }
+        "lifetime_value" = {
+          name     = "lifetime_value"
+          type     = "DECIMAL(12,2)"
+          nullable = true
+          comment  = "Calculated customer lifetime value"
+        }
+        "last_order_date" = {
+          name     = "last_order_date"
+          type     = "TIMESTAMPTZ"
+          nullable = true
+          comment  = "Date of most recent order"
+        }
+      }
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+      comment  = column.value.comment
+    }
+  }
+}
+
+# ⚡ ADVANCED: Customer service view with masked PII
+create "postgres_table" "customer_service_view" {
+  database   = postgres_database.ecommerce_transactional.name
+  schema     = "customer_service"
+  table_name = "customer_masked"
+
+  # 🛡️ Use transform_columns() to apply masking transformations
+  dynamic "column" {
+    for_each = transform_columns(
+      select_columns(
+        kolumn_data_object.customer.columns,
+        ["id", "email", "first_name", "last_name", "created_at", "updated_at"]
+      ),
+      {
+        "email" = {
+          type                = "VARCHAR(255)"
+          computed            = true
+          computed_expression = "mask_email(email, '*', 3)"
+          comment             = "Masked email for customer service"
+        }
+        "first_name" = {
+          type                = "VARCHAR(100)"
+          computed            = true
+          computed_expression = "CASE WHEN LENGTH(first_name) > 2 THEN LEFT(first_name, 1) || REPEAT('*', LENGTH(first_name)-1) ELSE first_name END"
+          comment             = "Masked first name for customer service"
+        }
+      }
+    )
+    content {
+      name       = column.value.name
+      type       = column.value.type
+      nullable   = try(column.value.nullable, true)
+      computed   = try(column.value.computed, false)
+      expression = try(column.value.computed_expression, null)
+      comment    = try(column.value.comment, null)
+    }
+  }
+}
+
 create "postgres_table" "products" {
   database   = postgres_database.ecommerce_transactional.name
-  columns    = kolumn_data_object.product.columns
   schema     = kolumn_data_object.product.config.postgres.schema
   table_name = kolumn_data_object.product.config.postgres.table_name
+
+  # ✅ CORRECT: Use dynamic blocks to pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.product.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type
+      nullable    = !column.value.primary_key
+      primary_key = column.value.primary_key
+      unique      = try(column.value.unique, false)
+      default     = try(column.value.default, null)
+    }
+  }
 
   dynamic "index" {
     for_each = kolumn_data_object.product.config.postgres.indexes
@@ -670,11 +793,88 @@ create "postgres_table" "products" {
   }
 }
 
+# ⚡ ADVANCED: Product catalog API table with renamed columns
+create "postgres_table" "product_catalog_api" {
+  database   = postgres_database.ecommerce_transactional.name
+  schema     = "api"
+  table_name = "product_catalog"
+
+  # 🔗 Use rename_columns() for API-friendly field names
+  dynamic "column" {
+    for_each = rename_columns(
+      exclude_columns(
+        kolumn_data_object.product.columns,
+        ["inventory_count"] # Exclude internal inventory data from API
+      ),
+      {
+        "id"          = "productId"
+        "sku"         = "productSku"
+        "name"        = "displayName"
+        "description" = "productDescription"
+        "price"       = "listPrice"
+        "category"    = "productCategory"
+        "created_at"  = "createdAt"
+      }
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+      unique   = try(column.value.unique, false)
+    }
+  }
+
+  # ⚡ Use add_columns() for API-specific metadata
+  dynamic "column" {
+    for_each = add_columns(
+      {},
+      {
+        "apiVersion" = {
+          name     = "apiVersion"
+          type     = "VARCHAR(10)"
+          nullable = false
+          default  = "v2.0"
+          comment  = "API version for this record"
+        }
+        "lastModified" = {
+          name     = "lastModified"
+          type     = "TIMESTAMPTZ"
+          nullable = false
+          default  = "CURRENT_TIMESTAMP"
+          comment  = "Last modification timestamp for API"
+        }
+      }
+    )
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+      default  = column.value.default
+      comment  = column.value.comment
+    }
+  }
+}
+
 create "postgres_table" "orders" {
   database   = postgres_database.ecommerce_transactional.name
-  columns    = kolumn_data_object.order.columns
   schema     = kolumn_data_object.order.config.postgres.schema
   table_name = kolumn_data_object.order.config.postgres.table_name
+
+  # ✅ CORRECT: Use dynamic blocks to pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.order.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type
+      nullable    = !column.value.primary_key
+      primary_key = column.value.primary_key
+      unique      = try(column.value.unique, false)
+      default     = try(column.value.default, null)
+
+      # Apply encryption for financial data
+      encrypted = contains(column.value.classifications, kolumn_classification.financial)
+    }
+  }
 
   dynamic "index" {
     for_each = kolumn_data_object.order.config.postgres.indexes
@@ -687,12 +887,84 @@ create "postgres_table" "orders" {
   partitioning = kolumn_data_object.order.config.postgres.partitioning
 }
 
+# ⚡ ADVANCED: Order analytics table with transformed financial data
+create "postgres_table" "order_analytics" {
+  database   = postgres_database.ecommerce_transactional.name
+  schema     = "analytics"
+  table_name = "order_analytics"
+
+  # 🔗 Use transform_columns() to convert sensitive financial data to tiers
+  dynamic "column" {
+    for_each = transform_columns(
+      kolumn_data_object.order.columns,
+      {
+        "total_amount" = {
+          name                = "amount_tier"
+          type                = "VARCHAR(20)"
+          computed            = true
+          computed_expression = "CASE WHEN total_amount < 50 THEN 'low' WHEN total_amount < 200 THEN 'medium' ELSE 'high' END"
+          comment             = "Tiered amount for privacy-safe analytics"
+        }
+        "shipping_address" = {
+          name                = "shipping_region"
+          type                = "VARCHAR(50)"
+          computed            = true
+          computed_expression = "shipping_address->>'state'"
+          comment             = "Extracted region from shipping address"
+        }
+      }
+    )
+    content {
+      name       = column.value.name
+      type       = column.value.type
+      nullable   = true
+      computed   = try(column.value.computed, false)
+      expression = try(column.value.computed_expression, null)
+      comment    = try(column.value.comment, null)
+    }
+  }
+
+  # ⚡ Use map_columns() to apply analytics optimizations to all columns
+  dynamic "column" {
+    for_each = map_columns(
+      select_columns(
+        kolumn_data_object.order.columns,
+        ["id", "customer_id", "status", "created_at"]
+      ),
+      {
+        "analytics_optimized" = true
+        "indexed"             = true
+        "compressed"          = true
+      }
+    )
+    content {
+      name       = column.value.name
+      type       = column.value.type
+      nullable   = column.value.nullable
+      indexed    = column.value.indexed
+      compressed = column.value.compressed
+    }
+  }
+}
+
 # Analytics table for real-time events
 create "postgres_table" "user_events" {
   database   = postgres_database.ecommerce_transactional.name
-  columns    = kolumn_data_object.user_event.columns
   schema     = kolumn_data_object.user_event.config.postgres.schema
   table_name = kolumn_data_object.user_event.config.postgres.table_name
+
+  # ✅ CORRECT: Use dynamic blocks to pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.user_event.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type
+      nullable    = !column.value.primary_key
+      primary_key = column.value.primary_key
+      unique      = try(column.value.unique, false)
+      default     = try(column.value.default, null)
+    }
+  }
 
   dynamic "index" {
     for_each = kolumn_data_object.user_event.config.postgres.indexes
@@ -703,6 +975,77 @@ create "postgres_table" "user_events" {
   }
 
   partitioning = kolumn_data_object.user_event.config.postgres.partitioning
+}
+
+# ⚡ ADVANCED: Privacy-safe aggregated events table
+create "postgres_table" "user_events_aggregated" {
+  database   = postgres_database.ecommerce_transactional.name
+  schema     = "analytics"
+  table_name = "user_events_aggregated"
+
+  # 🔗 Complex chained operations: filter -> transform -> add -> map
+  dynamic "column" {
+    for_each = map_columns(
+      add_columns(
+        transform_columns(
+          filter_columns(
+            kolumn_data_object.user_event.columns,
+            {
+              # Only include event_data and public classifications
+              classifications = [kolumn_classification.event_data, kolumn_classification.public]
+            }
+          ),
+          {
+            "user_id" = {
+              name                = "user_hash"
+              type                = "VARCHAR(64)"
+              computed            = true
+              computed_expression = "SHA256(user_id::TEXT)"
+              comment             = "Privacy-safe user identifier hash"
+            }
+            "properties" = {
+              name                = "event_metadata"
+              type                = "JSONB"
+              computed            = true
+              computed_expression = "properties - 'user_data' - 'personal_info'"
+              comment             = "Event properties with PII removed"
+            }
+          }
+        ),
+        {
+          "aggregation_window" = {
+            name     = "aggregation_window"
+            type     = "VARCHAR(20)"
+            nullable = false
+            default  = "hourly"
+            comment  = "Time window for aggregation (hourly, daily, weekly)"
+          }
+          "event_count" = {
+            name     = "event_count"
+            type     = "INTEGER"
+            nullable = false
+            default  = "1"
+            comment  = "Number of events in this aggregation"
+          }
+        }
+      ),
+      {
+        "analytics_ready" = true
+        "privacy_safe"    = true
+        "gdpr_compliant"  = true
+      }
+    )
+    content {
+      name       = column.value.name
+      type       = column.value.type
+      nullable   = try(column.value.nullable, true)
+      default    = try(column.value.default, null)
+      computed   = try(column.value.computed, false)
+      expression = try(column.value.computed_expression, null)
+      comment    = try(column.value.comment, null)
+      indexed    = try(column.value.analytics_ready, false)
+    }
+  }
 }
 
 # DynamoDB Provider - High-Scale NoSQL Operations  
@@ -1049,28 +1392,32 @@ output "governance_summary" {
 
     data_objects = [
       {
-        name                 = "customer"
-        table_count          = 2 # PostgreSQL + DynamoDB
-        stream_count         = 1 # Kafka
-        classifications_used = 4
+        name                  = "customer"
+        table_count           = 4 # PostgreSQL (main + analytics + service_view) + DynamoDB
+        stream_count          = 1 # Kafka
+        classifications_used  = 4
+        column_functions_used = ["filter_columns", "transform_columns", "add_columns", "select_columns"]
       },
       {
-        name                 = "product"
-        table_count          = 2
-        stream_count         = 1
-        classifications_used = 2
+        name                  = "product"
+        table_count           = 3 # PostgreSQL (main + catalog_api) + DynamoDB
+        stream_count          = 1
+        classifications_used  = 2
+        column_functions_used = ["rename_columns", "exclude_columns", "add_columns"]
       },
       {
-        name                 = "order"
-        table_count          = 2
-        stream_count         = 1
-        classifications_used = 3
+        name                  = "order"
+        table_count           = 3 # PostgreSQL (main + analytics) + DynamoDB
+        stream_count          = 1
+        classifications_used  = 3
+        column_functions_used = ["transform_columns", "map_columns", "select_columns"]
       },
       {
-        name                 = "user_event"
-        table_count          = 1
-        stream_count         = 1
-        classifications_used = 2
+        name                  = "user_event"
+        table_count           = 2 # PostgreSQL (main + aggregated)
+        stream_count          = 1
+        classifications_used  = 2
+        column_functions_used = ["filter_columns", "transform_columns", "add_columns", "map_columns", "chained_operations"]
       }
     ]
 
@@ -1080,6 +1427,73 @@ output "governance_summary" {
       kolumn_role.data_analyst.name,
       kolumn_role.streaming_engineer.name
     ]
+  }
+}
+
+# ⚡ NEW: Advanced Column Function Usage Summary
+output "column_functions_demonstration" {
+  description = "Advanced column manipulation patterns demonstrated"
+  value = {
+    patterns_showcased = {
+      "filter_columns" = {
+        usage   = "customer_analytics, user_events_aggregated"
+        purpose = "Filter columns by classification for different access levels"
+        example = "filter_columns(columns, { classifications = [public, pii_low] })"
+      }
+      "transform_columns" = {
+        usage   = "customer_service_view, order_analytics, user_events_aggregated"
+        purpose = "Apply transformations like masking, computed expressions, type changes"
+        example = "transform_columns(columns, { email = { computed_expression = 'mask_email(email)' } })"
+      }
+      "add_columns" = {
+        usage   = "customer_analytics, product_catalog_api, user_events_aggregated"
+        purpose = "Extend base schema with provider-specific or use-case specific columns"
+        example = "add_columns(base_columns, { new_field = { type = 'VARCHAR(50)' } })"
+      }
+      "select_columns" = {
+        usage   = "customer_service_view, order_analytics"
+        purpose = "Choose specific columns from data object for targeted tables"
+        example = "select_columns(columns, ['id', 'email', 'created_at'])"
+      }
+      "exclude_columns" = {
+        usage   = "product_catalog_api"
+        purpose = "Remove sensitive or internal columns from public interfaces"
+        example = "exclude_columns(columns, ['inventory_count'])"
+      }
+      "rename_columns" = {
+        usage   = "product_catalog_api"
+        purpose = "Create API-friendly or provider-specific column names"
+        example = "rename_columns(columns, { id = 'productId', name = 'displayName' })"
+      }
+      "map_columns" = {
+        usage   = "order_analytics, user_events_aggregated"
+        purpose = "Apply properties universally to all columns"
+        example = "map_columns(columns, { indexed = true, compressed = true })"
+      }
+      "chained_operations" = {
+        usage   = "user_events_aggregated"
+        purpose = "Complex multi-step transformations with sophisticated logic"
+        example = "map_columns(add_columns(transform_columns(filter_columns(...))))"
+      }
+    }
+
+    architecture_benefits = [
+      "Pull-based: Providers pull only the columns they need from data objects",
+      "Classification-aware: Column functions respect security classifications",
+      "Transformation flexibility: Complex column transformations for different use cases",
+      "Privacy-safe analytics: Transform sensitive data into safe aggregations",
+      "API optimization: Rename and restructure columns for external interfaces",
+      "Provider-specific: Each provider can customize column usage for their needs",
+      "Chainable operations: Compose multiple functions for sophisticated transformations"
+    ]
+
+    use_case_examples = {
+      "analytics_tables"     = "Use filter_columns + add_columns for privacy-safe analytics"
+      "api_interfaces"       = "Use rename_columns + exclude_columns for clean external APIs"
+      "customer_service"     = "Use transform_columns for PII masking and data protection"
+      "data_warehousing"     = "Use map_columns for performance optimizations across all columns"
+      "compliance_reporting" = "Use chained operations for complex privacy-preserving transformations"
+    }
   }
 }
 
@@ -1093,3 +1507,43 @@ output "connection_strings" {
     dagster_webserver       = "http://${dagster_workspace.ecommerce_pipelines.webserver_host}:3000"
   }
 }
+
+# =============================================================================
+# ⚡ ADVANCED COLUMN FUNCTION PATTERNS SUMMARY
+# =============================================================================
+# 
+# This example demonstrates Kolumn's most powerful column manipulation capabilities:
+# 
+# 🎯 PULL-BASED ARCHITECTURE
+# • Data objects define universal schema once
+# • Providers pull columns and apply transformations as needed
+# • No pre-configuration of which columns each provider uses
+# 
+# 🔗 SOPHISTICATED COLUMN FUNCTIONS
+# • filter_columns: Select columns by classification for security compliance
+# • transform_columns: Apply masking, computed expressions, type transformations
+# • add_columns: Extend schemas with provider-specific or use-case fields
+# • select_columns: Choose specific columns for targeted use cases
+# • exclude_columns: Remove sensitive columns from public interfaces
+# • rename_columns: Create API-friendly names for external consumption
+# • map_columns: Apply universal properties for optimization
+# • Chained operations: Complex multi-step transformations
+# 
+# 🛡️ SECURITY & COMPLIANCE PATTERNS
+# • customer_analytics: Filters out high-sensitivity PII for analytics
+# • customer_service_view: Applies PII masking for customer support
+# • product_catalog_api: Removes internal data from public API
+# • order_analytics: Transforms financial data into privacy-safe tiers
+# • user_events_aggregated: Complex privacy-preserving transformations
+# 
+# 🚀 REAL-WORLD USE CASES
+# • Analytics: Transform sensitive data into safe aggregations
+# • APIs: Clean, renamed interfaces for external consumption
+# • Customer Service: Masked data for support representatives
+# • Compliance: GDPR/CCPA-compliant data processing
+# • Performance: Optimized columns for different workloads
+# 
+# 🎆 RESULT: Enterprise-grade multi-provider data platform with
+#    sophisticated column manipulation, security compliance, and
+#    elegant separation of concerns!
+# =============================================================================

@@ -59,11 +59,11 @@ providers = {
   # Provider-specific configurations
   provider_configs = {
     postgres = {
-      default_version = "^0.1.0"
+      default_version = "^0.1.3-beta"
       health_check_timeout = 10
     }
     mysql = {
-      default_version = "^0.1.0"
+      default_version = "^0.1.3-beta"
       health_check_timeout = 10
     }
   }

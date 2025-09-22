@@ -1,0 +1,572 @@
+# 🏦 Financial Services Enterprise Template
+# SOX Compliant Multi-Region Trading Infrastructure
+# 
+# This template provides a production-ready configuration for financial services
+# institutions requiring SOX compliance, high availability, and enterprise safety.
+
+terraform {
+  required_version = ">= 1.0"
+  backend "schemabounce" {
+    api_url        = var.schemabounce_api_url
+    api_key        = var.schemabounce_api_key
+    environment_id = var.environment_id
+
+    # Financial services requirements
+    enable_versioning = true
+    enable_encryption = true
+    audit_logging     = true
+    data_residency    = "us"
+    retention_policy  = "7y" # SOX requires 7 years
+
+    tags = {
+      industry    = "financial_services"
+      compliance  = "sox"
+      environment = var.environment
+      cost_center = var.cost_center
+    }
+  }
+}
+
+# === VARIABLES ===
+
+variable "environment" {
+  description = "Environment (prod, dr, staging, dev)"
+  type        = string
+  validation {
+    condition     = contains(["prod", "dr", "staging", "dev"], var.environment)
+    error_message = "Environment must be prod, dr, staging, or dev."
+  }
+}
+
+variable "regions" {
+  description = "List of regions for deployment"
+  type        = list(string)
+  default     = ["us-east-1", "us-west-2", "eu-west-1"]
+}
+
+variable "cost_center" {
+  description = "Cost center for billing allocation"
+  type        = string
+}
+
+variable "schemabounce_api_url" {
+  description = "SchemaBounce API URL"
+  type        = string
+  default     = "https://api.schemabounce.com"
+}
+
+variable "schemabounce_api_key" {
+  description = "SchemaBounce API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "environment_id" {
+  description = "SchemaBounce environment ID"
+  type        = string
+}
+
+# === DATA OBJECTS ===
+
+# Trading data with strict compliance requirements
+create "kolumn_data_object" "trading_position" {
+  name        = "Trading Position Schema"
+  description = "Core trading position data with SOX compliance"
+
+  column "position_id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "trader_id" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    classifications = [kolumn_classification.pii]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "security_symbol" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "quantity" {
+    type            = "DECIMAL(18,8)"
+    nullable        = false
+    classifications = [kolumn_classification.confidential]
+  }
+
+  column "price" {
+    type            = "DECIMAL(18,4)"
+    nullable        = false
+    classifications = [kolumn_classification.confidential]
+  }
+
+  column "trade_timestamp" {
+    type     = "TIMESTAMP"
+    nullable = false
+    default  = "CURRENT_TIMESTAMP"
+  }
+
+  column "audit_trail" {
+    type            = "JSONB"
+    nullable        = false
+    classifications = [kolumn_classification.audit]
+  }
+
+  config = {
+    postgres = {
+      schema     = "trading"
+      tablespace = "trading_ts"
+    }
+  }
+}
+
+# Risk management data
+create "kolumn_data_object" "risk_metrics" {
+  name        = "Risk Metrics Schema"
+  description = "Risk management and compliance metrics"
+
+  column "metric_id" {
+    type        = "BIGINT"
+    nullable    = false
+    primary_key = true
+  }
+
+  column "portfolio_id" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    classifications = [kolumn_classification.confidential]
+  }
+
+  column "var_95" {
+    type            = "DECIMAL(18,4)"
+    nullable        = true
+    classifications = [kolumn_classification.confidential]
+  }
+
+  column "stress_test_result" {
+    type            = "DECIMAL(18,4)"
+    nullable        = true
+    classifications = [kolumn_classification.confidential]
+  }
+
+  column "calculated_at" {
+    type     = "TIMESTAMP"
+    nullable = false
+    default  = "CURRENT_TIMESTAMP"
+  }
+}
+
+# === CLASSIFICATIONS ===
+
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  level       = "confidential"
+  requirements = {
+    encryption      = true
+    audit_access    = true
+    retention_limit = "7y"
+  }
+
+  encryption_config = {
+    postgres = {
+      method       = "column_encryption"
+      algorithm    = "AES-256-GCM"
+      key_rotation = true
+    }
+  }
+}
+
+create "kolumn_classification" "audit" {
+  name        = "Audit"
+  description = "Audit trail information"
+  level       = "restricted"
+  requirements = {
+    immutable          = true
+    retention_required = true
+    audit_access       = true
+  }
+}
+
+# === PRIMARY TRADING INFRASTRUCTURE ===
+
+provider "postgres" "trading_primary" {
+  # Multi-region trading system deployment
+  connection_pattern = "trading-primary-{region}-{env}.financorp.com"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  # Connection configuration
+  port     = 5432
+  database = "trading"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Enterprise safety configuration for financial services
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 2 # Low threshold for financial systems
+      recovery_time     = "30s"
+      test_request_rate = 0.1
+    }
+
+    retry_policy {
+      max_attempts     = 3
+      backoff_strategy = "exponential"
+      initial_delay    = "500ms"
+      max_delay        = "30s"
+      jitter_enabled   = true
+    }
+
+    rollback_strategy {
+      enabled             = true
+      auto_rollback       = true
+      backup_before_apply = true
+      retention_days      = 90
+      rollback_timeout    = "2m"
+    }
+
+    health_checks {
+      enabled             = true
+      check_interval      = "10s" # Frequent health checks
+      timeout_duration    = "5s"
+      healthy_threshold   = 2
+      unhealthy_threshold = 3
+    }
+
+    risk_assessment {
+      enabled                 = true
+      check_dependents        = true
+      check_data_loss         = true
+      require_confirmation    = true
+      block_high_risk_changes = true
+    }
+  }
+
+  # Advanced orchestration for financial systems
+  orchestration {
+    execution_mode      = "sequential" # Conservative approach
+    max_concurrency     = 3
+    delay_between_batch = "1m"
+
+    dependencies {
+      enable_tracking     = true
+      validate_before_run = true
+      fail_on_circular    = true
+    }
+
+    resource_pools {
+      max_connections    = 100
+      connection_timeout = "30s"
+      idle_timeout       = "10m"
+      pool_size          = 20
+    }
+  }
+
+  # Comprehensive monitoring for compliance
+  monitoring {
+    metrics {
+      enabled          = true
+      collect_interval = "15s"
+      metrics_to_track = [
+        "connection_count",
+        "query_time",
+        "error_rate",
+        "transaction_rate",
+        "lock_waits"
+      ]
+      export_endpoint = var.prometheus_endpoint
+    }
+
+    logging {
+      level           = "info"
+      structured_logs = true
+      include_stacks  = true
+      log_connections = true
+      log_queries     = true
+      log_performance = true
+    }
+
+    alerting {
+      enabled               = true
+      notification_channels = ["#trading-ops", "#compliance-alerts"]
+
+      alert_thresholds {
+        error_rate      = 0.01 # 1% error rate threshold
+        response_time   = "1s" # 1 second response time
+        connection_loss = 5    # Alert on 5+ connection losses
+        memory_usage    = 0.8  # 80% memory usage threshold
+      }
+    }
+
+    performance {
+      track_query_time      = true
+      track_connection_time = true
+      slow_query_threshold  = "500ms"
+      enable_profiling      = true
+    }
+  }
+}
+
+# Risk management database
+provider "postgres" "risk_management" {
+  connection_pattern = "risk-mgmt-{region}-{env}.financorp.com"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  port     = 5432
+  database = "risk_management"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Identical safety configuration as trading
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 2
+      recovery_time     = "30s"
+    }
+
+    risk_assessment {
+      enabled              = true
+      check_dependents     = true
+      check_data_loss      = true
+      require_confirmation = true
+    }
+  }
+}
+
+# Compliance audit database
+provider "postgres" "compliance_audit" {
+  connection_pattern = "audit-{region}-{env}.financorp.com"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  port     = 5432
+  database = "compliance_audit"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Enhanced safety for audit systems
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 1 # Strictest threshold for audit
+      recovery_time     = "60s"
+    }
+
+    rollback_strategy {
+      enabled             = true
+      auto_rollback       = false # Manual approval for audit changes
+      backup_before_apply = true
+      retention_days      = 2555 # 7 years for SOX compliance
+    }
+  }
+}
+
+# === TRADING TABLES ===
+
+create "postgres_table" "trading_positions" {
+  provider = postgres.trading_primary
+
+  dynamic "column" {
+    for_each = kolumn_data_object.trading_position.columns
+    content {
+      name = column.value.name
+      type = (
+        column.value.type == "BIGINT" && column.value.primary_key ? "bigserial" :
+        column.value.type == "VARCHAR(50)" ? "varchar(50)" :
+        column.value.type == "VARCHAR(20)" ? "varchar(20)" :
+        column.value.type == "DECIMAL(18,8)" ? "decimal(18,8)" :
+        column.value.type == "DECIMAL(18,4)" ? "decimal(18,4)" :
+        column.value.type == "TIMESTAMP" ? "timestamp" :
+        column.value.type == "JSONB" ? "jsonb" :
+        column.value.type
+      )
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      nullable    = column.value.nullable
+      default     = column.value.default
+
+      # Apply encryption for PII columns
+      encrypted = contains(column.value.classifications, kolumn_classification.pii)
+    }
+  }
+
+  # Financial services specific indexes
+  index "idx_trading_positions_trader_timestamp" {
+    columns = ["trader_id", "trade_timestamp"]
+    method  = "btree"
+  }
+
+  index "idx_trading_positions_symbol" {
+    columns = ["security_symbol"]
+    method  = "btree"
+  }
+
+  # Partitioning by date for performance
+  partitioning {
+    type      = "range"
+    column    = "trade_timestamp"
+    interval  = "1 month"
+    retention = "7 years"
+  }
+
+  # SOX compliance settings
+  metadata = {
+    sox_classification = "critical"
+    data_retention     = "7y"
+    audit_required     = true
+    backup_frequency   = "4h"
+  }
+}
+
+create "postgres_table" "risk_metrics" {
+  provider = postgres.risk_management
+
+  dynamic "column" {
+    for_each = kolumn_data_object.risk_metrics.columns
+    content {
+      name = column.value.name
+      type = (
+        column.value.type == "BIGINT" && column.value.primary_key ? "bigserial" :
+        column.value.type == "VARCHAR(50)" ? "varchar(50)" :
+        column.value.type == "DECIMAL(18,4)" ? "decimal(18,4)" :
+        column.value.type == "TIMESTAMP" ? "timestamp" :
+        column.value.type
+      )
+      primary_key = column.value.primary_key
+      nullable    = column.value.nullable
+      default     = column.value.default
+    }
+  }
+
+  # Risk-specific indexes
+  index "idx_risk_metrics_portfolio_date" {
+    columns = ["portfolio_id", "calculated_at"]
+    method  = "btree"
+  }
+}
+
+# === REAL-TIME ANALYTICS ===
+
+provider "kafka" "trading_events" {
+  connection_pattern = "kafka-{region}-{env}.financorp.com"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  bootstrap_servers = ["${var.kafka_host}:9092"]
+
+  # Kafka-specific safety configuration
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 5
+      recovery_time     = "45s"
+    }
+  }
+}
+
+create "kafka_topic" "trade_executions" {
+  provider           = kafka.trading_events
+  name               = "trade-executions-${var.environment}"
+  partitions         = 12
+  replication_factor = 3
+
+  configs = {
+    "retention.ms"        = "604800000" # 7 days
+    "cleanup.policy"      = "delete"
+    "compression.type"    = "snappy"
+    "min.insync.replicas" = "2"
+  }
+
+  # Schema from trading position data object
+  dynamic "schema_field" {
+    for_each = select_columns(
+      kolumn_data_object.trading_position.columns,
+      ["position_id", "security_symbol", "quantity", "price", "trade_timestamp"]
+    )
+    content {
+      name     = schema_field.value.name
+      type     = schema_field.value.type == "BIGINT" ? "long" : schema_field.value.type == "VARCHAR(20)" ? "string" : schema_field.value.type == "DECIMAL(18,8)" ? "double" : schema_field.value.type == "DECIMAL(18,4)" ? "double" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
+      nullable = schema_field.value.nullable
+    }
+  }
+}
+
+# === RBAC CONFIGURATION ===
+
+create "kolumn_role" "trading_operator" {
+  name        = "Trading Operator"
+  description = "Read-only access to trading data with PII masking"
+  permissions = [
+    "read_trading_positions",
+    "read_risk_metrics"
+  ]
+  capabilities = {
+    max_concurrent_queries = 10
+    query_timeout          = "30s"
+  }
+}
+
+create "kolumn_role" "compliance_auditor" {
+  name        = "Compliance Auditor"
+  description = "Full audit access with complete audit trail"
+  permissions = [
+    "read_all_audit_data",
+    "generate_compliance_reports"
+  ]
+  capabilities = {
+    audit_trail_required = true
+    session_recording    = true
+  }
+}
+
+create "kolumn_role" "risk_manager" {
+  name        = "Risk Manager"
+  description = "Access to risk metrics and position data"
+  permissions = [
+    "read_trading_positions",
+    "read_write_risk_metrics",
+    "generate_risk_reports"
+  ]
+}
+
+# === OUTPUTS ===
+
+output "trading_endpoints" {
+  description = "Trading database connection endpoints"
+  value = {
+    for region in var.regions :
+    region => "trading-primary-${region}-${var.environment}.financorp.com:5432"
+  }
+  sensitive = true
+}
+
+output "kafka_endpoints" {
+  description = "Kafka cluster endpoints for real-time data"
+  value = {
+    for region in var.regions :
+    region => "kafka-${region}-${var.environment}.financorp.com:9092"
+  }
+}
+
+output "compliance_summary" {
+  description = "SOX compliance configuration summary"
+  value = {
+    audit_retention     = "7 years"
+    encryption_enabled  = true
+    audit_logging       = true
+    backup_frequency    = "4 hours"
+    rollback_capability = true
+  }
+}

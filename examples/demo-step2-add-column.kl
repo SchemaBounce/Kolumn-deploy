@@ -39,44 +39,104 @@ provider "dagster" {
 }
 
 # -----------------------------------------------------------------------------
-# STEP 2: EVOLVED SOURCE SCHEMA (Added middle_name column)
+# STEP 2: EVOLVED DATA OBJECT SCHEMA (Added middle_name column)
 # -----------------------------------------------------------------------------
 
-# The updated users table - now with middle_name column added
-create "postgres_table" "demo_users" {
-  name = "demo_users"
+# ✅ CORRECT: Update data object FIRST with the new column
+# This is what triggers the autonomous propagation!
+create "kolumn_data_object" "demo_user_schema" {
+  name        = "Demo User Schema"
+  description = "EVOLVED user schema - now includes middle_name column!"
 
-  # Original columns (unchanged)
+  # ⚡ AUTONOMOUS MAGIC: Schema now includes the new middle_name column
   column "id" {
-    type        = "BIGSERIAL"
-    primary_key = true
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
   }
 
   column "email" {
-    type     = "VARCHAR(255)"
-    unique   = true
-    nullable = false
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.pii]
   }
 
   column "first_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  # 🆕 NEW COLUMN: This is what triggers the autonomous propagation!
+  column "middle_name" {
+    type            = "VARCHAR(100)"
+    nullable        = true # Optional field
+    classifications = [kolumn_classification.public]
   }
 
   column "last_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
-  }
-
-  # ⚡ NEW COLUMN: This is what triggers the autonomous propagation!
-  column "middle_name" {
-    type     = "VARCHAR(100)"
-    nullable = true # Optional field
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
   }
 
   column "created_at" {
-    type    = "TIMESTAMP"
-    default = "CURRENT_TIMESTAMP"
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+
+  metadata = {
+    demo_step  = "add_column"
+    evolution  = "added_middle_name_column"
+    created_at = timestamp()
+  }
+}
+
+# Classification definitions for data governance
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  requirements = {
+    encryption   = true
+    audit_access = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "Public"
+  description = "Public information"
+  requirements = {
+    encryption = false
+  }
+}
+
+create "kolumn_classification" "identifier" {
+  name        = "Identifier"
+  description = "Unique identifiers and keys"
+  requirements = {
+    indexed = true
+  }
+}
+
+# ✅ PostgreSQL table that references the evolved data object
+create "postgres_table" "demo_users" {
+  name = "demo_users"
+
+  # Pull columns from evolved data object (now includes middle_name!)
+  dynamic "column" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMPTZ" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : column.value.default
+    }
   }
 
   # Sample data with the new field
@@ -100,89 +160,6 @@ create "postgres_table" "demo_users" {
       last_name   = "Williams"
     }
   ]
-}
-
-# Updated Kolumn data object - now includes the new column automatically
-create "kolumn_data_object" "demo_user_schema" {
-  name        = "Demo User Schema"
-  description = "EVOLVED user schema - now includes middle_name column!"
-
-  # ⚡ AUTONOMOUS MAGIC: Schema now includes the new middle_name column
-  dynamic "column" {
-    for_each = {
-      id = {
-        name        = "id"
-        type        = "BIGINT"
-        nullable    = false
-        primary_key = true
-      }
-      email = {
-        name     = "email"
-        type     = "VARCHAR(255)"
-        nullable = false
-        unique   = true
-      }
-      first_name = {
-        name     = "first_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-      }
-      # 🆕 NEW COLUMN: Automatically included in the schema
-      middle_name = {
-        name     = "middle_name"
-        type     = "VARCHAR(100)"
-        nullable = true
-      }
-      last_name = {
-        name     = "last_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-      }
-      created_at = {
-        name     = "created_at"
-        type     = "TIMESTAMP"
-        nullable = true
-      }
-    }
-
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-
-      # Same classification logic - email is still PII
-      classifications = column.key == "email" ? [
-        kolumn_classification.pii
-        ] : [
-        kolumn_classification.public
-      ]
-    }
-  }
-
-  metadata = {
-    source     = "postgres_table.demo_users"
-    demo_step  = "add_column"
-    evolution  = "added_middle_name_column"
-    created_at = timestamp()
-  }
-}
-
-# Same classification definitions
-create "kolumn_classification" "pii" {
-  name        = "PII"
-  description = "Personally Identifiable Information"
-  requirements = {
-    encryption   = true
-    audit_access = true
-  }
-}
-
-create "kolumn_classification" "public" {
-  name        = "Public"
-  description = "Public information"
-  requirements = {
-    encryption = false
-  }
 }
 
 # -----------------------------------------------------------------------------

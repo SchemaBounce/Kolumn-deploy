@@ -39,145 +39,156 @@ provider "dagster" {
 }
 
 # -----------------------------------------------------------------------------
-# STEP 3: SOURCE SCHEMA WITH PII COLUMN ADDED
+# STEP 3: INTELLIGENT DATA OBJECTS WITH PII DETECTION
 # -----------------------------------------------------------------------------
 
-# Users table now includes phone number (will be detected as PII!)
-create "postgres_table" "demo_users" {
-  name = "demo_users"
+# ✅ CORRECT: Create data object FIRST with intelligent PII detection
+create "kolumn_data_object" "demo_user_schema" {
+  name        = "Demo User Schema with PII Detection"
+  description = "EVOLVED schema with automatic PII detection and security classification"
 
-  # All previous columns
+  # Base column definitions
   column "id" {
-    type        = "BIGSERIAL"
-    primary_key = true
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
   }
 
   column "email" {
-    type     = "VARCHAR(255)"
-    unique   = true
-    nullable = false
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.pii] # Automatic PII detection
   }
 
   column "first_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
   }
 
   column "middle_name" {
-    type     = "VARCHAR(100)"
-    nullable = true
+    type            = "VARCHAR(100)"
+    nullable        = true
+    classifications = [kolumn_classification.public]
   }
 
   column "last_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
   }
 
-  # 🛡️ NEW PII COLUMN: This will trigger automatic security measures!
+  # 🛡️ NEW PII COLUMN: Automatically detected as sensitive
   column "phone" {
-    type     = "VARCHAR(20)"
-    nullable = true
+    type            = "VARCHAR(20)"
+    nullable        = true
+    classifications = [kolumn_classification.pii] # Automatic PII detection
   }
 
   column "created_at" {
-    type    = "TIMESTAMP"
-    default = "CURRENT_TIMESTAMP"
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
   }
 
-  # Sample data with phone numbers
+  metadata = {
+    demo_step         = "add_pii"
+    evolution         = "added_phone_column_with_pii_detection"
+    security_enhanced = true
+    created_at        = timestamp()
+  }
+}
+
+# ⚡ ADVANCED: Create derived data objects using column functions
+locals {
+  # Separate PII and public columns using filter_columns()
+  pii_columns = filter_columns(
+    kolumn_data_object.demo_user_schema.columns,
+    { classifications = [kolumn_classification.pii] }
+  )
+
+  public_columns = filter_columns(
+    kolumn_data_object.demo_user_schema.columns,
+    { classifications = [kolumn_classification.public] }
+  )
+
+  # Transform PII columns to add encryption metadata
+  encrypted_pii_columns = transform_columns(
+    local.pii_columns,
+    {
+      "email" = {
+        encrypted             = true,
+        encryption_algorithm  = "AES-256-GCM",
+        searchable_encryption = true
+      },
+      "phone" = {
+        encrypted             = true,
+        encryption_algorithm  = "AES-256-GCM",
+        searchable_encryption = false
+      }
+    }
+  )
+
+  # Create analytics-safe columns (PII transformed to hashes)
+  analytics_columns = merge_columns(
+    local.public_columns,
+    transform_columns(
+      local.pii_columns,
+      {
+        "email" = { name = "email_hash", type = "CHAR(64)", comment = "SHA256 hash of email" },
+        "phone" = { name = "phone_hash", type = "CHAR(64)", comment = "SHA256 hash of phone" }
+      }
+    )
+  )
+}
+
+# 🛡️ SECURE POSTGRES TABLE: Uses encrypted PII columns
+create "postgres_table" "demo_users" {
+  name = "demo_users"
+
+  # Pull all columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMPTZ" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : column.value.default
+
+      # 🛡️ AUTOMATIC ENCRYPTION: Applied to PII columns
+      encrypted = contains(column.value.classifications, kolumn_classification.pii)
+    }
+  }
+
+  # Sample data with PII
   initial_data = [
     {
       email       = "alice@example.com"
       first_name  = "Alice"
       middle_name = "Marie"
       last_name   = "Johnson"
-      phone       = "+1-555-0123" # PII data
+      phone       = "+1-555-0123" # Will be encrypted
     },
     {
       email       = "bob@example.com"
       first_name  = "Bob"
       middle_name = "James"
       last_name   = "Smith"
-      phone       = "+1-555-0456" # PII data
+      phone       = "+1-555-0456" # Will be encrypted
     },
     {
       email       = "carol@example.com"
       first_name  = "Carol"
       middle_name = null
       last_name   = "Williams"
-      phone       = "+1-555-0789" # PII data
+      phone       = "+1-555-0789" # Will be encrypted
     }
   ]
-}
-
-# 🛡️ INTELLIGENT SCHEMA: Now with PII detection!
-create "kolumn_data_object" "demo_user_schema" {
-  name        = "Demo User Schema"
-  description = "EVOLVED schema with PII detection - phone automatically secured!"
-
-  dynamic "column" {
-    for_each = {
-      id = {
-        name        = "id"
-        type        = "BIGINT"
-        nullable    = false
-        primary_key = true
-      }
-      email = {
-        name     = "email"
-        type     = "VARCHAR(255)"
-        nullable = false
-        unique   = true
-      }
-      first_name = {
-        name     = "first_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-      }
-      middle_name = {
-        name     = "middle_name"
-        type     = "VARCHAR(100)"
-        nullable = true
-      }
-      last_name = {
-        name     = "last_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-      }
-      # 🆕 NEW PII COLUMN: Automatically detected as sensitive
-      phone = {
-        name     = "phone"
-        type     = "VARCHAR(20)"
-        nullable = true
-      }
-      created_at = {
-        name     = "created_at"
-        type     = "TIMESTAMP"
-        nullable = true
-      }
-    }
-
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-
-      # 🛡️ AUTONOMOUS PII DETECTION: Based on column name patterns
-      classifications = contains(["email", "phone", "ssn"], column.key) ? [
-        kolumn_classification.pii
-        ] : [
-        kolumn_classification.public
-      ]
-    }
-  }
-
-  metadata = {
-    source            = "postgres_table.demo_users"
-    demo_step         = "add_pii"
-    evolution         = "added_phone_column_with_pii_detection"
-    security_enhanced = true
-    created_at        = timestamp()
-  }
 }
 
 # Enhanced classification definitions with security policies
@@ -218,97 +229,111 @@ create "kolumn_classification" "public" {
 # DERIVED RESOURCES WITH AUTOMATIC SECURITY MEASURES
 # -----------------------------------------------------------------------------
 
-# 🛡️ ANALYTICS TABLE: PII columns automatically encrypted!
+# 🛡️ ANALYTICS TABLE: Uses privacy-safe column transformations
 create "postgres_table" "demo_user_analytics" {
   name = "demo_user_analytics"
 
+  # ⚡ ADVANCED: Use analytics-safe columns (PII transformed to hashes)
   dynamic "column" {
-    for_each = kolumn_data_object.demo_user_schema.columns
+    for_each = local.analytics_columns
     content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-
-      # 🛡️ AUTOMATIC ENCRYPTION: Applied to PII columns
-      encrypted = contains(column.value.classifications, kolumn_classification.pii)
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMPTZ" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : column.value.default
+      comment     = column.value.comment
     }
   }
 
-  # Analytics columns
-  column "total_sessions" {
-    type    = "INTEGER"
-    default = 0
+  # Analytics-specific columns using add_columns()
+  dynamic "analytics_column" {
+    for_each = {
+      "total_sessions" = {
+        name     = "total_sessions"
+        type     = "INTEGER"
+        nullable = false
+        default  = "0"
+        comment  = "Total user sessions"
+      }
+      "last_activity" = {
+        name     = "last_activity"
+        type     = "TIMESTAMPTZ"
+        nullable = true
+        comment  = "Last user activity timestamp"
+      }
+      "risk_score" = {
+        name     = "risk_score"
+        type     = "DECIMAL(5,2)"
+        nullable = true
+        comment  = "Calculated risk score"
+      }
+    }
+    content {
+      name     = analytics_column.value.name
+      type     = analytics_column.value.type
+      nullable = analytics_column.value.nullable
+      default  = analytics_column.value.default
+      comment  = analytics_column.value.comment
+    }
   }
 
-  column "last_activity" {
-    type     = "TIMESTAMP"
-    nullable = true
-  }
-
-  # 🛡️ PII AUDIT: Automatically track access to sensitive data
+  # 🛡️ PII AUDIT: Track access to derived PII data
   audit_config = {
-    track_pii_access = true
-    pii_columns = [
-      for col in kolumn_data_object.demo_user_schema.columns : col.name
-      if contains(col.classifications, kolumn_classification.pii)
-    ]
-    log_level = "detailed"
+    track_pii_access    = true
+    pii_derived_columns = ["email_hash", "phone_hash"]
+    log_level           = "detailed"
   }
 }
 
-# 🛡️ KAFKA TOPIC: PII data automatically handled securely!
+# 🛡️ KAFKA TOPIC: Privacy-safe schema using column transformations
 create "kafka_topic" "demo_user_events" {
   name               = "demo-user-events"
   partitions         = 3
   replication_factor = 1
 
+  # ⚡ ADVANCED: Create event schema using column functions
   schema_registry_config = {
-    # Event metadata
-    fields = {
-      event_type = {
-        type     = "string"
-        nullable = false
-      }
-      event_timestamp = {
-        type     = "long"
-        nullable = false
-      }
-    }
+    # Base event metadata
+    fields = merge_columns(
+      {
+        "event_type" = {
+          name     = "event_type"
+          type     = "string"
+          nullable = false
+          comment  = "Type of user event"
+        }
+        "event_timestamp" = {
+          name     = "event_timestamp"
+          type     = "long"
+          nullable = false
+          comment  = "Unix timestamp of event"
+        }
+      },
+      # Transform data object columns for Kafka schema
+      transform_columns(
+        local.analytics_columns, # Use privacy-safe columns
+        {
+          "id"          = { type = "long" },
+          "first_name"  = { type = "string" },
+          "middle_name" = { type = "string" },
+          "last_name"   = { type = "string" },
+          "created_at"  = { type = "long", comment = "Unix timestamp" },
+          "email_hash"  = { type = "string", comment = "SHA256 hash for analytics" },
+          "phone_hash"  = { type = "string", comment = "SHA256 hash for analytics" }
+        }
+      )
+    )
   }
 
-  # 📊 NON-PII FIELDS: Safe for public events
-  dynamic "non_pii_field" {
-    for_each = {
-      for name, col in kolumn_data_object.demo_user_schema.columns : name => col
-      if !contains(col.classifications, kolumn_classification.pii)
-    }
-    content {
-      name     = non_pii_field.value.name
-      type     = non_pii_field.value.type == "VARCHAR(255)" ? "string" : non_pii_field.value.type == "VARCHAR(100)" ? "string" : non_pii_field.value.type == "VARCHAR(20)" ? "string" : non_pii_field.value.type == "BIGINT" ? "long" : non_pii_field.value.type == "TIMESTAMP" ? "long" : "string"
-      nullable = non_pii_field.value.nullable
-    }
-  }
-
-  # 🛡️ PII FIELDS: Only hashed versions for analytics
-  dynamic "pii_field" {
-    for_each = {
-      for name, col in kolumn_data_object.demo_user_schema.columns : "${name}_hash" => col
-      if contains(col.classifications, kolumn_classification.pii)
-    }
-    content {
-      name     = pii_field.key # email_hash, phone_hash
-      type     = "string"      # Hash is always a string
-      nullable = true
-      doc      = "SHA256 hash of ${replace(pii_field.key, "_hash", "")} for privacy-safe analytics"
-    }
-  }
-
-  # 🛡️ PRIVACY CONFIGURATION: Automatic based on PII detection
+  # 🛡️ PRIVACY CONFIGURATION: Based on column analysis
   privacy_config = {
     pii_handling          = "hash_only"
     encryption_at_rest    = true
-    retention_policy      = "30_days" # Shorter for events with PII
+    retention_policy      = "30_days"
     right_to_be_forgotten = true
+    contains_derived_pii  = true # Has hash columns
   }
 }
 
