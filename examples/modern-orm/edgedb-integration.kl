@@ -1,0 +1,778 @@
+# EdgeDB Integration Example
+# Demonstrates complete EdgeDB ESDL discovery and graph-relational management with Kolumn
+
+# Variables for configuration
+variable "edgedb_instance" {
+  description = "EdgeDB instance name"
+  type        = string
+  default     = "content_platform"
+}
+
+variable "edgedb_host" {
+  description = "EdgeDB server host"
+  type        = string
+  default     = "localhost"
+}
+
+variable "edgedb_port" {
+  description = "EdgeDB server port"
+  type        = number
+  default     = 5656
+}
+
+variable "environment" {
+  description = "Environment (dev, staging, production)"
+  type        = string
+  default     = "dev"
+}
+
+variable "enable_ai_features" {
+  description = "Enable AI-powered content analysis features"
+  type        = bool
+  default     = true
+}
+
+# EdgeDB provider configuration
+provider "edgedb" {
+  instance = var.edgedb_instance
+  host     = var.edgedb_host
+  port     = var.edgedb_port
+
+  # Authentication
+  auth = {
+    method   = "password"
+    username = "edgedb"
+    password = var.edgedb_password
+  }
+
+  # Connection configuration
+  connection = {
+    pool_size      = 10
+    timeout        = "30s"
+    retry_attempts = 3
+  }
+
+  # Advanced features
+  features = {
+    enable_computed_properties = true
+    enable_access_policies     = true
+    enable_migrations          = true
+    enable_introspection       = true
+  }
+}
+
+# PostgreSQL provider for relational compatibility layer
+provider "postgres" {
+  host     = var.edgedb_host
+  port     = 5432
+  database = "edgedb_compat"
+  username = "postgres"
+  password = var.postgres_password
+  sslmode  = "prefer"
+}
+
+# EdgeDB ESDL schema discovery
+discover "edgedb_schema" "content_platform" {
+  project_path = "./edgedb-project"
+  schema_files = [
+    "dbschema/default.esdl",
+    "dbschema/users.esdl",
+    "dbschema/content.esdl",
+    "dbschema/social.esdl",
+    "dbschema/analytics.esdl",
+    "dbschema/ai_features.esdl"
+  ]
+
+  # ESDL parsing options
+  esdl_parsing = {
+    extract_types               = true
+    extract_links               = true
+    extract_properties          = true
+    extract_computed_properties = true
+    extract_constraints         = true
+    extract_indexes             = true
+    extract_functions           = true
+    extract_triggers            = true
+    extract_access_policies     = true
+  }
+
+  # EdgeDB-specific features
+  edgedb_features = {
+    extract_modules                 = true
+    extract_migrations              = true
+    extract_ai_extensions           = var.enable_ai_features
+    extract_vector_properties       = var.enable_ai_features
+    analyze_graph_relationships     = true
+    extract_inheritance_hierarchies = true
+  }
+
+  # Schema validation
+  validation = {
+    validate_esdl_syntax      = true
+    check_type_consistency    = true
+    validate_link_targets     = true
+    check_constraint_validity = true
+    validate_access_policies  = true
+  }
+
+  # Performance analysis
+  performance_analysis = {
+    analyze_query_patterns                = true
+    identify_optimization_opportunities   = true
+    suggest_index_strategies              = true
+    analyze_computed_property_performance = true
+  }
+}
+
+# Create Kolumn data objects from discovered EdgeDB schema
+create "kolumn_data_object" "users_from_edgedb" {
+  name        = "Content Platform Users from EdgeDB"
+  description = "User schema extracted from EdgeDB ESDL with graph relationships"
+
+  dynamic "column" {
+    for_each = discover.edgedb_schema.content_platform.types.User.properties
+    content {
+      name     = column.key
+      type     = edgedb_to_sql_type(column.value.type)
+      nullable = !column.value.required
+      default  = column.value.default
+      unique   = contains(column.value.constraints, "exclusive")
+
+      # EdgeDB-specific features
+      computed          = column.value.computed
+      computation_logic = column.value.computed ? column.value.expression : null
+
+      # Data type handling
+      json_schema       = column.value.type == "json" ? column.value.json_schema : null
+      vector_dimensions = column.value.type == "vector" ? column.value.dimensions : null
+
+      # Constraint handling
+      validation_rules = column.value.constraints
+      regex_validation = contains(column.value.constraints, "regexp") ? column.value.regexp_pattern : null
+
+      # AI features
+      ai_searchable     = var.enable_ai_features && contains(["bio", "description", "content"], column.key)
+      embedding_enabled = var.enable_ai_features && column.value.type == "vector"
+    }
+  }
+
+  # Handle EdgeDB links as relationships
+  dynamic "relationship" {
+    for_each = discover.edgedb_schema.content_platform.types.User.links
+    content {
+      name        = relationship.key
+      type        = relationship.value.cardinality == "multi" ? "one_to_many" : "one_to_one"
+      target_type = relationship.value.target
+
+      # EdgeDB-specific relationship features
+      link_properties = relationship.value.properties
+      computed_link   = relationship.value.computed
+      access_policy   = relationship.value.access_policy
+
+      # Graph traversal optimization
+      index_required = relationship.value.frequently_traversed
+      backlink_name  = relationship.value.backlink
+    }
+  }
+
+  # Access policies from EdgeDB
+  dynamic "access_policy" {
+    for_each = discover.edgedb_schema.content_platform.types.User.access_policies
+    content {
+      name       = policy.key
+      condition  = policy.value.condition
+      action     = policy.value.action
+      applies_to = policy.value.applies_to
+
+      # Policy metadata
+      description = policy.value.description
+      priority    = policy.value.priority
+    }
+  }
+
+  # EdgeDB-specific metadata
+  metadata = {
+    source_type                  = "EdgeDB"
+    module                       = discover.edgedb_schema.content_platform.types.User.module
+    esdl_version                 = discover.edgedb_schema.content_platform.esdl_version
+    supports_computed_properties = true
+    supports_access_policies     = true
+    supports_graph_queries       = true
+    supports_ai_features         = var.enable_ai_features
+    inheritance_hierarchy        = discover.edgedb_schema.content_platform.types.User.inheritance
+  }
+}
+
+# Create content objects with rich metadata
+create "kolumn_data_object" "content_from_edgedb" {
+  name        = "Content Objects from EdgeDB"
+  description = "Rich content schema with AI features and graph relationships"
+
+  dynamic "column" {
+    for_each = discover.edgedb_schema.content_platform.types.Content.properties
+    content {
+      name     = column.key
+      type     = edgedb_to_sql_type(column.value.type)
+      nullable = !column.value.required
+      default  = column.value.default
+
+      # Content-specific features
+      full_text_searchable = contains(["title", "body", "tags"], column.key)
+      ai_analyzable        = var.enable_ai_features && contains(["title", "body", "description"], column.key)
+
+      # Vector embeddings for AI search
+      embedding_model           = var.enable_ai_features && column.value.type == "vector" ? column.value.embedding_model : null
+      similarity_search_enabled = column.value.type == "vector"
+
+      # Content moderation
+      moderation_required     = contains(["body", "comments"], column.key)
+      auto_moderation_enabled = var.enable_ai_features
+    }
+  }
+
+  # Complex graph relationships
+  dynamic "relationship" {
+    for_each = discover.edgedb_schema.content_platform.types.Content.links
+    content {
+      name        = relationship.key
+      type        = relationship.value.cardinality == "multi" ? "many_to_many" : "many_to_one"
+      target_type = relationship.value.target
+
+      # Relationship metadata for content
+      relationship_strength = relationship.value.weight
+      auto_suggested        = relationship.value.ai_suggested
+      moderation_applied    = relationship.value.moderated
+    }
+  }
+}
+
+# Create EdgeDB types with advanced features
+create "edgedb_type" "User" {
+  instance  = edgedb_provider.instance
+  module    = "default"
+  type_name = "User"
+
+  # Use discovered properties
+  dynamic "property" {
+    for_each = kolumn_data_object.users_from_edgedb.columns
+    content {
+      name     = property.value.name
+      type     = sql_to_edgedb_type(property.value.type)
+      required = !property.value.nullable
+      default  = property.value.default
+
+      # EdgeDB-specific property features
+      computed   = property.value.computed
+      expression = property.value.computation_logic
+
+      # Constraints
+      dynamic "constraint" {
+        for_each = property.value.validation_rules
+        content {
+          type       = constraint.value.type
+          expression = constraint.value.expression
+        }
+      }
+    }
+  }
+
+  # Graph relationships (links)
+  dynamic "link" {
+    for_each = kolumn_data_object.users_from_edgedb.relationships
+    content {
+      name        = link.value.name
+      target      = link.value.target_type
+      cardinality = link.value.type == "one_to_many" ? "multi" : "single"
+
+      # Link properties for metadata
+      dynamic "property" {
+        for_each = link.value.link_properties
+        content {
+          name    = property.key
+          type    = property.value.type
+          default = property.value.default
+        }
+      }
+
+      # Access control on links
+      dynamic "access_policy" {
+        for_each = link.value.access_policy
+        content {
+          allow     = policy.value.allow
+          condition = policy.value.condition
+        }
+      }
+    }
+  }
+
+  # Type-level access policies
+  dynamic "access_policy" {
+    for_each = kolumn_data_object.users_from_edgedb.access_policies
+    content {
+      allow     = policy.value.action
+      condition = policy.value.condition
+
+      # Advanced policy features
+      priority    = policy.value.priority
+      description = policy.value.description
+    }
+  }
+
+  # Computed properties for derived data
+  computed_property "full_name" {
+    type       = "str"
+    expression = ".first_name ++ ' ' ++ .last_name"
+  }
+
+  computed_property "content_count" {
+    type       = "int64"
+    expression = "count(.authored_content)"
+  }
+
+  computed_property "engagement_score" {
+    type       = "float64"
+    expression = <<-EDGEQL
+      (count(.authored_content.likes) + 
+       count(.authored_content.comments) * 2 + 
+       count(.authored_content.shares) * 3) / 
+      greatest(count(.authored_content), 1)
+    EDGEQL
+  }
+}
+
+# Create Content type with AI features
+create "edgedb_type" "Content" {
+  instance  = edgedb_provider.instance
+  module    = "default"
+  type_name = "Content"
+
+  # Content properties with AI enhancements
+  dynamic "property" {
+    for_each = kolumn_data_object.content_from_edgedb.columns
+    content {
+      name     = property.value.name
+      type     = sql_to_edgedb_type(property.value.type)
+      required = !property.value.nullable
+      default  = property.value.default
+    }
+  }
+
+  # AI-powered content analysis
+  computed_property "sentiment_score" {
+    type       = "float32"
+    expression = var.enable_ai_features ? "ai::analyze_sentiment(.body)" : null
+  }
+
+  computed_property "topic_tags" {
+    type       = "array<str>"
+    expression = var.enable_ai_features ? "ai::extract_topics(.title ++ ' ' ++ .body)" : null
+  }
+
+  computed_property "readability_score" {
+    type       = "float32"
+    expression = var.enable_ai_features ? "ai::calculate_readability(.body)" : null
+  }
+
+  # Vector embedding for semantic search
+  property "content_embedding" {
+    type       = "ext::pgvector::vector"
+    computed   = var.enable_ai_features
+    expression = var.enable_ai_features ? "ai::generate_embedding(.title ++ ' ' ++ .body)" : null
+  }
+
+  # Content relationships
+  link "author" {
+    target      = "User"
+    cardinality = "single"
+    required    = true
+  }
+
+  link "tags" {
+    target      = "Tag"
+    cardinality = "multi"
+
+    property "relevance_score" {
+      type    = "float32"
+      default = 1.0
+    }
+  }
+
+  link "related_content" {
+    target      = "Content"
+    cardinality = "multi"
+    computed    = var.enable_ai_features
+    expression  = var.enable_ai_features ? "(SELECT Content FILTER .id != __source__.id ORDER BY ext::pgvector::cosine_distance(.content_embedding, __source__.content_embedding) LIMIT 5)" : null
+  }
+
+  # Access policies for content
+  access_policy "author_full_access" {
+    allow     = "all"
+    condition = "(.author ?= global current_user)"
+  }
+
+  access_policy "published_content_read" {
+    allow     = "select"
+    condition = ".published = true"
+  }
+
+  access_policy "draft_content_restricted" {
+    allow     = "select"
+    condition = "(.published = false AND .author ?= global current_user)"
+  }
+}
+
+# Create PostgreSQL compatibility layer
+create "postgres_table" "users_edgedb_replica" {
+  database   = postgres_database.edgedb_compat.name
+  schema     = "edgedb_replica"
+  table_name = "users"
+
+  # Convert EdgeDB properties to SQL columns
+  dynamic "column" {
+    for_each = [
+      for col in kolumn_data_object.users_from_edgedb.columns :
+      col if !col.computed # Skip computed properties for base table
+    ]
+    content {
+      name        = column.value.name
+      type        = column.value.type
+      nullable    = column.value.nullable
+      default     = column.value.default
+      primary_key = column.value.name == "id"
+      unique      = column.value.unique
+    }
+  }
+
+  # Separate table for computed properties
+  computed_properties = {
+    view_name = "users_computed"
+    properties = [
+      for col in kolumn_data_object.users_from_edgedb.columns :
+      col if col.computed
+    ]
+  }
+}
+
+# Create materialized view for EdgeDB computed properties in PostgreSQL
+create "postgres_view" "users_with_computed_properties" {
+  database     = postgres_database.edgedb_compat.name
+  schema       = "edgedb_replica"
+  view_name    = "users_with_computed_properties"
+  materialized = true
+
+  query = <<-SQL
+    SELECT 
+      u.*,
+      CONCAT(u.first_name, ' ', u.last_name) as full_name,
+      (SELECT COUNT(*) FROM edgedb_replica.content c WHERE c.author_id = u.id) as content_count,
+      CASE 
+        WHEN u.created_at > NOW() - INTERVAL '30 days' THEN 'new'
+        WHEN u.last_login > NOW() - INTERVAL '7 days' THEN 'active'
+        ELSE 'inactive'
+      END as user_status
+    FROM edgedb_replica.users u
+  SQL
+
+  # Refresh schedule
+  refresh_schedule = "0 */4 * * *" # Every 4 hours
+
+  indexes = [
+    {
+      columns = ["full_name"]
+      method  = "btree"
+    },
+    {
+      columns = ["user_status"]
+      method  = "btree"
+    }
+  ]
+}
+
+# AI-powered content analysis functions
+create "edgedb_function" "analyze_content_sentiment" {
+  instance      = edgedb_provider.instance
+  function_name = "analyze_content_sentiment"
+  module        = "ai"
+
+  parameters = [
+    {
+      name = "content_text"
+      type = "str"
+    }
+  ]
+  returns = "float32"
+
+  body = <<-EDGEQL
+    SELECT <float32>(
+      # Integration with external AI service or local ML model
+      ext::ai::sentiment_analysis(content_text)
+    )
+  EDGEQL
+
+  # Function configuration
+  volatility = "stable"
+  language   = "edgeql"
+
+  # Enable only if AI features are enabled
+  enabled = var.enable_ai_features ? true : false
+}
+
+# Content recommendation system
+create "edgedb_function" "recommend_content" {
+  instance      = edgedb_provider.instance
+  function_name = "recommend_content"
+  module        = "ai"
+
+  parameters = [
+    {
+      name = "user_id"
+      type = "uuid"
+    },
+    {
+      name    = "limit"
+      type    = "int64"
+      default = "10"
+    }
+  ]
+  returns = "array<Content>"
+
+  body = <<-EDGEQL
+    WITH 
+      user := (SELECT User FILTER .id = user_id),
+      user_interests := (
+        SELECT user.authored_content.tags.name
+        GROUP BY user.authored_content.tags.name
+      ),
+      recommended := (
+        SELECT Content
+        FILTER .author != user 
+          AND .published = true
+          AND .tags.name IN user_interests
+        ORDER BY .created_at DESC
+        LIMIT limit
+      )
+    SELECT recommended
+  EDGEQL
+
+  volatility = "stable"
+  language   = "edgeql"
+}
+
+# Cross-provider data pipeline: EdgeDB to Analytics
+create "airbyte_source" "edgedb_content_sync" {
+  source_type = "edgedb"
+  configuration = {
+    instance = var.edgedb_instance
+    host     = var.edgedb_host
+    port     = var.edgedb_port
+
+    # Extract data using EdgeQL queries
+    extract_queries = [
+      {
+        name         = "users_with_content"
+        query        = <<-EDGEQL
+          SELECT User {
+            id,
+            email,
+            first_name,
+            last_name,
+            created_at,
+            full_name := .first_name ++ ' ' ++ .last_name,
+            content_count := count(.authored_content),
+            authored_content: {
+              id,
+              title,
+              body,
+              published,
+              created_at,
+              sentiment_score,
+              topic_tags
+            }
+          }
+        EDGEQL
+        output_table = "users_content_analytics"
+      }
+    ]
+
+    # Incremental sync based on updated_at
+    incremental_sync = {
+      cursor_field    = "updated_at"
+      lookback_window = "1 hour"
+    }
+  }
+
+  # Schema evolution handling
+  schema_evolution = {
+    auto_detect_schema_changes   = true
+    handle_computed_properties   = true
+    preserve_graph_relationships = true
+  }
+}
+
+# EdgeDB migration management
+create "edgedb_migration" "content_platform_v1" {
+  instance       = edgedb_provider.instance
+  migration_name = "content_platform_v1"
+  description    = "Initial content platform schema with AI features"
+
+  # Migration source
+  source_esdl_files = discover.edgedb_schema.content_platform.schema_files
+
+  # Migration strategy
+  migration_strategy = {
+    type                  = "safe_migration"
+    create_backup         = true
+    validate_before_apply = true
+    rollback_on_error     = true
+  }
+
+  # Schema changes included
+  schema_changes = [
+    "Create User type with computed properties",
+    "Create Content type with AI features",
+    "Add access policies for content security",
+    "Enable vector embeddings for semantic search",
+    "Add AI analysis functions"
+  ]
+
+  # Generated migration files
+  generated_files = {
+    migration_esdl = "./dbschema/migrations/m1_content_platform.esdl"
+    migration_sql  = "./dbschema/migrations/m1_content_platform.sql"
+    rollback_esdl  = "./dbschema/migrations/m1_rollback.esdl"
+  }
+
+  # Post-migration tasks
+  post_migration_tasks = [
+    "Refresh materialized views",
+    "Update search indexes",
+    "Recalculate AI embeddings"
+  ]
+}
+
+# Performance monitoring for EdgeDB
+create "edgedb_function" "performance_analytics" {
+  instance      = edgedb_provider.instance
+  function_name = "performance_analytics"
+  module        = "monitoring"
+
+  returns = "json"
+
+  body = <<-EDGEQL
+    SELECT <json>{
+      'query_performance' := (
+        SELECT sys::QueryStats {
+          query,
+          avg_duration,
+          total_calls,
+          cache_hit_ratio
+        }
+        ORDER BY .avg_duration DESC
+        LIMIT 10
+      ),
+      'type_statistics' := (
+        SELECT schema::ObjectType {
+          name,
+          property_count := count(.properties),
+          link_count := count(.links),
+          access_policy_count := count(.access_policies)
+        }
+        FILTER .name LIKE 'default::%'
+      ),
+      'ai_feature_usage' := (
+        SELECT {
+          'sentiment_analyses_today' := count(
+            (SELECT Content FILTER .created_at > <datetime>datetime_of_transaction() - <duration>'1 day')
+          ),
+          'embeddings_generated' := count(
+            (SELECT Content FILTER .content_embedding IS NOT {}[])
+          )
+        }
+      )
+    }
+  EDGEQL
+
+  volatility = "volatile"
+  language   = "edgeql"
+}
+
+# Output comprehensive integration summary
+output "edgedb_integration_summary" {
+  description = "Complete EdgeDB integration summary with AI features"
+  value = {
+    # Schema discovery
+    types_discovered   = length(discover.edgedb_schema.content_platform.types)
+    modules_discovered = length(discover.edgedb_schema.content_platform.modules)
+    computed_properties_found = sum([
+      for type_name, type_def in discover.edgedb_schema.content_platform.types :
+      length([for prop in type_def.properties : prop if prop.computed])
+    ])
+
+    # AI features
+    ai_features_enabled       = var.enable_ai_features
+    vector_properties_created = var.enable_ai_features ? 3 : 0
+    ai_functions_created      = var.enable_ai_features ? 3 : 0
+
+    # Graph relationships
+    links_created = sum([
+      for type_name, type_def in discover.edgedb_schema.content_platform.types :
+      length(type_def.links)
+    ])
+    access_policies_applied = sum([
+      for type_name, type_def in discover.edgedb_schema.content_platform.types :
+      length(type_def.access_policies)
+    ])
+
+    # Cross-provider integration
+    postgres_replica_created   = true
+    airbyte_sync_configured    = true
+    materialized_views_created = 1
+
+    # Performance features
+    computed_properties_optimized = true
+    graph_query_optimization      = true
+    vector_search_enabled         = var.enable_ai_features
+  }
+}
+
+output "ai_features_status" {
+  description = "AI-powered content analysis features status"
+  value = var.enable_ai_features ? {
+    sentiment_analysis      = "enabled"
+    topic_extraction        = "enabled"
+    content_recommendations = "enabled"
+    semantic_search         = "enabled"
+    readability_scoring     = "enabled"
+    embedding_model         = "text-embedding-ada-002"
+    vector_dimensions       = 1536
+    } : {
+    status  = "disabled"
+    message = "Set enable_ai_features = true to activate AI capabilities"
+  }
+}
+
+output "graph_capabilities" {
+  description = "EdgeDB graph database capabilities utilized"
+  value = {
+    # Graph traversal features
+    computed_relationships = "enabled"
+    recursive_queries      = "supported"
+    path_queries           = "supported"
+    shortest_path          = "supported"
+
+    # Advanced features
+    inheritance_hierarchies = "supported"
+    polymorphic_queries     = "supported"
+    nested_object_queries   = "optimized"
+
+    # Security features
+    row_level_security    = "access_policies"
+    column_level_security = "property_policies"
+    link_level_security   = "link_policies"
+
+    # Performance
+    query_optimization               = "automatic"
+    index_suggestions                = "ai_powered"
+    materialized_computed_properties = "available"
+  }
+}

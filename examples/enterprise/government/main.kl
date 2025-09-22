@@ -1,0 +1,787 @@
+# 🏛️ Government Enterprise Template
+# FISMA Compliant Federal Agency Infrastructure
+# 
+# This template provides a production-ready configuration for government
+# agencies requiring FISMA compliance, FedRAMP authorization, and maximum security.
+
+terraform {
+  required_version = ">= 1.0"
+  backend "schemabounce" {
+    api_url        = var.schemabounce_api_url
+    api_key        = var.schemabounce_api_key
+    environment_id = var.environment_id
+
+    # Government security requirements
+    enable_versioning = true
+    enable_encryption = true
+    audit_logging     = true
+    data_residency    = "us_gov"
+    retention_policy  = "10y" # Extended retention for government records
+
+    tags = {
+      sector                = "government"
+      compliance            = "fisma"
+      clearance_level       = var.clearance_level
+      environment           = var.environment
+      agency                = var.agency_name
+      system_categorization = var.system_categorization
+    }
+  }
+}
+
+# === VARIABLES ===
+
+variable "environment" {
+  description = "Environment (prod, dr, staging, dev)"
+  type        = string
+  validation {
+    condition     = contains(["prod", "dr", "staging", "dev"], var.environment)
+    error_message = "Environment must be prod, dr, staging, or dev."
+  }
+}
+
+variable "agency_name" {
+  description = "Government agency name"
+  type        = string
+}
+
+variable "clearance_level" {
+  description = "Security clearance level (public, confidential, secret, top_secret)"
+  type        = string
+  validation {
+    condition     = contains(["public", "confidential", "secret", "top_secret"], var.clearance_level)
+    error_message = "Clearance level must be public, confidential, secret, or top_secret."
+  }
+}
+
+variable "system_categorization" {
+  description = "FISMA system categorization (low, moderate, high)"
+  type        = string
+  validation {
+    condition     = contains(["low", "moderate", "high"], var.system_categorization)
+    error_message = "System categorization must be low, moderate, or high."
+  }
+}
+
+variable "regions" {
+  description = "Government cloud regions"
+  type        = list(string)
+  default     = ["us-gov-east-1", "us-gov-west-1"]
+}
+
+variable "schemabounce_api_url" {
+  description = "SchemaBounce API URL (Government cloud)"
+  type        = string
+  default     = "https://api.gov.schemabounce.com"
+}
+
+variable "schemabounce_api_key" {
+  description = "SchemaBounce API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "environment_id" {
+  description = "SchemaBounce environment ID"
+  type        = string
+}
+
+# === DATA OBJECTS ===
+
+# Citizen services data with privacy protection
+create "kolumn_data_object" "citizen_record" {
+  name        = "Citizen Services Record Schema"
+  description = "Citizen data with Privacy Act protection"
+
+  column "citizen_id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.government_identifier]
+  }
+
+  column "ssn" {
+    type            = "VARCHAR(11)"
+    nullable        = true
+    classifications = [kolumn_classification.pii, kolumn_classification.restricted]
+    encryption_config = {
+      algorithm          = "AES-256-GCM"
+      searchable         = false
+      key_rotation       = true
+      access_audit       = true
+      clearance_required = "confidential"
+    }
+  }
+
+  column "first_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.pii]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = true
+    }
+  }
+
+  column "last_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.pii]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = true
+    }
+  }
+
+  column "date_of_birth" {
+    type            = "DATE"
+    nullable        = false
+    classifications = [kolumn_classification.pii]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "address" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.pii]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "security_clearance" {
+    type            = "VARCHAR(20)"
+    nullable        = true
+    classifications = [kolumn_classification.security_relevant]
+    encryption_config = {
+      algorithm          = "AES-256-GCM"
+      searchable         = false
+      clearance_required = "secret"
+    }
+  }
+
+  column "service_interactions" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.official_use]
+  }
+
+  column "created_at" {
+    type     = "TIMESTAMP"
+    nullable = false
+    default  = "CURRENT_TIMESTAMP"
+  }
+
+  column "audit_trail" {
+    type            = "JSONB"
+    nullable        = false
+    classifications = [kolumn_classification.audit]
+  }
+
+  config = {
+    postgres = {
+      schema     = "citizen_services"
+      tablespace = "government_ts"
+    }
+  }
+}
+
+# Security operations data for threat monitoring
+create "kolumn_data_object" "security_event" {
+  name        = "Security Operations Schema"
+  description = "Security events and threat monitoring data"
+
+  column "event_id" {
+    type        = "BIGINT"
+    nullable    = false
+    primary_key = true
+  }
+
+  column "event_type" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    classifications = [kolumn_classification.security_relevant]
+  }
+
+  column "severity" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    classifications = [kolumn_classification.security_relevant]
+  }
+
+  column "source_ip" {
+    type            = "INET"
+    nullable        = true
+    classifications = [kolumn_classification.security_relevant]
+  }
+
+  column "user_agent" {
+    type            = "TEXT"
+    nullable        = true
+    classifications = [kolumn_classification.security_relevant]
+  }
+
+  column "threat_indicators" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.classified]
+    encryption_config = {
+      algorithm          = "AES-256-GCM"
+      searchable         = false
+      clearance_required = "secret"
+    }
+  }
+
+  column "response_actions" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.official_use]
+  }
+
+  column "occurred_at" {
+    type     = "TIMESTAMP"
+    nullable = false
+  }
+}
+
+# === CLASSIFICATIONS ===
+
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information (Privacy Act)"
+  level       = "controlled"
+  requirements = {
+    encryption            = true
+    audit_access          = true
+    retention_limit       = "10y"
+    privacy_act_compliant = true
+    breach_notification   = true
+  }
+
+  encryption_config = {
+    postgres = {
+      method         = "column_encryption"
+      algorithm      = "FIPS_140_2_AES_256_GCM"
+      key_management = "HSM"
+      key_rotation   = true
+    }
+  }
+}
+
+create "kolumn_classification" "restricted" {
+  name        = "Restricted"
+  description = "Highly sensitive PII (SSN, financial data)"
+  level       = "restricted"
+  requirements = {
+    encryption         = true
+    audit_access       = true
+    multi_factor_auth  = true
+    clearance_required = "confidential"
+    need_to_know       = true
+  }
+}
+
+create "kolumn_classification" "security_relevant" {
+  name        = "Security Relevant"
+  description = "Security operations and threat data"
+  level       = "controlled"
+  requirements = {
+    encryption                  = true
+    audit_access                = true
+    security_clearance_required = true
+  }
+}
+
+create "kolumn_classification" "classified" {
+  name        = "Classified"
+  description = "Classified national security information"
+  level       = "classified"
+  requirements = {
+    encryption             = true
+    audit_access           = true
+    clearance_required     = "secret"
+    compartmented          = true
+    special_access_program = true
+  }
+}
+
+create "kolumn_classification" "official_use" {
+  name        = "Official Use"
+  description = "For Official Use Only (FOUO)"
+  level       = "sensitive"
+  requirements = {
+    access_control = true
+    audit_access   = true
+  }
+}
+
+create "kolumn_classification" "government_identifier" {
+  name        = "Government Identifier"
+  description = "Government-issued identifiers"
+  level       = "controlled"
+  requirements = {
+    audit_access      = true
+    unique_validation = true
+  }
+}
+
+# === CITIZEN SERVICES DATABASE ===
+
+provider "postgres" "citizen_services" {
+  # Government cloud multi-region deployment
+  connection_pattern = "citizen-services-{region}-{env}.agency.gov"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  # Government cloud configuration
+  port     = 5432
+  database = "citizen_services"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Maximum security safety configuration
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 1 # Strictest threshold for government
+      recovery_time     = "120s"
+      test_request_rate = 0.01
+    }
+
+    retry_policy {
+      max_attempts     = 2 # Conservative retry for sensitive systems
+      backoff_strategy = "exponential"
+      initial_delay    = "2s"
+      max_delay        = "60s"
+      jitter_enabled   = true
+    }
+
+    rollback_strategy {
+      enabled             = true
+      auto_rollback       = false # Manual approval required
+      backup_before_apply = true
+      retention_days      = 3650 # 10 years for government records
+      rollback_timeout    = "10m"
+      approval_required   = true
+    }
+
+    health_checks {
+      enabled             = true
+      check_interval      = "10s"
+      timeout_duration    = "3s"
+      healthy_threshold   = 1
+      unhealthy_threshold = 1
+    }
+
+    risk_assessment {
+      enabled                    = true
+      check_dependents           = true
+      check_data_loss            = true
+      require_confirmation       = true
+      block_high_risk_changes    = true
+      security_impact_assessment = true
+      fisma_compliance_check     = true
+    }
+  }
+
+  # Government-specific orchestration
+  orchestration {
+    execution_mode      = "sequential" # Maximum security approach
+    max_concurrency     = 1
+    delay_between_batch = "5m"
+
+    dependencies {
+      enable_tracking                = true
+      validate_before_run            = true
+      fail_on_circular               = true
+      security_dependency_validation = true
+    }
+
+    resource_pools {
+      max_connections    = 25
+      connection_timeout = "30s"
+      idle_timeout       = "5m"
+      pool_size          = 5
+    }
+  }
+
+  # FISMA-compliant monitoring
+  monitoring {
+    metrics {
+      enabled          = true
+      collect_interval = "5s"
+      metrics_to_track = [
+        "connection_count",
+        "query_time",
+        "error_rate",
+        "security_events",
+        "access_attempts",
+        "failed_authentications"
+      ]
+      export_endpoint         = var.prometheus_endpoint
+      security_classification = "official_use"
+    }
+
+    logging {
+      level              = "info"
+      structured_logs    = true
+      include_stacks     = true
+      log_connections    = true
+      log_queries        = false # Disable for PII protection
+      log_performance    = true
+      siem_integration   = true
+      log_classification = "official_use"
+    }
+
+    alerting {
+      enabled               = true
+      notification_channels = ["#gov-ops", "#fisma-compliance", "#security-ops"]
+      escalation_channels   = ["#incident-response"]
+
+      alert_thresholds {
+        error_rate      = 0.001 # 0.1% error rate threshold
+        response_time   = "1s"  # 1 second response time
+        connection_loss = 1     # Alert on any connection loss
+        memory_usage    = 0.7   # 70% memory usage threshold
+        security_events = 1     # Alert on any security event
+      }
+    }
+
+    performance {
+      track_query_time      = true
+      track_connection_time = true
+      slow_query_threshold  = "500ms"
+      enable_profiling      = true
+      anonymized_profiling  = true
+    }
+  }
+}
+
+# Security operations database
+provider "postgres" "security_operations" {
+  connection_pattern = "security-ops-{region}-{env}.agency.gov"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  port     = 5432
+  database = "security_operations"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Enhanced security for threat monitoring
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 1
+      recovery_time     = "180s"
+    }
+
+    risk_assessment {
+      enabled                    = true
+      security_impact_assessment = true
+      classified_data_check      = true
+    }
+  }
+}
+
+# Audit and compliance database
+provider "postgres" "audit_compliance" {
+  connection_pattern = "audit-{region}-{env}.agency.gov"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  port     = 5432
+  database = "audit_compliance"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Maximum security for audit records
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 1
+      recovery_time     = "300s"
+    }
+
+    rollback_strategy {
+      enabled             = true
+      auto_rollback       = false
+      backup_before_apply = true
+      retention_days      = 7300 # 20 years for critical audit records
+      immutable_records   = true
+    }
+  }
+}
+
+# === CITIZEN SERVICES TABLES ===
+
+create "postgres_table" "citizens" {
+  provider = postgres.citizen_services
+
+  dynamic "column" {
+    for_each = kolumn_data_object.citizen_record.columns
+    content {
+      name = column.value.name
+      type = (
+        column.value.type == "BIGINT" && column.value.primary_key ? "bigserial" :
+        column.value.type == "VARCHAR(11)" ? "varchar(11)" :
+        column.value.type == "VARCHAR(100)" ? "varchar(100)" :
+        column.value.type == "VARCHAR(20)" ? "varchar(20)" :
+        column.value.type == "DATE" ? "date" :
+        column.value.type == "TIMESTAMP" ? "timestamp" :
+        column.value.type == "JSONB" ? "jsonb" :
+        column.value.type
+      )
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      nullable    = column.value.nullable
+      default     = column.value.default
+
+      # Apply encryption for PII and restricted data
+      encrypted = contains(column.value.classifications, kolumn_classification.pii) || contains(column.value.classifications, kolumn_classification.restricted) || contains(column.value.classifications, kolumn_classification.security_relevant)
+    }
+  }
+
+  # Government-specific indexes (encrypted search capability)
+  index "idx_citizens_name_encrypted" {
+    columns   = ["last_name", "first_name"]
+    method    = "btree"
+    encrypted = true
+  }
+
+  # Partitioning for performance and data management
+  partitioning {
+    type      = "range"
+    column    = "created_at"
+    interval  = "1 year"
+    retention = "75 years" # Lifetime retention for government records
+  }
+
+  # FISMA compliance settings
+  metadata = {
+    fisma_categorization = var.system_categorization
+    data_retention       = "lifetime"
+    audit_required       = true
+    backup_frequency     = "1h"
+    encryption_required  = true
+    access_logging       = true
+    clearance_required   = var.clearance_level
+  }
+}
+
+create "postgres_table" "security_events" {
+  provider = postgres.security_operations
+
+  dynamic "column" {
+    for_each = kolumn_data_object.security_event.columns
+    content {
+      name = column.value.name
+      type = (
+        column.value.type == "BIGINT" && column.value.primary_key ? "bigserial" :
+        column.value.type == "VARCHAR(50)" ? "varchar(50)" :
+        column.value.type == "VARCHAR(20)" ? "varchar(20)" :
+        column.value.type == "INET" ? "inet" :
+        column.value.type == "TEXT" ? "text" :
+        column.value.type == "TIMESTAMP" ? "timestamp" :
+        column.value.type == "JSONB" ? "jsonb" :
+        column.value.type
+      )
+      primary_key = column.value.primary_key
+      nullable    = column.value.nullable
+      default     = column.value.default
+
+      # Apply encryption for classified and security-relevant data
+      encrypted = contains(column.value.classifications, kolumn_classification.classified) || contains(column.value.classifications, kolumn_classification.security_relevant)
+    }
+  }
+
+  # Security-specific indexes
+  index "idx_security_events_type_severity" {
+    columns = ["event_type", "severity"]
+    method  = "btree"
+  }
+
+  index "idx_security_events_time" {
+    columns = ["occurred_at"]
+    method  = "btree"
+  }
+}
+
+# === SECURE MESSAGING ===
+
+provider "kafka" "secure_messaging" {
+  connection_pattern = "secure-kafka-{region}-{env}.agency.gov"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  bootstrap_servers = ["${var.kafka_host}:9092"]
+
+  # Maximum security for government messaging
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 2
+      recovery_time     = "120s"
+    }
+  }
+
+  # Government-specific security
+  security_config = {
+    encryption_in_transit = "TLS_1_3"
+    encryption_at_rest    = "FIPS_140_2_AES_256"
+    authentication        = "mutual_tls"
+    authorization         = "rbac"
+  }
+}
+
+create "kafka_topic" "citizen_notifications" {
+  provider           = kafka.secure_messaging
+  name               = "citizen-notifications-${var.environment}"
+  partitions         = 3
+  replication_factor = 3
+
+  configs = {
+    "retention.ms"        = "7776000000" # 90 days
+    "cleanup.policy"      = "delete"
+    "compression.type"    = "gzip"
+    "min.insync.replicas" = "3"
+  }
+
+  # Government notification schema
+  schema_definition = {
+    type           = "AVRO"
+    classification = "official_use"
+    pii_fields     = ["citizen_id", "notification_content"]
+  }
+}
+
+# === RBAC CONFIGURATION ===
+
+create "kolumn_role" "government_employee" {
+  name        = "Government Employee"
+  description = "Standard government employee access"
+  permissions = [
+    "read_citizen_data_limited",
+    "process_citizen_requests"
+  ]
+  capabilities = {
+    max_concurrent_queries = 5
+    query_timeout          = "30s"
+    audit_trail_required   = true
+    multi_factor_auth      = true
+  }
+
+  clearance_required = "public"
+  need_to_know       = true
+}
+
+create "kolumn_role" "security_analyst" {
+  name        = "Security Analyst"
+  description = "Security operations and threat monitoring"
+  permissions = [
+    "read_security_events",
+    "analyze_threats",
+    "generate_security_reports"
+  ]
+  capabilities = {
+    max_concurrent_queries = 10
+    query_timeout          = "60s"
+    audit_trail_required   = true
+    privileged_access      = true
+  }
+
+  clearance_required = "secret"
+}
+
+create "kolumn_role" "fisma_compliance_officer" {
+  name        = "FISMA Compliance Officer"
+  description = "FISMA compliance monitoring and reporting"
+  permissions = [
+    "read_all_audit_data",
+    "generate_fisma_reports",
+    "manage_compliance_controls"
+  ]
+  capabilities = {
+    audit_trail_required = true
+    session_recording    = true
+    full_access          = true
+  }
+
+  clearance_required = "secret"
+}
+
+create "kolumn_role" "system_administrator" {
+  name        = "System Administrator"
+  description = "System administration with security oversight"
+  permissions = [
+    "manage_system_configuration",
+    "monitor_system_health",
+    "perform_maintenance"
+  ]
+  capabilities = {
+    privileged_access    = true
+    break_glass_access   = true
+    audit_trail_required = true
+  }
+
+  clearance_required       = "secret"
+  background_investigation = "SSBI"
+}
+
+# === OUTPUTS ===
+
+output "citizen_services_endpoints" {
+  description = "Citizen services database endpoints"
+  value = {
+    for region in var.regions :
+    region => "citizen-services-${region}-${var.environment}.agency.gov:5432"
+  }
+  sensitive = true
+}
+
+output "security_operations_endpoints" {
+  description = "Security operations endpoints"
+  value = {
+    for region in var.regions :
+    region => "security-ops-${region}-${var.environment}.agency.gov:5432"
+  }
+  sensitive = true
+}
+
+output "fisma_compliance_summary" {
+  description = "FISMA compliance configuration summary"
+  value = {
+    system_categorization = var.system_categorization
+    clearance_level       = var.clearance_level
+    encryption_standard   = "FIPS 140-2"
+    audit_retention       = "20 years"
+    backup_frequency      = "1 hour"
+    rollback_capability   = true
+    continuous_monitoring = true
+    incident_response     = true
+  }
+}
+
+output "security_controls" {
+  description = "Security controls implemented (NIST 800-53)"
+  value = {
+    access_control                   = "AC-1 through AC-25"
+    audit_accountability             = "AU-1 through AU-16"
+    configuration_management         = "CM-1 through CM-11"
+    contingency_planning             = "CP-1 through CP-13"
+    identification_authentication    = "IA-1 through IA-12"
+    incident_response                = "IR-1 through IR-10"
+    maintenance                      = "MA-1 through MA-7"
+    media_protection                 = "MP-1 through MP-8"
+    physical_protection              = "PE-1 through PE-20"
+    planning                         = "PL-1 through PL-9"
+    risk_assessment                  = "RA-1 through RA-9"
+    system_services_acquisition      = "SA-1 through SA-23"
+    system_communications_protection = "SC-1 through SC-46"
+    system_information_integrity     = "SI-1 through SI-17"
+  }
+}

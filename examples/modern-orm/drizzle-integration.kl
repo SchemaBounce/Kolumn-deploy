@@ -1,0 +1,606 @@
+# Drizzle ORM Integration Example
+# Demonstrates complete Drizzle schema discovery and management with Kolumn
+
+# Variables for configuration
+variable "database_url" {
+  description = "PostgreSQL database URL"
+  type        = string
+  default     = "postgresql://localhost:5432/ecommerce_db"
+}
+
+variable "environment" {
+  description = "Environment (dev, staging, production)"
+  type        = string
+  default     = "dev"
+}
+
+variable "schema_version" {
+  description = "Schema version for tracking"
+  type        = string
+  default     = "1.0.0"
+}
+
+# PostgreSQL provider for database operations
+provider "postgres" {
+  host     = "localhost"
+  port     = 5432
+  database = "ecommerce_db"
+  username = "postgres"
+  password = var.postgres_password
+  sslmode  = "disable"
+}
+
+# Drizzle ORM schema discovery
+discover "drizzle_schema" "ecommerce_app" {
+  project_path = "./apps/ecommerce"
+  schema_files = [
+    "src/schema/users.ts",
+    "src/schema/products.ts",
+    "src/schema/orders.ts",
+    "src/schema/categories.ts",
+    "src/schema/relations.ts"
+  ]
+
+  # Discovery options
+  discover_tables      = true
+  discover_relations   = true
+  discover_indexes     = true
+  discover_enums       = true
+  discover_constraints = true
+
+  # TypeScript configuration
+  typescript_config = {
+    config_path          = "./tsconfig.json"
+    include_node_modules = false
+    strict_mode          = true
+    target               = "ES2020"
+  }
+
+  # Advanced parsing options
+  parsing_options = {
+    extract_comments       = true
+    extract_decorators     = true
+    extract_validators     = true
+    preserve_relationships = true
+  }
+
+  # Schema validation
+  validation = {
+    require_primary_keys      = true
+    require_timestamps        = true
+    enforce_naming_convention = "snake_case"
+    validate_foreign_keys     = true
+  }
+}
+
+# ⚡ ADVANCED: Column transformation patterns using discovered Drizzle schema
+locals {
+  # Raw discovered columns from Drizzle
+  raw_user_columns = discover.drizzle_schema.ecommerce_app.tables.users.columns
+
+  # Transform Drizzle types to PostgreSQL types with enhanced metadata
+  postgres_enhanced_columns = transform_columns(
+    local.raw_user_columns,
+    {
+      "id" = {
+        type              = "BIGSERIAL",
+        postgres_specific = true,
+        auto_increment    = true
+      },
+      "email" = {
+        type            = "VARCHAR(255)",
+        classifications = [kolumn_classification.pii],
+        validation = {
+          format = "email",
+          unique = true
+        }
+      },
+      "phone" = {
+        type            = "VARCHAR(20)",
+        classifications = [kolumn_classification.pii],
+        validation = {
+          format  = "phone",
+          pattern = "^\\+?[1-9]\\d{1,14}$"
+        }
+      },
+      "created_at" = {
+        type    = "TIMESTAMPTZ",
+        default = "CURRENT_TIMESTAMP"
+      },
+      "updated_at" = {
+        type    = "TIMESTAMPTZ",
+        default = "CURRENT_TIMESTAMP"
+      }
+    }
+  )
+
+  # Filter columns by classification for different use cases
+  pii_columns = filter_columns(
+    local.postgres_enhanced_columns,
+    { classifications = [kolumn_classification.pii] }
+  )
+
+  public_columns = filter_columns(
+    local.postgres_enhanced_columns,
+    { classifications = [kolumn_classification.public] }
+  )
+
+  # Create analytics-safe columns (PII transformed to hashes)
+  analytics_safe_columns = merge_columns(
+    local.public_columns,
+    transform_columns(
+      local.pii_columns,
+      {
+        "email" = {
+          name                = "email_domain",
+          type                = "VARCHAR(100)",
+          comment             = "Domain extracted from email for analytics",
+          computed_expression = "SUBSTRING(email FROM '@(.*)$')"
+        },
+        "phone" = {
+          name                = "phone_country_code",
+          type                = "VARCHAR(5)",
+          comment             = "Country code extracted from phone",
+          computed_expression = "SUBSTRING(phone FROM '^\\+?([0-9]{1,3}).*')"
+        }
+      }
+    )
+  )
+
+  # Add governance columns for enterprise compliance
+  enterprise_columns = add_columns(
+    local.postgres_enhanced_columns,
+    {
+      "data_classification" = {
+        name     = "data_classification"
+        type     = "VARCHAR(50)"
+        nullable = false
+        default  = "'standard'"
+        comment  = "Data classification level for governance"
+      },
+      "retention_policy" = {
+        name     = "retention_policy"
+        type     = "VARCHAR(50)"
+        nullable = false
+        default  = "'7_years'"
+        comment  = "Data retention policy identifier"
+      },
+      "last_accessed" = {
+        name     = "last_accessed"
+        type     = "TIMESTAMPTZ"
+        nullable = true
+        comment  = "Last time this record was accessed for audit"
+      }
+    }
+  )
+}
+
+# Classification definitions
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  requirements = {
+    encryption   = true
+    audit_access = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "Public"
+  description = "Public information"
+  requirements = {
+    encryption = false
+  }
+}
+
+# Create Kolumn data objects from enhanced Drizzle schema
+create "kolumn_data_object" "users_from_drizzle" {
+  name        = "Enhanced User Schema from Drizzle"
+  description = "User entity discovered from Drizzle with PostgreSQL optimizations and governance"
+
+  # Use the enhanced PostgreSQL columns
+  dynamic "column" {
+    for_each = local.postgres_enhanced_columns
+    content {
+      name            = column.value.name
+      type            = column.value.type
+      nullable        = column.value.nullable
+      default         = column.value.default
+      primary_key     = column.value.primary_key
+      unique          = column.value.unique
+      auto_increment  = column.value.auto_increment
+      classifications = column.value.classifications
+      validation      = column.value.validation
+      comment         = column.value.comment
+    }
+  }
+
+  # Metadata from discovery with enhancements
+  metadata = {
+    source_framework        = "drizzle"
+    enhanced_with_functions = true
+    schema_version          = var.schema_version
+    environment             = var.environment
+    discovery_timestamp     = timestamp()
+    drizzle_version         = discover.drizzle_schema.ecommerce_app.drizzle_version
+  }
+}
+
+# Create analytics-optimized data object
+create "kolumn_data_object" "users_analytics" {
+  name        = "Privacy-Safe User Analytics Schema"
+  description = "Analytics-optimized user schema with PII protection"
+
+  # Use the analytics-safe columns
+  dynamic "column" {
+    for_each = local.analytics_safe_columns
+    content {
+      name                = column.value.name
+      type                = column.value.type
+      nullable            = column.value.nullable
+      default             = column.value.default
+      comment             = column.value.comment
+      computed_expression = column.value.computed_expression
+    }
+  }
+
+  metadata = {
+    purpose      = "analytics"
+    privacy_safe = true
+    pii_removed  = true
+  }
+}
+
+# Production table with full enterprise features
+create "postgres_table" "users" {
+  name = "users"
+
+  # ⚡ ADVANCED: Use enterprise columns with governance features
+  dynamic "column" {
+    for_each = local.enterprise_columns
+    content {
+      name        = column.value.name
+      type        = column.value.type
+      nullable    = column.value.nullable
+      default     = column.value.default
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      comment     = column.value.comment
+
+      # Enhanced security for PII
+      encrypted = contains(column.value.classifications, kolumn_classification.pii)
+    }
+  }
+
+  # Enhanced governance using column analysis
+  governance = {
+    classification = "user_data"
+    pii_columns = [
+      for col in local.enterprise_columns : col.name
+      if contains(col.classifications, kolumn_classification.pii)
+    ]
+    public_columns = [
+      for col in local.enterprise_columns : col.name
+      if contains(col.classifications, kolumn_classification.public)
+    ]
+    audit_trail           = true
+    encryption_required   = true
+    backup_retention_days = 2555 # 7 years for compliance
+  }
+
+  # Performance optimizations from Drizzle discovery
+  dynamic "index" {
+    for_each = discover.drizzle_schema.ecommerce_app.tables.users.indexes
+    content {
+      name    = index.value.name
+      columns = index.value.columns
+      method  = index.value.method
+      unique  = index.value.unique
+    }
+  }
+}
+
+# Analytics table using privacy-safe columns
+create "postgres_table" "users_analytics" {
+  name = "users_analytics"
+
+  # ⚡ ADVANCED: Use analytics-safe columns (no raw PII)
+  dynamic "column" {
+    for_each = kolumn_data_object.users_analytics.columns
+    content {
+      name     = column.value.name
+      type     = column.value.type
+      nullable = column.value.nullable
+      default  = column.value.default
+      comment  = column.value.comment
+
+      # Add computed expressions for derived fields
+      computed_expression = column.value.computed_expression
+    }
+  }
+
+  # Analytics-specific enhancements using add_columns()
+  dynamic "analytics_column" {
+    for_each = {
+      "session_count" = {
+        name    = "session_count"
+        type    = "INTEGER"
+        default = "0"
+        comment = "Total user sessions"
+      },
+      "lifetime_value" = {
+        name     = "lifetime_value"
+        type     = "DECIMAL(10,2)"
+        nullable = true
+        comment  = "Customer lifetime value"
+      },
+      "segment" = {
+        name    = "segment"
+        type    = "VARCHAR(50)"
+        default = "'standard'"
+        comment = "Customer segment classification"
+      }
+    }
+    content {
+      name     = analytics_column.value.name
+      type     = analytics_column.value.type
+      nullable = analytics_column.value.nullable
+      default  = analytics_column.value.default
+      comment  = analytics_column.value.comment
+    }
+  }
+
+  # Optimized for analytics queries
+  indexes = [
+    {
+      name    = "idx_users_analytics_segment"
+      columns = ["segment"]
+      method  = "btree"
+    },
+    {
+      name    = "idx_users_analytics_lifetime_value"
+      columns = ["lifetime_value"]
+      method  = "btree"
+    }
+  ]
+}
+
+# Create products table with advanced features
+create "postgres_table" "products" {
+  database   = postgres_database.ecommerce.name
+  schema     = "public"
+  table_name = "products"
+
+  # Products schema from Drizzle
+  dynamic "column" {
+    for_each = discover.drizzle_schema.ecommerce_app.tables.products.columns
+    content {
+      name     = column.value.name
+      type     = postgres_type_mapping(column.value.type)
+      nullable = column.value.nullable
+      default  = column.value.default
+
+      # JSON fields for product metadata
+      json_schema = column.value.type == "json" ? column.value.json_schema : null
+    }
+  }
+
+  # Full-text search index for product search
+  index "idx_products_search" {
+    columns = ["name", "description"]
+    method  = "gin"
+    using   = "gin(to_tsvector('english', name || ' ' || description))"
+  }
+
+  # Category-based partitioning for large catalogs
+  partitioning = {
+    type            = "range"
+    column          = "category_id"
+    partition_count = 10
+  }
+}
+
+# Create orders table with relationship management
+create "postgres_table" "orders" {
+  database   = postgres_database.ecommerce.name
+  schema     = "public"
+  table_name = "orders"
+
+  # Orders schema from Drizzle  
+  dynamic "column" {
+    for_each = discover.drizzle_schema.ecommerce_app.tables.orders.columns
+    content {
+      name     = column.value.name
+      type     = postgres_type_mapping(column.value.type)
+      nullable = column.value.nullable
+      default  = column.value.default
+    }
+  }
+
+  # Foreign key relationships from Drizzle discovery
+  dynamic "foreign_key" {
+    for_each = discover.drizzle_schema.ecommerce_app.tables.orders.foreign_keys
+    content {
+      name               = foreign_key.value.name
+      columns            = [foreign_key.value.column]
+      references_table   = foreign_key.value.references_table
+      references_columns = [foreign_key.value.references_column]
+      on_delete          = foreign_key.value.on_delete
+      on_update          = foreign_key.value.on_update
+    }
+  }
+
+  # Time-based partitioning for order history
+  partitioning = {
+    type             = "range"
+    column           = "created_at"
+    interval         = "1 month"
+    retention_months = 84 # 7 years
+  }
+}
+
+# Create comprehensive view combining all entities
+create "postgres_view" "order_analytics" {
+  database  = postgres_database.ecommerce.name
+  schema    = "analytics"
+  view_name = "order_analytics"
+
+  query = <<-SQL
+    SELECT 
+      o.id as order_id,
+      u.email as customer_email,
+      u.id as customer_id,
+      p.name as product_name,
+      p.price as product_price,
+      o.quantity,
+      o.total_amount,
+      o.created_at as order_date,
+      c.name as category_name
+    FROM ${postgres_table.orders.full_name} o
+    JOIN ${postgres_table.users.full_name} u ON o.user_id = u.id
+    JOIN ${postgres_table.products.full_name} p ON o.product_id = p.id
+    JOIN categories c ON p.category_id = c.id
+    WHERE o.status = 'completed'
+  SQL
+
+  # Materialized view for performance
+  materialized     = true
+  refresh_schedule = "0 2 * * *" # Daily at 2 AM
+
+  # Indexes for common queries
+  indexes = [
+    {
+      columns = ["customer_email"]
+      method  = "btree"
+    },
+    {
+      columns = ["order_date"]
+      method  = "btree"
+    }
+  ]
+}
+
+# Cross-provider integration: Kafka topic for order events
+create "kafka_topic" "order_events" {
+  name               = "ecommerce.orders.v1"
+  partitions         = 6
+  replication_factor = 3
+
+  # Schema evolution based on Drizzle schema
+  schema_evolution = {
+    source_table                = postgres_table.orders
+    change_data_capture         = true
+    schema_registry_integration = true
+  }
+
+  config = {
+    "cleanup.policy"   = "delete"
+    "retention.ms"     = "604800000" # 7 days
+    "compression.type" = "snappy"
+  }
+}
+
+# Data pipeline: Stream order changes to analytics
+create "kafka_producer" "order_change_stream" {
+  topic = kafka_topic.order_events.name
+
+  # Automatically produce events when orders table changes
+  source_table  = postgres_table.orders
+  change_events = ["INSERT", "UPDATE", "DELETE"]
+
+  # Message format based on discovered schema
+  message_schema = {
+    key_field = "id"
+    value_fields = [
+      for col in discover.drizzle_schema.ecommerce_app.tables.orders.columns :
+      col.name
+    ]
+    metadata_fields = ["operation", "timestamp", "schema_version"]
+  }
+
+  # Serialization
+  serialization = {
+    format          = "avro"
+    schema_registry = "http://localhost:8081"
+    compatibility   = "FORWARD"
+  }
+}
+
+# Migration management from Drizzle
+create "schema_migration" "drizzle_sync_v1_0_0" {
+  name        = "sync_drizzle_schema_v1_0_0"
+  version     = var.schema_version
+  description = "Initial sync from Drizzle TypeScript schema"
+
+  # Migration source
+  source_framework = "drizzle"
+  source_files     = discover.drizzle_schema.ecommerce_app.source_files
+
+  # Target database
+  target_database = postgres_database.ecommerce
+
+  # Migration strategy
+  strategy = {
+    type                    = "safe_migration"
+    backup_before_migrate   = true
+    rollback_on_error       = true
+    validate_data_integrity = true
+  }
+
+  # Generated migration scripts
+  migration_files = {
+    up_migration   = "./migrations/${var.schema_version}_drizzle_sync_up.sql"
+    down_migration = "./migrations/${var.schema_version}_drizzle_sync_down.sql"
+  }
+
+  # Dependencies
+  depends_on = [
+    postgres_table.users,
+    postgres_table.products,
+    postgres_table.orders
+  ]
+}
+
+# Output important information
+output "discovered_schema_summary" {
+  description = "Summary of discovered Drizzle schema"
+  value = {
+    tables_discovered = length(discover.drizzle_schema.ecommerce_app.tables)
+    total_columns = sum([
+      for table_name, table in discover.drizzle_schema.ecommerce_app.tables :
+      length(table.columns)
+    ])
+    relationships_found = sum([
+      for table_name, table in discover.drizzle_schema.ecommerce_app.tables :
+      length(table.relations)
+    ])
+    pii_columns_identified = length([
+      for table_name, table in discover.drizzle_schema.ecommerce_app.tables :
+      [for col in table.columns : col.name if contains(["email", "phone", "address"], col.name)]
+    ])
+    framework_version   = discover.drizzle_schema.ecommerce_app.drizzle_version
+    discovery_timestamp = discover.drizzle_schema.ecommerce_app.discovery_timestamp
+  }
+}
+
+output "database_endpoints" {
+  description = "Database connection information"
+  value = {
+    postgres_url             = "postgresql://${postgres_provider.host}:${postgres_provider.port}/${postgres_provider.database}"
+    analytics_view_available = postgres_view.order_analytics.full_name
+    kafka_topic_name         = kafka_topic.order_events.name
+  }
+  sensitive = true
+}
+
+output "governance_summary" {
+  description = "Data governance implementation summary"
+  value = {
+    pii_protected_tables = [
+      postgres_table.users.table_name
+    ]
+    encryption_enabled        = postgres_table.users.governance.encryption_required
+    audit_trails_active       = postgres_table.users.governance.audit_trail
+    compliance_retention_days = postgres_table.users.governance.backup_retention_days
+  }
+}

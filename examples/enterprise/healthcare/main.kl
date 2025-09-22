@@ -1,0 +1,821 @@
+# 🏥 Healthcare Enterprise Template
+# HIPAA Compliant Multi-Site Hospital Network Infrastructure
+# 
+# This template provides a production-ready configuration for healthcare
+# organizations requiring HIPAA compliance, PHI protection, and multi-site coordination.
+
+terraform {
+  required_version = ">= 1.0"
+  backend "schemabounce" {
+    api_url        = var.schemabounce_api_url
+    api_key        = var.schemabounce_api_key
+    environment_id = var.environment_id
+
+    # Healthcare compliance requirements
+    enable_versioning = true
+    enable_encryption = true
+    audit_logging     = true
+    data_residency    = var.data_residency
+    retention_policy  = "6y" # HIPAA requires 6 years
+
+    tags = {
+      industry      = "healthcare"
+      compliance    = "hipaa"
+      phi_data      = "true"
+      environment   = var.environment
+      health_system = var.health_system_name
+    }
+  }
+}
+
+# === VARIABLES ===
+
+variable "environment" {
+  description = "Environment (prod, dr, staging, dev)"
+  type        = string
+  validation {
+    condition     = contains(["prod", "dr", "staging", "dev"], var.environment)
+    error_message = "Environment must be prod, dr, staging, or dev."
+  }
+}
+
+variable "health_system_name" {
+  description = "Health system organization name"
+  type        = string
+}
+
+variable "hospital_sites" {
+  description = "List of hospital sites for deployment"
+  type        = list(string)
+  default     = ["main-campus", "north-campus", "south-campus", "outpatient"]
+}
+
+variable "regions" {
+  description = "Geographic regions for deployment"
+  type        = list(string)
+  default     = ["us-east", "us-central", "us-west"]
+}
+
+variable "data_residency" {
+  description = "Data residency requirement (us, eu, etc.)"
+  type        = string
+  default     = "us"
+}
+
+variable "schemabounce_api_url" {
+  description = "SchemaBounce API URL"
+  type        = string
+  default     = "https://api.schemabounce.com"
+}
+
+variable "schemabounce_api_key" {
+  description = "SchemaBounce API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "environment_id" {
+  description = "SchemaBounce environment ID"
+  type        = string
+}
+
+# === DATA OBJECTS ===
+
+# Patient data with comprehensive PHI protection
+create "kolumn_data_object" "patient_record" {
+  name        = "Patient Medical Record Schema"
+  description = "Core patient data with HIPAA PHI protection"
+
+  column "patient_id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "mrn" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.phi]
+    encryption_config = {
+      algorithm    = "AES-256-GCM"
+      searchable   = true
+      key_rotation = true
+    }
+  }
+
+  column "first_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.phi]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = true
+    }
+  }
+
+  column "last_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.phi]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = true
+    }
+  }
+
+  column "date_of_birth" {
+    type            = "DATE"
+    nullable        = false
+    classifications = [kolumn_classification.phi]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "ssn" {
+    type            = "VARCHAR(11)"
+    nullable        = true
+    classifications = [kolumn_classification.phi, kolumn_classification.restricted]
+    encryption_config = {
+      algorithm    = "AES-256-GCM"
+      searchable   = false
+      access_audit = true
+    }
+  }
+
+  column "phone_number" {
+    type            = "VARCHAR(20)"
+    nullable        = true
+    classifications = [kolumn_classification.phi]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = true
+    }
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    nullable        = true
+    classifications = [kolumn_classification.phi]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = true
+    }
+  }
+
+  column "emergency_contact" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.phi]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "insurance_info" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.phi, kolumn_classification.financial]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "created_at" {
+    type     = "TIMESTAMP"
+    nullable = false
+    default  = "CURRENT_TIMESTAMP"
+  }
+
+  column "updated_at" {
+    type     = "TIMESTAMP"
+    nullable = false
+    default  = "CURRENT_TIMESTAMP"
+  }
+
+  column "audit_trail" {
+    type            = "JSONB"
+    nullable        = false
+    classifications = [kolumn_classification.audit]
+  }
+
+  config = {
+    postgres = {
+      schema     = "patient_data"
+      tablespace = "patient_ts"
+    }
+  }
+}
+
+# Clinical data for medical procedures and diagnostics
+create "kolumn_data_object" "clinical_record" {
+  name        = "Clinical Data Schema"
+  description = "Clinical procedures, diagnostics, and treatment data"
+
+  column "record_id" {
+    type        = "BIGINT"
+    nullable    = false
+    primary_key = true
+  }
+
+  column "patient_id" {
+    type            = "BIGINT"
+    nullable        = false
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "encounter_id" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "procedure_code" {
+    type            = "VARCHAR(20)"
+    nullable        = true
+    classifications = [kolumn_classification.medical]
+  }
+
+  column "diagnosis_code" {
+    type            = "VARCHAR(20)"
+    nullable        = true
+    classifications = [kolumn_classification.medical]
+  }
+
+  column "clinical_notes" {
+    type            = "TEXT"
+    nullable        = true
+    classifications = [kolumn_classification.phi, kolumn_classification.medical]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "lab_results" {
+    type            = "JSONB"
+    nullable        = true
+    classifications = [kolumn_classification.phi, kolumn_classification.medical]
+    encryption_config = {
+      algorithm  = "AES-256-GCM"
+      searchable = false
+    }
+  }
+
+  column "physician_id" {
+    type            = "VARCHAR(50)"
+    nullable        = false
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "treatment_date" {
+    type     = "TIMESTAMP"
+    nullable = false
+  }
+
+  column "location" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+}
+
+# === CLASSIFICATIONS ===
+
+create "kolumn_classification" "phi" {
+  name        = "PHI"
+  description = "Protected Health Information (HIPAA)"
+  level       = "restricted"
+  requirements = {
+    encryption          = true
+    audit_access        = true
+    retention_limit     = "6y"
+    access_approval     = true
+    breach_notification = true
+  }
+
+  encryption_config = {
+    postgres = {
+      method       = "column_encryption"
+      algorithm    = "AES-256-GCM"
+      key_rotation = true
+      access_audit = true
+    }
+    kafka = {
+      method       = "field_level"
+      algorithm    = "AES-256-CTR"
+      key_rotation = true
+    }
+  }
+}
+
+create "kolumn_classification" "medical" {
+  name        = "Medical"
+  description = "Medical procedures and clinical data"
+  level       = "confidential"
+  requirements = {
+    encryption               = true
+    audit_access             = true
+    professional_access_only = true
+  }
+}
+
+create "kolumn_classification" "restricted" {
+  name        = "Restricted"
+  description = "Highly sensitive PHI (SSN, genetic data)"
+  level       = "top_secret"
+  requirements = {
+    encryption        = true
+    audit_access      = true
+    multi_factor_auth = true
+    break_glass_only  = true
+  }
+}
+
+create "kolumn_classification" "financial" {
+  name        = "Financial"
+  description = "Financial and insurance information"
+  level       = "confidential"
+  requirements = {
+    encryption     = true
+    audit_access   = true
+    pci_compliance = true
+  }
+}
+
+# === PRIMARY PATIENT DATABASE ===
+
+provider "postgres" "patient_database" {
+  # Multi-site hospital deployment
+  connection_pattern = "patient-db-{region}-{site}-{env}.healthsystem.org"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  # Custom attributes for multi-site deployment
+  sites = var.hospital_sites
+
+  # Database configuration
+  port     = 5432
+  database = "patient_records"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # HIPAA-compliant safety configuration
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 2 # Low threshold for patient safety
+      recovery_time     = "45s"
+      test_request_rate = 0.05
+    }
+
+    retry_policy {
+      max_attempts     = 2 # Conservative retry for patient data
+      backoff_strategy = "exponential"
+      initial_delay    = "1s"
+      max_delay        = "30s"
+      jitter_enabled   = true
+    }
+
+    rollback_strategy {
+      enabled             = true
+      auto_rollback       = false # Manual approval for patient data changes
+      backup_before_apply = true
+      retention_days      = 2190 # 6 years for HIPAA
+      rollback_timeout    = "5m"
+    }
+
+    health_checks {
+      enabled             = true
+      check_interval      = "15s"
+      timeout_duration    = "5s"
+      healthy_threshold   = 2
+      unhealthy_threshold = 2
+    }
+
+    risk_assessment {
+      enabled                 = true
+      check_dependents        = true
+      check_data_loss         = true
+      require_confirmation    = true
+      block_high_risk_changes = true
+      phi_impact_assessment   = true
+    }
+  }
+
+  # Healthcare-specific orchestration
+  orchestration {
+    execution_mode      = "sequential" # Conservative for patient safety
+    max_concurrency     = 2
+    delay_between_batch = "2m"
+
+    dependencies {
+      enable_tracking       = true
+      validate_before_run   = true
+      fail_on_circular      = true
+      patient_safety_checks = true
+    }
+
+    resource_pools {
+      max_connections    = 50
+      connection_timeout = "30s"
+      idle_timeout       = "15m"
+      pool_size          = 10
+    }
+  }
+
+  # Comprehensive HIPAA monitoring
+  monitoring {
+    metrics {
+      enabled          = true
+      collect_interval = "10s"
+      metrics_to_track = [
+        "connection_count",
+        "query_time",
+        "error_rate",
+        "phi_access_count",
+        "failed_login_attempts"
+      ]
+      export_endpoint = var.prometheus_endpoint
+    }
+
+    logging {
+      level            = "info"
+      structured_logs  = true
+      include_stacks   = true
+      log_connections  = true
+      log_queries      = false # Disable query logging for PHI protection
+      log_performance  = true
+      phi_safe_logging = true
+    }
+
+    alerting {
+      enabled               = true
+      notification_channels = ["#healthcare-ops", "#hipaa-compliance", "#security-team"]
+
+      alert_thresholds {
+        error_rate      = 0.005 # 0.5% error rate threshold
+        response_time   = "2s"  # 2 second response time
+        connection_loss = 3     # Alert on 3+ connection losses
+        memory_usage    = 0.75  # 75% memory usage threshold
+      }
+    }
+
+    performance {
+      track_query_time         = true
+      track_connection_time    = true
+      slow_query_threshold     = "1s"
+      enable_profiling         = true
+      phi_anonymized_profiling = true
+    }
+  }
+}
+
+# Clinical data database
+provider "postgres" "clinical_database" {
+  connection_pattern = "clinical-db-{region}-{site}-{env}.healthsystem.org"
+  regions            = var.regions
+  environments       = [var.environment]
+  sites              = var.hospital_sites
+
+  port     = 5432
+  database = "clinical_data"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Similar safety configuration as patient database
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 2
+      recovery_time     = "45s"
+    }
+
+    risk_assessment {
+      enabled               = true
+      check_dependents      = true
+      check_data_loss       = true
+      require_confirmation  = true
+      phi_impact_assessment = true
+    }
+  }
+}
+
+# Research database (de-identified data)
+provider "postgres" "research_database" {
+  connection_pattern = "research-db-{region}-{env}.healthsystem.org"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  port     = 5432
+  database = "research_data"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Relaxed safety for de-identified research data
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 5
+      recovery_time     = "30s"
+    }
+  }
+}
+
+# === PATIENT TABLES ===
+
+create "postgres_table" "patients" {
+  provider = postgres.patient_database
+
+  dynamic "column" {
+    for_each = kolumn_data_object.patient_record.columns
+    content {
+      name = column.value.name
+      type = (
+        column.value.type == "BIGINT" && column.value.primary_key ? "bigserial" :
+        column.value.type == "VARCHAR(50)" ? "varchar(50)" :
+        column.value.type == "VARCHAR(100)" ? "varchar(100)" :
+        column.value.type == "VARCHAR(11)" ? "varchar(11)" :
+        column.value.type == "VARCHAR(20)" ? "varchar(20)" :
+        column.value.type == "VARCHAR(255)" ? "varchar(255)" :
+        column.value.type == "DATE" ? "date" :
+        column.value.type == "TIMESTAMP" ? "timestamp" :
+        column.value.type == "JSONB" ? "jsonb" :
+        column.value.type
+      )
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      nullable    = column.value.nullable
+      default     = column.value.default
+
+      # Apply encryption for PHI columns
+      encrypted = contains(column.value.classifications, kolumn_classification.phi) || contains(column.value.classifications, kolumn_classification.restricted)
+    }
+  }
+
+  # HIPAA-specific indexes (on encrypted search fields)
+  index "idx_patients_mrn_encrypted" {
+    columns   = ["mrn"]
+    method    = "btree"
+    encrypted = true
+  }
+
+  index "idx_patients_name_encrypted" {
+    columns   = ["last_name", "first_name"]
+    method    = "btree"
+    encrypted = true
+  }
+
+  # Partitioning by created date for performance
+  partitioning {
+    type      = "range"
+    column    = "created_at"
+    interval  = "1 year"
+    retention = "25 years" # Extended retention for healthcare
+  }
+
+  # HIPAA compliance settings
+  metadata = {
+    hipaa_classification = "phi"
+    data_retention       = "25y"
+    audit_required       = true
+    backup_frequency     = "2h"
+    encryption_required  = true
+    access_logging       = true
+  }
+}
+
+create "postgres_table" "clinical_records" {
+  provider = postgres.clinical_database
+
+  dynamic "column" {
+    for_each = kolumn_data_object.clinical_record.columns
+    content {
+      name = column.value.name
+      type = (
+        column.value.type == "BIGINT" && column.value.primary_key ? "bigserial" :
+        column.value.type == "BIGINT" ? "bigint" :
+        column.value.type == "VARCHAR(50)" ? "varchar(50)" :
+        column.value.type == "VARCHAR(20)" ? "varchar(20)" :
+        column.value.type == "VARCHAR(100)" ? "varchar(100)" :
+        column.value.type == "TEXT" ? "text" :
+        column.value.type == "TIMESTAMP" ? "timestamp" :
+        column.value.type == "JSONB" ? "jsonb" :
+        column.value.type
+      )
+      primary_key = column.value.primary_key
+      nullable    = column.value.nullable
+      default     = column.value.default
+
+      # Apply encryption for PHI and medical data
+      encrypted = contains(column.value.classifications, kolumn_classification.phi) || contains(column.value.classifications, kolumn_classification.medical)
+    }
+  }
+
+  # Foreign key to patients table
+  foreign_key {
+    columns            = ["patient_id"]
+    references_table   = "patients"
+    references_columns = ["patient_id"]
+    on_delete          = "RESTRICT" # Prevent patient deletion with records
+  }
+
+  # Clinical-specific indexes
+  index "idx_clinical_patient_date" {
+    columns = ["patient_id", "treatment_date"]
+    method  = "btree"
+  }
+
+  index "idx_clinical_physician" {
+    columns = ["physician_id"]
+    method  = "btree"
+  }
+}
+
+# === HL7 MESSAGING ===
+
+provider "kafka" "hl7_messaging" {
+  connection_pattern = "hl7-kafka-{region}-{env}.healthsystem.org"
+  regions            = var.regions
+  environments       = [var.environment]
+
+  bootstrap_servers = ["${var.kafka_host}:9092"]
+
+  # HL7-specific safety configuration
+  safety {
+    circuit_breaker {
+      enabled           = true
+      failure_threshold = 3
+      recovery_time     = "60s"
+    }
+  }
+}
+
+create "kafka_topic" "patient_admissions" {
+  provider           = kafka.hl7_messaging
+  name               = "patient-admissions-${var.environment}"
+  partitions         = 6
+  replication_factor = 3
+
+  configs = {
+    "retention.ms"        = "2592000000" # 30 days
+    "cleanup.policy"      = "delete"
+    "compression.type"    = "gzip"
+    "min.insync.replicas" = "2"
+  }
+
+  # HL7 ADT message schema
+  schema_definition = {
+    type         = "HL7"
+    version      = "2.5"
+    message_type = "ADT^A01"
+    phi_fields   = ["PID.3", "PID.5", "PID.7", "PID.11"]
+  }
+}
+
+create "kafka_topic" "lab_results" {
+  provider           = kafka.hl7_messaging
+  name               = "lab-results-${var.environment}"
+  partitions         = 8
+  replication_factor = 3
+
+  configs = {
+    "retention.ms"     = "604800000" # 7 days
+    "cleanup.policy"   = "delete"
+    "compression.type" = "gzip"
+  }
+
+  # HL7 ORU message schema
+  schema_definition = {
+    type         = "HL7"
+    version      = "2.5"
+    message_type = "ORU^R01"
+    phi_fields   = ["PID.3", "PID.5", "OBX.5"]
+  }
+}
+
+# === RBAC CONFIGURATION ===
+
+create "kolumn_role" "physician" {
+  name        = "Physician"
+  description = "Full clinical access with PHI for treating physicians"
+  permissions = [
+    "read_write_patient_data",
+    "read_write_clinical_data",
+    "access_phi_full"
+  ]
+  capabilities = {
+    max_concurrent_queries = 15
+    query_timeout          = "60s"
+    audit_trail_required   = true
+    break_glass_access     = true
+  }
+
+  # HIPAA minimum necessary rule
+  data_access_scope = "treating_patients_only"
+}
+
+create "kolumn_role" "nurse" {
+  name        = "Nurse"
+  description = "Clinical access with limited PHI for patient care"
+  permissions = [
+    "read_patient_data_limited",
+    "read_write_clinical_data",
+    "access_phi_limited"
+  ]
+  capabilities = {
+    max_concurrent_queries = 10
+    query_timeout          = "45s"
+    audit_trail_required   = true
+  }
+
+  data_access_scope = "assigned_patients_only"
+}
+
+create "kolumn_role" "researcher" {
+  name        = "Researcher"
+  description = "De-identified data access for research purposes"
+  permissions = [
+    "read_research_data",
+    "generate_research_reports"
+  ]
+  capabilities = {
+    max_concurrent_queries = 5
+    query_timeout          = "300s"
+    audit_trail_required   = true
+  }
+
+  data_access_scope = "de_identified_only"
+  phi_access        = false
+}
+
+create "kolumn_role" "hipaa_compliance_officer" {
+  name        = "HIPAA Compliance Officer"
+  description = "Full audit access for compliance monitoring"
+  permissions = [
+    "read_all_audit_data",
+    "generate_compliance_reports",
+    "manage_data_retention",
+    "breach_investigation"
+  ]
+  capabilities = {
+    audit_trail_required = true
+    session_recording    = true
+    privileged_access    = true
+  }
+}
+
+# === OUTPUTS ===
+
+output "patient_database_endpoints" {
+  description = "Patient database connection endpoints by site"
+  value = {
+    for site in var.hospital_sites :
+    site => {
+      for region in var.regions :
+      region => "patient-db-${region}-${site}-${var.environment}.healthsystem.org:5432"
+    }
+  }
+  sensitive = true
+}
+
+output "hl7_endpoints" {
+  description = "HL7 messaging endpoints"
+  value = {
+    for region in var.regions :
+    region => "hl7-kafka-${region}-${var.environment}.healthsystem.org:9092"
+  }
+}
+
+output "hipaa_compliance_summary" {
+  description = "HIPAA compliance configuration summary"
+  value = {
+    phi_encryption              = true
+    audit_logging               = true
+    data_retention              = "6 years minimum, 25 years for patient records"
+    access_controls             = true
+    breach_notification         = true
+    backup_frequency            = "2 hours"
+    rollback_capability         = true
+    de_identification_available = true
+  }
+}
+
+output "security_controls" {
+  description = "Security controls implemented"
+  value = {
+    encryption_at_rest         = true
+    encryption_in_transit      = true
+    access_logging             = true
+    role_based_access          = true
+    minimum_necessary_rule     = true
+    break_glass_access         = true
+    session_timeouts           = true
+    multi_factor_auth_required = true
+  }
+}

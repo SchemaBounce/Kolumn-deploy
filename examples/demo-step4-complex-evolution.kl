@@ -42,338 +42,130 @@ provider "dagster" {
 # STEP 4: COMPLEX EVOLVED SCHEMA - MULTIPLE ADVANCED CHANGES
 # -----------------------------------------------------------------------------
 
-# Users table with comprehensive real-world schema
-create "postgres_table" "demo_users" {
-  name = "demo_users"
-
-  # Core identity columns
-  column "id" {
-    type        = "BIGSERIAL"
-    primary_key = true
-  }
-
-  column "email" {
-    type     = "VARCHAR(255)"
-    unique   = true
-    nullable = false
-  }
-
-  # Name columns (existing)
-  column "first_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
-  }
-
-  column "middle_name" {
-    type     = "VARCHAR(100)"
-    nullable = true
-  }
-
-  column "last_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
-  }
-
-  # PII column (existing)
-  column "phone" {
-    type     = "VARCHAR(20)"
-    nullable = true
-  }
-
-  # 🆕 NEW BUSINESS COLUMNS: Different data types and purposes
-  column "user_tier" {
-    type     = "VARCHAR(20)"
-    default  = "standard"
-    nullable = false
-  }
-
-  column "annual_revenue" {
-    type     = "DECIMAL(15,2)"
-    nullable = true
-  }
-
-  column "account_balance" {
-    type     = "DECIMAL(12,2)"
-    default  = 0.00
-    nullable = false
-  }
-
-  column "is_verified" {
-    type     = "BOOLEAN"
-    default  = false
-    nullable = false
-  }
-
-  # 🛡️ NEW PII COLUMNS: High sensitivity data
-  column "social_security_number" {
-    type     = "VARCHAR(50)"
-    nullable = true
-  }
-
-  column "date_of_birth" {
-    type     = "DATE"
-    nullable = true
-  }
-
-  # 📊 NEW ANALYTICS COLUMNS: JSON and array data
-  column "preferences" {
-    type     = "JSONB"
-    default  = "{}"
-    nullable = false
-  }
-
-  column "tags" {
-    type     = "VARCHAR[]"
-    nullable = true
-  }
-
-  # 🕒 TEMPORAL COLUMNS: Enhanced tracking
-  column "last_login_at" {
-    type     = "TIMESTAMP"
-    nullable = true
-  }
-
-  column "created_at" {
-    type    = "TIMESTAMP"
-    default = "CURRENT_TIMESTAMP"
-  }
-
-  column "updated_at" {
-    type    = "TIMESTAMP"
-    default = "CURRENT_TIMESTAMP"
-  }
-
-  # Rich sample data demonstrating all features
-  initial_data = [
-    {
-      email                  = "alice@example.com"
-      first_name             = "Alice"
-      middle_name            = "Marie"
-      last_name              = "Johnson"
-      phone                  = "+1-555-0123"
-      user_tier              = "premium"
-      annual_revenue         = 150000.00
-      account_balance        = 5420.50
-      is_verified            = true
-      social_security_number = "123-45-6789"
-      date_of_birth          = "1985-03-15"
-      preferences = jsonencode({
-        theme         = "dark"
-        notifications = true
-        language      = "en"
-      })
-      tags          = ["vip", "early_adopter", "enterprise"]
-      last_login_at = "2024-01-15T10:30:00Z"
-    },
-    {
-      email                  = "bob@example.com"
-      first_name             = "Bob"
-      middle_name            = "James"
-      last_name              = "Smith"
-      phone                  = "+1-555-0456"
-      user_tier              = "standard"
-      annual_revenue         = 75000.00
-      account_balance        = 1250.00
-      is_verified            = true
-      social_security_number = "987-65-4321"
-      date_of_birth          = "1992-07-22"
-      preferences = jsonencode({
-        theme         = "light"
-        notifications = false
-        language      = "en"
-      })
-      tags          = ["standard_user"]
-      last_login_at = "2024-01-14T15:45:00Z"
-    },
-    {
-      email                  = "carol@example.com"
-      first_name             = "Carol"
-      middle_name            = null
-      last_name              = "Williams"
-      phone                  = "+1-555-0789"
-      user_tier              = "enterprise"
-      annual_revenue         = 500000.00
-      account_balance        = 25000.00
-      is_verified            = true
-      social_security_number = null # Some PII may be optional
-      date_of_birth          = "1978-11-03"
-      preferences = jsonencode({
-        theme         = "auto"
-        notifications = true
-        language      = "es"
-      })
-      tags          = ["enterprise", "multi_location", "high_value"]
-      last_login_at = "2024-01-15T09:15:00Z"
-    }
-  ]
-}
-
-# 🧠 INTELLIGENT SCHEMA: Advanced PII detection and classification
+# ✅ CORRECT: Create data object FIRST with comprehensive enterprise schema
 create "kolumn_data_object" "demo_user_schema" {
   name        = "Demo User Schema - Complete Evolution"
   description = "Full enterprise user schema with comprehensive PII detection and business intelligence"
 
-  dynamic "column" {
-    for_each = {
-      # Identity columns
-      id = {
-        name        = "id"
-        type        = "BIGINT"
-        nullable    = false
-        primary_key = true
-        category    = "identity"
-      }
+  # Core identity columns
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
 
-      # Contact information (PII)
-      email = {
-        name     = "email"
-        type     = "VARCHAR(255)"
-        nullable = false
-        unique   = true
-        category = "contact"
-      }
+  # Contact information (PII)
+  column "email" {
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.pii]
+  }
 
-      # Personal information
-      first_name = {
-        name     = "first_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-        category = "personal"
-      }
+  # Personal information
+  column "first_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.personal]
+  }
 
-      middle_name = {
-        name     = "middle_name"
-        type     = "VARCHAR(100)"
-        nullable = true
-        category = "personal"
-      }
+  column "middle_name" {
+    type            = "VARCHAR(100)"
+    nullable        = true
+    classifications = [kolumn_classification.personal]
+  }
 
-      last_name = {
-        name     = "last_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-        category = "personal"
-      }
+  column "last_name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.personal]
+  }
 
-      # Contact PII
-      phone = {
-        name     = "phone"
-        type     = "VARCHAR(20)"
-        nullable = true
-        category = "contact"
-      }
+  # Contact PII
+  column "phone" {
+    type            = "VARCHAR(20)"
+    nullable        = true
+    classifications = [kolumn_classification.pii]
+  }
 
-      # Business attributes
-      user_tier = {
-        name     = "user_tier"
-        type     = "VARCHAR(20)"
-        nullable = false
-        category = "business"
-      }
+  # 🆕 NEW BUSINESS COLUMNS: Different data types and purposes
+  column "user_tier" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    default         = "standard"
+    classifications = [kolumn_classification.public]
+  }
 
-      annual_revenue = {
-        name     = "annual_revenue"
-        type     = "DECIMAL(15,2)"
-        nullable = true
-        category = "financial"
-      }
+  column "annual_revenue" {
+    type            = "DECIMAL(15,2)"
+    nullable        = true
+    classifications = [kolumn_classification.financial]
+  }
 
-      account_balance = {
-        name     = "account_balance"
-        type     = "DECIMAL(12,2)"
-        nullable = false
-        category = "financial"
-      }
+  column "account_balance" {
+    type            = "DECIMAL(12,2)"
+    nullable        = false
+    default         = "0.00"
+    classifications = [kolumn_classification.financial]
+  }
 
-      is_verified = {
-        name     = "is_verified"
-        type     = "BOOLEAN"
-        nullable = false
-        category = "status"
-      }
+  column "is_verified" {
+    type            = "BOOLEAN"
+    nullable        = false
+    default         = "false"
+    classifications = [kolumn_classification.public]
+  }
 
-      # High-sensitivity PII
-      social_security_number = {
-        name     = "social_security_number"
-        type     = "VARCHAR(50)"
-        nullable = true
-        category = "identity"
-      }
+  # 🛡️ NEW PII COLUMNS: High sensitivity data
+  column "social_security_number" {
+    type            = "VARCHAR(50)"
+    nullable        = true
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
 
-      date_of_birth = {
-        name     = "date_of_birth"
-        type     = "DATE"
-        nullable = true
-        category = "personal"
-      }
+  column "date_of_birth" {
+    type            = "DATE"
+    nullable        = true
+    classifications = [kolumn_classification.highly_sensitive_pii]
+  }
 
-      # Structured data
-      preferences = {
-        name     = "preferences"
-        type     = "JSONB"
-        nullable = false
-        category = "preferences"
-      }
+  # 📊 NEW ANALYTICS COLUMNS: JSON and array data
+  column "preferences" {
+    type            = "JSONB"
+    nullable        = false
+    default         = "{}"
+    classifications = [kolumn_classification.public]
+  }
 
-      tags = {
-        name     = "tags"
-        type     = "VARCHAR[]"
-        nullable = true
-        category = "metadata"
-      }
+  column "tags" {
+    type            = "VARCHAR[]"
+    nullable        = true
+    classifications = [kolumn_classification.public]
+  }
 
-      # Temporal columns
-      last_login_at = {
-        name     = "last_login_at"
-        type     = "TIMESTAMP"
-        nullable = true
-        category = "activity"
-      }
+  # 🕒 TEMPORAL COLUMNS: Enhanced tracking
+  column "last_login_at" {
+    type            = "TIMESTAMP"
+    nullable        = true
+    classifications = [kolumn_classification.public]
+  }
 
-      created_at = {
-        name     = "created_at"
-        type     = "TIMESTAMP"
-        nullable = true
-        category = "metadata"
-      }
+  column "created_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
 
-      updated_at = {
-        name     = "updated_at"
-        type     = "TIMESTAMP"
-        nullable = true
-        category = "metadata"
-      }
-    }
-
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-      category = column.value.category
-
-      # 🛡️ ADVANCED PII DETECTION: Pattern and context-based
-      classifications = (
-        # High-sensitivity PII
-        contains(["social_security_number", "ssn"], column.key) ? [kolumn_classification.highly_sensitive_pii] :
-        contains(["date_of_birth", "dob"], column.key) ? [kolumn_classification.highly_sensitive_pii] :
-
-        # Standard PII
-        contains(["email", "phone"], column.key) ? [kolumn_classification.pii] :
-
-        # Financial data (special handling)
-        contains(["revenue", "balance", "salary", "income"], column.key) ? [kolumn_classification.financial] :
-
-        # Personal data (lower sensitivity)
-        column.value.category == "personal" ? [kolumn_classification.personal] :
-
-        # Public data
-        [kolumn_classification.public]
-      )
-    }
+  column "updated_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
   }
 
   metadata = {
-    source                  = "postgres_table.demo_users"
     demo_step               = "complex_evolution"
     evolution               = "comprehensive_enterprise_schema"
     security_level          = "enterprise"
@@ -442,6 +234,96 @@ create "kolumn_classification" "public" {
   requirements = {
     encryption = false
   }
+}
+
+create "kolumn_classification" "identifier" {
+  name        = "Identifier"
+  description = "Unique identifiers and keys"
+  requirements = {
+    indexed = true
+  }
+}
+
+# ✅ PostgreSQL table references the data object
+create "postgres_table" "demo_users" {
+  name = "demo_users"
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMPTZ" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : column.value.default
+    }
+  }
+
+  # Rich sample data demonstrating all features
+  initial_data = [
+    {
+      email                  = "alice@example.com"
+      first_name             = "Alice"
+      middle_name            = "Marie"
+      last_name              = "Johnson"
+      phone                  = "+1-555-0123"
+      user_tier              = "premium"
+      annual_revenue         = 150000.00
+      account_balance        = 5420.50
+      is_verified            = true
+      social_security_number = "123-45-6789"
+      date_of_birth          = "1985-03-15"
+      preferences = jsonencode({
+        theme         = "dark"
+        notifications = true
+        language      = "en"
+      })
+      tags          = ["vip", "early_adopter", "enterprise"]
+      last_login_at = "2024-01-15T10:30:00Z"
+    },
+    {
+      email                  = "bob@example.com"
+      first_name             = "Bob"
+      middle_name            = "James"
+      last_name              = "Smith"
+      phone                  = "+1-555-0456"
+      user_tier              = "standard"
+      annual_revenue         = 75000.00
+      account_balance        = 1250.00
+      is_verified            = true
+      social_security_number = "987-65-4321"
+      date_of_birth          = "1992-07-22"
+      preferences = jsonencode({
+        theme         = "light"
+        notifications = false
+        language      = "en"
+      })
+      tags          = ["standard_user"]
+      last_login_at = "2024-01-14T15:45:00Z"
+    },
+    {
+      email                  = "carol@example.com"
+      first_name             = "Carol"
+      middle_name            = null
+      last_name              = "Williams"
+      phone                  = "+1-555-0789"
+      user_tier              = "enterprise"
+      annual_revenue         = 500000.00
+      account_balance        = 25000.00
+      is_verified            = true
+      social_security_number = null # Some PII may be optional
+      date_of_birth          = "1978-11-03"
+      preferences = jsonencode({
+        theme         = "auto"
+        notifications = true
+        language      = "es"
+      })
+      tags          = ["enterprise", "multi_location", "high_value"]
+      last_login_at = "2024-01-15T09:15:00Z"
+    }
+  ]
 }
 
 # -----------------------------------------------------------------------------
@@ -547,16 +429,16 @@ create "kafka_topic" "demo_user_events" {
   }
 
   # 📊 SAFE PUBLIC FIELDS: No PII or financial data
-  dynamic "public_field" {
+  dynamic "schema_field" {
     for_each = {
       for name, col in kolumn_data_object.demo_user_schema.columns : name => col
       if contains(col.classifications, kolumn_classification.public) ||
       contains(col.classifications, kolumn_classification.personal)
     }
     content {
-      name     = public_field.value.name
-      type     = startswith(public_field.value.type, "VARCHAR") ? "string" : public_field.value.type == "BIGINT" ? "long" : public_field.value.type == "BOOLEAN" ? "boolean" : public_field.value.type == "TIMESTAMP" ? "long" : public_field.value.type == "DATE" ? "int" : startswith(public_field.value.type, "DECIMAL") ? "double" : public_field.value.type == "JSONB" ? "string" : public_field.value.type == "VARCHAR[]" ? "array" : "string"
-      nullable = public_field.value.nullable
+      name     = schema_field.value.name
+      type     = startswith(schema_field.value.type, "VARCHAR") ? "string" : schema_field.value.type == "BIGINT" ? "long" : schema_field.value.type == "BOOLEAN" ? "boolean" : schema_field.value.type == "TIMESTAMP" ? "long" : schema_field.value.type == "DATE" ? "int" : startswith(schema_field.value.type, "DECIMAL") ? "double" : schema_field.value.type == "JSONB" ? "string" : schema_field.value.type == "VARCHAR[]" ? "array" : "string"
+      nullable = schema_field.value.nullable
     }
   }
 

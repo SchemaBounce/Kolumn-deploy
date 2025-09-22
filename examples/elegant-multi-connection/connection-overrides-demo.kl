@@ -1,0 +1,278 @@
+# Connection Overrides Demo - GDPR Compliance Example
+# This example demonstrates connection-specific overrides for regional compliance
+
+# Enhanced Provider with Pattern Expansion
+provider "postgres" "regional" {
+  # Pattern-based connection generation (creates 6 connections automatically)
+  connection_pattern = "app-{region}-{env}-db.company.com"
+  regions            = ["us-east", "us-west", "eu-west"]
+  environments       = ["prod", "staging"]
+
+  # Base configuration for ALL connections
+  port     = 5432
+  database = "ecommerce"
+  username = var.postgres_username
+  password = var.postgres_password
+
+  # Enterprise safety embedded directly
+  safety {
+    circuit_breaker = { failure_threshold = 3, recovery_time = "30s" }
+    retry_policy    = { max_attempts = 3, backoff = "exponential" }
+    rollback        = { enable_snapshots = true, retention_days = 30 }
+  }
+
+  # Multi-connection orchestration
+  orchestration {
+    parallel_limit      = 3
+    deployment_strategy = "rolling"
+    failure_tolerance   = 10
+  }
+}
+
+# Variables for configuration
+variable "postgres_username" {
+  description = "PostgreSQL username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL password"
+  type        = string
+  sensitive   = true
+  default     = "password"
+}
+
+# Create data object FIRST for multi-connection deployments
+create "kolumn_data_object" "regional_user_schema" {
+  name        = "Regional User Schema"
+  description = "Universal user schema for multi-region deployment with compliance"
+
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = ["identifier"]
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = ["pii"]
+  }
+
+  column "name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = ["pii"]
+  }
+
+  column "created_at" {
+    type     = "TIMESTAMP"
+    nullable = false
+    default  = "CURRENT_TIMESTAMP"
+  }
+}
+
+# Standard create blocks - automatically scale to ALL connections
+create "postgres_table" "users" {
+  provider   = postgres.regional # Auto-scales to all 6 connections
+  depends_on = []
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.regional_user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "bigserial" : column.value.type == "VARCHAR(255)" ? "varchar(255)" : column.value.type == "VARCHAR(100)" ? "varchar(100)" : column.value.type
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      nullable    = column.value.nullable
+      default     = column.value.default
+    }
+  }
+
+  # Connection-specific overrides for regional compliance
+  connection_overrides = {
+    # EU GDPR Compliance
+    "eu-west-prod" = {
+      additional_columns = {
+        gdpr_consent = {
+          type    = "BOOLEAN"
+          default = false
+          comment = "GDPR consent tracking"
+        }
+        data_retention_days = {
+          type    = "INTEGER"
+          default = 2555 # 7 years for compliance
+          comment = "GDPR data retention policy"
+        }
+        gdpr_processing_basis = {
+          type    = "VARCHAR(50)"
+          default = "consent"
+          comment = "Legal basis for processing personal data"
+        }
+      }
+      additional_config = {
+        tablespace  = "eu_compliance_data"
+        encryption  = true
+        audit_level = "detailed"
+      }
+    }
+
+    "eu-west-staging" = {
+      additional_columns = {
+        gdpr_consent = {
+          type    = "BOOLEAN"
+          default = true # Default to true in staging
+          comment = "GDPR consent tracking (staging)"
+        }
+        test_data_flag = {
+          type    = "BOOLEAN"
+          default = true
+          comment = "Flag indicating this is test data"
+        }
+      }
+      additional_config = {
+        tablespace = "eu_staging_data"
+        encryption = false # No encryption in staging
+      }
+    }
+
+    # US CCPA Compliance
+    "us-east-prod" = {
+      additional_columns = {
+        ccpa_opt_out = {
+          type    = "BOOLEAN"
+          default = false
+          comment = "CCPA opt-out status"
+        }
+        data_sale_consent = {
+          type    = "BOOLEAN"
+          default = false
+          comment = "Consent for data sale under CCPA"
+        }
+      }
+      additional_config = {
+        tablespace  = "us_compliance_data"
+        encryption  = true
+        audit_level = "standard"
+      }
+    }
+
+    "us-west-prod" = {
+      additional_columns = {
+        ccpa_opt_out = {
+          type    = "BOOLEAN"
+          default = false
+          comment = "CCPA opt-out status"
+        }
+        regional_backup_consent = {
+          type    = "BOOLEAN"
+          default = true
+          comment = "Consent for cross-region backup"
+        }
+      }
+      additional_config = {
+        tablespace    = "us_west_data"
+        backup_region = "us-east"
+        encryption    = true
+      }
+    }
+  }
+}
+
+# Create another table to show consistent pattern
+create "postgres_table" "orders" {
+  provider   = postgres.regional
+  depends_on = []
+
+  column "id" {
+    type        = "bigserial"
+    primary_key = true
+  }
+
+  column "user_id" {
+    type     = "bigint"
+    not_null = true
+  }
+
+  column "total_amount" {
+    type     = "decimal(10,2)"
+    not_null = true
+  }
+
+  column "created_at" {
+    type    = "timestamp"
+    default = "CURRENT_TIMESTAMP"
+  }
+
+  # Foreign key to users table
+  foreign_key {
+    columns            = ["user_id"]
+    references_table   = "users"
+    references_columns = ["id"]
+    on_delete          = "CASCADE"
+  }
+
+  # Connection-specific overrides for compliance
+  connection_overrides = {
+    "eu-west-prod" = {
+      additional_columns = {
+        gdpr_data_source = {
+          type    = "VARCHAR(100)"
+          default = "eu_ecommerce"
+          comment = "Data source for GDPR compliance"
+        }
+        vat_rate = {
+          type    = "DECIMAL(5,4)"
+          default = 0.2000 # 20% EU VAT
+          comment = "EU VAT rate"
+        }
+      }
+      additional_config = {
+        currency_code  = "EUR"
+        tax_compliance = "eu_vat"
+      }
+    }
+
+    "us-east-prod" = {
+      additional_columns = {
+        tax_jurisdiction = {
+          type    = "VARCHAR(50)"
+          default = "us_federal"
+          comment = "Tax jurisdiction"
+        }
+        sales_tax_rate = {
+          type    = "DECIMAL(5,4)"
+          default = 0.0875 # 8.75% NY sales tax
+          comment = "State sales tax rate"
+        }
+      }
+      additional_config = {
+        currency_code  = "USD"
+        tax_compliance = "us_sales_tax"
+      }
+    }
+
+    "us-west-prod" = {
+      additional_columns = {
+        tax_jurisdiction = {
+          type    = "VARCHAR(50)"
+          default = "us_california"
+          comment = "Tax jurisdiction"
+        }
+        sales_tax_rate = {
+          type    = "DECIMAL(5,4)"
+          default = 0.1025 # 10.25% CA sales tax
+          comment = "State sales tax rate"
+        }
+      }
+      additional_config = {
+        currency_code  = "USD"
+        tax_compliance = "us_california_tax"
+      }
+    }
+  }
+}

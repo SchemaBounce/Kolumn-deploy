@@ -1,0 +1,184 @@
+# Quick Start: Elegant Multi-Connection Deployment
+# The simplest possible example showing the elegant approach
+
+# ✅ CORRECT: Create data objects FIRST for schema definition
+create "kolumn_data_object" "user_schema" {
+  name        = "Quick Start User Schema"
+  description = "Simple user schema for multi-connection deployment"
+
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "email" {
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.pii]
+  }
+
+  column "name" {
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  metadata = {
+    purpose = "Quick start user management"
+    domain  = "user_management"
+  }
+}
+
+create "kolumn_data_object" "post_schema" {
+  name        = "Quick Start Post Schema"
+  description = "Simple post schema for multi-connection deployment"
+
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "user_id" {
+    type            = "BIGINT"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "title" {
+    type            = "VARCHAR(255)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "content" {
+    type            = "TEXT"
+    nullable        = true
+    classifications = [kolumn_classification.public]
+  }
+
+  metadata = {
+    purpose = "Quick start content management"
+    domain  = "content"
+  }
+}
+
+# Classification definitions
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  requirements = {
+    encryption   = true
+    audit_access = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "Public"
+  description = "Public information"
+  requirements = {
+    encryption = false
+  }
+}
+
+create "kolumn_classification" "identifier" {
+  name        = "Identifier"
+  description = "Unique identifiers and keys"
+  requirements = {
+    indexed = true
+  }
+}
+
+# Enhanced Provider - Creates 4 connections automatically
+provider "postgres" "multi" {
+  # Pattern expansion: 2 regions × 2 environments = 4 connections
+  connection_pattern = "app-{region}-{env}.company.com"
+  regions            = ["us", "eu"]
+  environments       = ["prod", "staging"]
+
+  # Common configuration for all connections
+  port     = 5432
+  database = "demo"
+  username = "postgres"
+  password = "password"
+
+  # Enterprise safety (optional but recommended)
+  safety {
+    circuit_breaker = { failure_threshold = 3 }
+    retry_policy    = { max_attempts = 3 }
+    rollback        = { enable_snapshots = true }
+  }
+}
+
+# ✅ CORRECT: Table references data object with dynamic blocks
+create "postgres_table" "users" {
+  provider = postgres.multi # Auto-scales to all connections
+
+  name = "users"
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+    }
+  }
+
+  # ⚡ CORRECT: Use add_columns() for regional compliance
+  connection_overrides = {
+    "eu" = {
+      columns = add_columns(
+        kolumn_data_object.user_schema.columns,
+        {
+          "gdpr_consent" = {
+            name            = "gdpr_consent"
+            type            = "BOOLEAN"
+            nullable        = false
+            default         = "false"
+            comment         = "GDPR data processing consent"
+            classifications = [kolumn_classification.public]
+          }
+        }
+      )
+    }
+  }
+}
+
+# ✅ CORRECT: Another table also references data object
+create "postgres_table" "posts" {
+  provider = postgres.multi
+
+  name = "posts"
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.post_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+    }
+  }
+
+  # Foreign key relationship (created on all connections)
+  foreign_key "fk_posts_user" {
+    columns            = ["user_id"]
+    references_table   = "users"
+    references_columns = ["id"]
+    on_delete          = "CASCADE"
+  }
+}
+
+# That's it! No new commands, no new concepts
+# Just run: kolumn apply
+# Result: 2 tables × 4 connections = 8 database tables created automatically

@@ -1,39 +1,164 @@
 # Standard Project - Main Resource Configuration
-# All resources are defined here using variables from variables.kl
+# All resources are defined here using variables from variables.kl and kolumn_data_objects
 
-# Core application tables
-create "postgres_table" "users" {
+# ✅ CORRECT: Create data objects FIRST for schema definition
+create "kolumn_data_object" "user_schema" {
+  name        = "Standard User Schema"
+  description = "User schema for standard project structure"
+
   column "id" {
-    type        = "UUID"
-    primary_key = true
-    default     = "gen_random_uuid()"
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
   }
 
   column "username" {
-    type     = "VARCHAR(50)"
-    nullable = false
-    unique   = true
+    type            = "VARCHAR(50)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.public]
   }
 
   column "email" {
-    type     = "VARCHAR(255)"
-    nullable = false
-    unique   = true
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.pii]
   }
 
   column "password_hash" {
-    type     = "VARCHAR(255)"
-    nullable = false
+    type            = "VARCHAR(255)"
+    nullable        = false
+    classifications = [kolumn_classification.sensitive]
   }
 
   column "created_at" {
-    type    = "TIMESTAMP"
-    default = "NOW()"
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
   }
 
   column "updated_at" {
-    type    = "TIMESTAMP"
-    default = "NOW()"
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+
+  metadata = {
+    purpose = "user_management"
+    domain  = "authentication"
+  }
+}
+
+create "kolumn_data_object" "post_schema" {
+  name        = "Standard Post Schema"
+  description = "Post schema for content management"
+
+  column "id" {
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
+  }
+
+  column "title" {
+    type            = "VARCHAR(200)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "content" {
+    type            = "TEXT"
+    nullable        = true
+    classifications = [kolumn_classification.public]
+  }
+
+  column "author_id" {
+    type            = "BIGINT"
+    nullable        = false
+    classifications = [kolumn_classification.public]
+  }
+
+  column "status" {
+    type            = "VARCHAR(20)"
+    nullable        = false
+    default         = "draft"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "created_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+
+  column "updated_at" {
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+
+  metadata = {
+    purpose = "content_management"
+    domain  = "publishing"
+  }
+}
+
+# Classification definitions
+create "kolumn_classification" "pii" {
+  name        = "PII"
+  description = "Personally Identifiable Information"
+  requirements = {
+    encryption   = true
+    audit_access = true
+  }
+}
+
+create "kolumn_classification" "public" {
+  name        = "Public"
+  description = "Public information"
+  requirements = {
+    encryption = false
+  }
+}
+
+create "kolumn_classification" "identifier" {
+  name        = "Identifier"
+  description = "Unique identifiers and keys"
+  requirements = {
+    indexed = true
+  }
+}
+
+create "kolumn_classification" "sensitive" {
+  name        = "Sensitive"
+  description = "Sensitive information requiring protection"
+  requirements = {
+    encryption = true
+    hashing    = true
+  }
+}
+
+# ✅ CORRECT: Tables reference data objects with dynamic blocks
+create "postgres_table" "users" {
+  name = "users"
+
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "UUID" : column.value.type == "TIMESTAMP" ? "TIMESTAMP" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "BIGINT" && column.value.primary_key ? "gen_random_uuid()" : column.value.type == "TIMESTAMP" ? "NOW()" : column.value.default
+    }
   }
 
   # Add environment-specific configuration
@@ -41,39 +166,19 @@ create "postgres_table" "users" {
 }
 
 create "postgres_table" "posts" {
-  column "id" {
-    type        = "UUID"
-    primary_key = true
-    default     = "gen_random_uuid()"
-  }
+  name = "posts"
 
-  column "title" {
-    type     = "VARCHAR(200)"
-    nullable = false
-  }
-
-  column "content" {
-    type = "TEXT"
-  }
-
-  column "author_id" {
-    type     = "UUID"
-    nullable = false
-  }
-
-  column "status" {
-    type    = "VARCHAR(20)"
-    default = "draft"
-  }
-
-  column "created_at" {
-    type    = "TIMESTAMP"
-    default = "NOW()"
-  }
-
-  column "updated_at" {
-    type    = "TIMESTAMP"
-    default = "NOW()"
+  # Pull columns from data object
+  dynamic "column" {
+    for_each = kolumn_data_object.post_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "UUID" : column.value.type == "BIGINT" ? "UUID" : column.value.type == "TIMESTAMP" ? "TIMESTAMP" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "BIGINT" && column.value.primary_key ? "gen_random_uuid()" : column.value.type == "TIMESTAMP" ? "NOW()" : column.value.default
+    }
   }
 
   schema = var.environment == "prod" ? "public" : var.environment

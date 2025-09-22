@@ -57,34 +57,77 @@ provider "dagster" {
 # -----------------------------------------------------------------------------
 
 # The initial users table - this is our SINGLE SOURCE OF TRUTH
-# Start with a basic schema that we'll evolve throughout the demo
-create "postgres_table" "demo_users" {
-  name = "demo_users"
+# ✅ CORRECT STRATEGY: Create data object FIRST, then reference it
+# This demonstrates the proper architectural pattern for Kolumn
 
+# =============================================================================
+# KOLUMN PROVIDER RESOURCES (this repository)
+# =============================================================================  
+# The following resources are provided by the Kolumn provider (this repository)
+# and provide universal data governance across all external providers.
+
+# Create Kolumn data object to make the schema reusable
+# This will be the foundation for all autonomous propagation
+create "kolumn_data_object" "demo_user_schema" {
+  name        = "Demo User Schema"
+  description = "Baseline user schema for autonomous propagation demo"
+
+  # ✅ CORRECT: Use proper column blocks for schema definition
   column "id" {
-    type        = "BIGSERIAL"
-    primary_key = true
+    type            = "BIGINT"
+    nullable        = false
+    primary_key     = true
+    classifications = [kolumn_classification.identifier]
   }
 
   column "email" {
-    type     = "VARCHAR(255)"
-    unique   = true
-    nullable = false
+    type            = "VARCHAR(255)"
+    nullable        = false
+    unique          = true
+    classifications = [kolumn_classification.pii]
   }
 
   column "first_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
   }
 
   column "last_name" {
-    type     = "VARCHAR(100)"
-    nullable = false
+    type            = "VARCHAR(100)"
+    nullable        = false
+    classifications = [kolumn_classification.public]
   }
 
   column "created_at" {
-    type    = "TIMESTAMP"
-    default = "CURRENT_TIMESTAMP"
+    type            = "TIMESTAMP"
+    nullable        = false
+    default         = "CURRENT_TIMESTAMP"
+    classifications = [kolumn_classification.public]
+  }
+
+  metadata = {
+    source     = "postgres_table.demo_users"
+    demo_step  = "baseline"
+    created_at = timestamp()
+  }
+}
+
+# ✅ PostgreSQL table that references the data object (CORRECT PATTERN)
+create "postgres_table" "demo_users" {
+  name = "demo_users"
+
+  # Use columns from data object (following recommended strategy)
+  dynamic "column" {
+    for_each = kolumn_data_object.demo_user_schema.columns
+    content {
+      name        = column.value.name
+      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type
+      nullable    = column.value.nullable
+      primary_key = column.value.primary_key
+      unique      = column.value.unique
+      default     = column.value.type == "TIMESTAMP" ? "CURRENT_TIMESTAMP" : null
+    }
   }
 
   # Insert sample data for demonstration
@@ -107,71 +150,6 @@ create "postgres_table" "demo_users" {
   ]
 }
 
-# =============================================================================
-# KOLUMN PROVIDER RESOURCES (this repository)
-# =============================================================================  
-# The following resources are provided by the Kolumn provider (this repository)
-# and provide universal data governance across all external providers.
-
-# Create Kolumn data object to make the schema reusable
-# This will be the foundation for all autonomous propagation
-create "kolumn_data_object" "demo_user_schema" {
-  name        = "Demo User Schema"
-  description = "Baseline user schema for autonomous propagation demo"
-
-  # Extract columns from the source table
-  dynamic "column" {
-    for_each = {
-      id = {
-        name        = "id"
-        type        = "BIGINT"
-        nullable    = false
-        primary_key = true
-      }
-      email = {
-        name     = "email"
-        type     = "VARCHAR(255)"
-        nullable = false
-        unique   = true
-      }
-      first_name = {
-        name     = "first_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-      }
-      last_name = {
-        name     = "last_name"
-        type     = "VARCHAR(100)"
-        nullable = false
-      }
-      created_at = {
-        name     = "created_at"
-        type     = "TIMESTAMP"
-        nullable = true
-      }
-    }
-
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-
-      # Basic classification - email is PII
-      classifications = column.key == "email" ? [
-        kolumn_classification.pii
-        ] : [
-        kolumn_classification.public
-      ]
-    }
-  }
-
-  metadata = {
-    source     = "postgres_table.demo_users"
-    demo_step  = "baseline"
-    created_at = timestamp()
-  }
-}
-
 # Classification definitions
 create "kolumn_classification" "pii" {
   name        = "PII"
@@ -187,6 +165,14 @@ create "kolumn_classification" "public" {
   description = "Public information"
   requirements = {
     encryption = false
+  }
+}
+
+create "kolumn_classification" "identifier" {
+  name        = "Identifier"
+  description = "Unique identifiers and keys"
+  requirements = {
+    indexed = true
   }
 }
 

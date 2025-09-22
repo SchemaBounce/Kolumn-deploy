@@ -355,7 +355,7 @@ File discovery integrates seamlessly with:
 - **Variable System**: Use HCL variables in interpolation
 - **Data Objects**: Reference column schemas and metadata
 - **State Management**: Track file state across runs
-- **Provider Ecosystem**: Works with all 30+ external providers
+- **Provider Ecosystem**: Designed to work with all external providers in the planned ecosystem
 - **Module System**: Share discovered files across modules
 
 This system revolutionizes infrastructure-as-code by bridging the gap between declarative Kolumn configurations and existing file-based workflows, enabling seamless migration and hybrid architectures.
