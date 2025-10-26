@@ -13,13 +13,13 @@
 
 # External Provider Configuration
 # NOTE: These providers are from separate repositories, not the Kolumn provider
-terraform {
+kolumn {
   required_providers {
     postgres = {
       source = "kolumn/postgres" # External: kolumn-provider-postgres repository
     }
     kafka = {
-      source = "kolumn/kafka" # External: kolumn-provider-kafka repository  
+      source = "kolumn/kafka" # External: kolumn-provider-kafka repository
     }
     dagster = {
       source = "kolumn/dagster" # External: kolumn-provider-dagster repository
