@@ -23,7 +23,6 @@ exclude:
   - examples/          # Exclude examples directory - contains SQL files with incompatible syntax
   - scripts/           # Exclude scripts directory
   - test-pipeline.sh   # Exclude shell scripts
-  - releases/          # Exclude binary releases
   - DOCUMENTATION_SYSTEM.md  # Exclude internal documentation
   - README.md          # Exclude repository README
   - Gemfile
