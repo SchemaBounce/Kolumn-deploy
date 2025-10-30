@@ -1,7 +1,7 @@
 {
-  "version": "0.1.42",
-  "tag": "v0.1.42",
-  "released": "2025-10-29T17:56:02Z",
+  "version": "0.1.48",
+  "tag": "v0.1.48",
+  "released": "2025-10-30T18:10:37Z",
   "platforms": [
     "linux-amd64", "linux-arm64",
     "darwin-amd64", "darwin-arm64", 
