@@ -1018,9 +1018,9 @@ output "development_guidance" {
           benefits = "70% less code, automatic RPC handling, enterprise safety"
         },
         {
-          approach = "Full Terraform Protocol"
+          approach = "Full Infrastructure-as-Code Protocol"
           methods  = 11
-          benefits = "100% Terraform compatibility, <4 hour migration"
+          benefits = "100% legacy IaC compatibility, <4 hour migration"
         },
         {
           approach = "Hybrid Approach"

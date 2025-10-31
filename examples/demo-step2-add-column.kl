@@ -6,7 +6,7 @@
 # =============================================================================
 
 # Use the same provider configuration as step 1
-terraform {
+state {
   required_providers {
     postgres = {
       source = "kolumn/postgres"

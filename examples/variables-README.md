@@ -254,18 +254,18 @@ KOLUMN_LOG_LEVEL=debug kolumn plan -var-file="production.klvars"
 - **Encryption**: Use encrypted storage for production variable files
 - **Access control**: Restrict access to production variable files
 
-## Migration from Terraform
+## Migration from Other Infrastructure-as-Code Tools
 
-If migrating from Terraform, Kolumn supports `TF_VAR_*` environment variables for compatibility:
+If migrating from other infrastructure-as-code tools, Kolumn supports `TF_VAR_*` environment variables for compatibility:
 
 ```bash
 # Works with existing TF_VAR_ variables
-export TF_VAR_database_host="terraform-db.com"
+export TF_VAR_database_host="legacy-db.com"
 kolumn plan  # Will use TF_VAR_ values
 
 # Equivalent Kolumn native approach
-export KOLUMN_VAR_database_host="kolumn-db.com" 
+export KOLUMN_VAR_database_host="kolumn-db.com"
 kolumn plan  # KOLUMN_VAR_ takes precedence over TF_VAR_
 ```
 
-This ensures smooth migration from Terraform-based infrastructure.
+This ensures smooth migration from legacy infrastructure-as-code systems.
