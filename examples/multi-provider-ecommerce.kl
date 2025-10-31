@@ -1,5 +1,5 @@
 # Complete Multi-Provider E-Commerce Data Platform
-# This example demonstrates Kolumn's full capability as "Terraform for the entire data stack"
+# This example demonstrates Kolumn's full capability as "infrastructure-as-code for the entire data stack"
 # with true multi-provider orchestration and universal governance.
 #
 # ARCHITECTURE OVERVIEW:
@@ -607,7 +607,7 @@ create "kolumn_permission" "analytics_read" {
 # =============================================================================
 # The following resources use external providers that integrate with Kolumn's
 # governance layer. Each provider is developed in a separate repository using
-# Kolumn's revolutionary SDK with either 4-method or 11-method Terraform patterns.
+# Kolumn's revolutionary SDK with either 4-method or 11-method infrastructure-as-code patterns.
 
 # PostgreSQL Provider - Transactional Database
 create "postgres_database" "ecommerce_transactional" {

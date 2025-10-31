@@ -6,7 +6,7 @@
 # measures across the entire ecosystem automatically!
 # =============================================================================
 
-terraform {
+state {
   required_providers {
     postgres = {
       source = "kolumn/postgres"

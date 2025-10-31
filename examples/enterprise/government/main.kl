@@ -4,7 +4,7 @@
 # This template provides a production-ready configuration for government
 # agencies requiring FISMA compliance, FedRAMP authorization, and maximum security.
 
-terraform {
+state {
   required_version = ">= 1.0"
   backend "schemabounce" {
     api_url        = var.schemabounce_api_url

@@ -6,7 +6,7 @@
 # Watch the autonomous intelligence adapt to every scenario!
 # =============================================================================
 
-terraform {
+state {
   required_providers {
     postgres = {
       source = "kolumn/postgres"

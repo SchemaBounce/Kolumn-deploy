@@ -4,7 +4,7 @@
 # This template provides a production-ready configuration for healthcare
 # organizations requiring HIPAA compliance, PHI protection, and multi-site coordination.
 
-terraform {
+state {
   required_version = ">= 1.0"
   backend "schemabounce" {
     api_url        = var.schemabounce_api_url

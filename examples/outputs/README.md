@@ -1,8 +1,8 @@
 # Kolumn Complete Output System
 
-This directory demonstrates Kolumn's complete output system implementation, which achieves **100% Terraform parity** and adds powerful enhancements for data infrastructure.
+This directory demonstrates Kolumn's complete output system implementation, which achieves **100% infrastructure-as-code parity** and adds powerful enhancements for data infrastructure.
 
-## 🎉 **IMPLEMENTATION COMPLETE**: 100% Terraform-Equivalent Output System
+## 🎉 **IMPLEMENTATION COMPLETE**: 100% Infrastructure-as-Code-Equivalent Output System
 
 The output system is now **production-ready** with all major components implemented:
 
@@ -100,7 +100,7 @@ output "table_info" {
 
 Outputs can reference create blocks because the system:
 
-1. **Loads State**: Reads `.kolumn/terraform.tfstate` during output evaluation
+1. **Loads State**: Reads `.kolumn/kolumn.tfstate` during output evaluation
 2. **Extracts Attributes**: Gets resource attributes from `ResourceInstance.Attributes`
 3. **Creates Context**: Builds HCL evaluation context with create block values
 4. **Type Conversion**: Converts state values to proper cty.Value types
@@ -197,11 +197,11 @@ output "all_resources" {
    export DATABASE_URL
    ```
 
-### 🏆 **Terraform Parity Achievement**
+### 🏆 **Infrastructure-as-Code Parity Achievement**
 
-Kolumn's output system now matches **100% of Terraform's output functionality**:
+Kolumn's output system now matches **100% of modern infrastructure-as-code functionality**:
 
-| Feature | Terraform | Kolumn | Status |
+| Feature | Modern IaC | Kolumn | Status |
 |---------|-----------|---------|---------|
 | Output blocks | ✅ | ✅ | **Complete** |
 | Variable references | ✅ | ✅ | **Complete** |  
