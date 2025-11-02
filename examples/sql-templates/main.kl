@@ -1,0 +1,129 @@
+# SQL Templates Example
+# Demonstrates external .sql file templates with provider-specific overrides
+
+# Provider configuration
+provider "postgres" "production" {
+  host     = "localhost"
+  port     = 5432
+  database = "test_db"
+  username = "postgres"
+  password = "password"
+  store_backend = true
+}
+
+# SQL Template definitions for external .sql files
+sql "table_schemas" {
+  description = "Reusable table templates for common schemas"
+  version     = "1.0.0"
+
+  template "users" {
+    description    = "Standard user table template"
+    type          = "table"
+    source        = "./sql/users_table.sql"
+    database_types = ["postgres", "mysql", "snowflake"]
+
+    # Provider-specific overrides
+    provider_overrides {
+      postgres  = "./sql/postgres/users_table.sql"
+      mysql     = "./sql/mysql/users_table.sql"
+      snowflake = "./sql/snowflake/users_table.sql"
+    }
+
+    # Template variables
+    variable "table_name" {
+      type        = "string"
+      description = "Name of the user table"
+      default     = "users"
+      required    = true
+    }
+
+    variable "enable_audit" {
+      type        = "bool"
+      description = "Enable audit columns"
+      default     = true
+    }
+
+    variable "schema_name" {
+      type        = "string"
+      description = "Database schema name"
+      default     = "public"
+    }
+  }
+
+  template "products" {
+    description    = "Product catalog table template"
+    type          = "table"
+    source        = "./sql/products_table.sql"
+    database_types = ["postgres", "mysql"]
+
+    variable "table_name" {
+      type     = "string"
+      default  = "products"
+      required = true
+    }
+
+    variable "enable_versioning" {
+      type    = "bool"
+      default = false
+    }
+  }
+}
+
+sql "view_schemas" {
+  description = "Reusable view templates"
+  version     = "1.0.0"
+
+  template "user_summary" {
+    description    = "User summary view with aggregated data"
+    type          = "view"
+    source        = "./sql/views/user_summary.sql"
+    database_types = ["postgres", "mysql"]
+
+    variable "source_table" {
+      type        = "string"
+      description = "Source table for the view"
+      required    = true
+    }
+
+    variable "include_metrics" {
+      type    = "bool"
+      default = true
+    }
+  }
+}
+
+# Create tables using SQL templates
+create "postgres_table" "users" {
+  provider      = postgres.production
+  from_template = "sql.table_schemas.users"
+
+  # Template variables
+  variables = {
+    table_name   = "app_users"
+    enable_audit = true
+    schema_name  = "public"
+  }
+}
+
+create "postgres_table" "products" {
+  provider      = postgres.production
+  from_template = "sql.table_schemas.products"
+
+  variables = {
+    table_name        = "product_catalog"
+    enable_versioning = true
+  }
+}
+
+# Create view using template
+create "postgres_view" "user_analytics" {
+  provider      = postgres.production
+  from_template = "sql.view_schemas.user_summary"
+
+  variables = {
+    source_table     = postgres_table.users.name
+    include_metrics  = true
+  }
+
+  depends_on = [postgres_table.users]
+}

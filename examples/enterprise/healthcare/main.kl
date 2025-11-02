@@ -4,27 +4,29 @@
 # This template provides a production-ready configuration for healthcare
 # organizations requiring HIPAA compliance, PHI protection, and multi-site coordination.
 
-state {
-  required_version = ">= 1.0"
-  backend "schemabounce" {
-    api_url        = var.schemabounce_api_url
-    api_key        = var.schemabounce_api_key
-    environment_id = var.environment_id
+# State storage using SchemaBounce provider
+provider "schemabounce" "state" {
+  api_url        = var.schemabounce_api_url
+  api_key        = var.schemabounce_api_key
+  environment_id = var.environment_id
 
-    # Healthcare compliance requirements
-    enable_versioning = true
-    enable_encryption = true
-    audit_logging     = true
-    data_residency    = var.data_residency
-    retention_policy  = "6y" # HIPAA requires 6 years
+  # Mark as state backend
+  store_backend = true
+  primary       = true
 
-    tags = {
-      industry      = "healthcare"
-      compliance    = "hipaa"
-      phi_data      = "true"
-      environment   = var.environment
-      health_system = var.health_system_name
-    }
+  # Healthcare compliance requirements
+  enable_versioning = true
+  enable_encryption = true
+  audit_logging     = true
+  data_residency    = var.data_residency
+  retention_policy  = "6y" # HIPAA requires 6 years
+
+  tags = {
+    industry      = "healthcare"
+    compliance    = "hipaa"
+    phi_data      = "true"
+    environment   = var.environment
+    health_system = var.health_system_name
   }
 }
 

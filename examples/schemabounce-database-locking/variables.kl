@@ -1,0 +1,38 @@
+# Variables for SchemaBounce Database Locking Example
+
+# SchemaBounce API credentials
+variable "schemabounce_api_key" {
+  description = "SchemaBounce API key"
+  type        = "string"
+  sensitive   = true
+}
+
+variable "environment_id" {
+  description = "SchemaBounce environment ID"
+  type        = "string"
+}
+
+variable "business_id" {
+  description = "SchemaBounce business ID (optional)"
+  type        = "string"
+  default     = null
+}
+
+# Database credentials for locking system
+variable "lock_database_url" {
+  description = "Database connection URL for state locking"
+  type        = "string"
+  sensitive   = true
+  # Example: "postgres://username:password@localhost:5432/kolumn_locks?sslmode=disable"
+}
+
+variable "postgres_username" {
+  description = "PostgreSQL username"
+  type        = "string"
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL password"
+  type        = "string"
+  sensitive   = true
+}
