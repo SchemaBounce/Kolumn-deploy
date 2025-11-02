@@ -1,0 +1,57 @@
+# SchemaBounce with Database-Based Locking Example
+# Demonstrates how to configure SchemaBounce backend with database-based locking
+
+# State configuration with SchemaBounce backend and database locking
+state {
+  backend "schemabounce" {
+    # SchemaBounce API configuration
+    api_url = "http://localhost:8081"
+    api_key = var.schemabounce_api_key
+    environment_id = var.environment_id
+    business_id = var.business_id
+
+    # Enterprise features
+    enable_versioning = true
+    enable_encryption = true
+    audit_logging = true
+    data_residency = "us"
+    retention_policy = "1y"
+
+    # Database-based locking configuration
+    lock_database_provider = "postgres"
+    lock_database_url = var.lock_database_url
+    lock_table_name = "kolumn_schemabounce_lock"
+  }
+}
+
+# PostgreSQL provider that will also be used for locking
+provider "postgres" "main" {
+  host     = "localhost"
+  port     = 5432
+  database = "kolumn_locks"
+  username = var.postgres_username
+  password = var.postgres_password
+}
+
+# Example table to demonstrate the setup
+create "postgres_table" "users" {
+  provider = postgres.main
+  schema   = "public"
+  name     = "users"
+
+  column "id" {
+    type        = "bigserial"
+    primary_key = true
+  }
+
+  column "email" {
+    type     = "varchar(255)"
+    not_null = true
+    unique   = true
+  }
+
+  column "created_at" {
+    type    = "timestamp with time zone"
+    default = "CURRENT_TIMESTAMP"
+  }
+}

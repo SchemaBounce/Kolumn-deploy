@@ -4,28 +4,30 @@
 # This template provides a production-ready configuration for government
 # agencies requiring FISMA compliance, FedRAMP authorization, and maximum security.
 
-state {
-  required_version = ">= 1.0"
-  backend "schemabounce" {
-    api_url        = var.schemabounce_api_url
-    api_key        = var.schemabounce_api_key
-    environment_id = var.environment_id
+# State storage using SchemaBounce provider
+provider "schemabounce" "state" {
+  api_url        = var.schemabounce_api_url
+  api_key        = var.schemabounce_api_key
+  environment_id = var.environment_id
 
-    # Government security requirements
-    enable_versioning = true
-    enable_encryption = true
-    audit_logging     = true
-    data_residency    = "us_gov"
-    retention_policy  = "10y" # Extended retention for government records
+  # Mark as state backend
+  store_backend = true
+  primary       = true
 
-    tags = {
-      sector                = "government"
-      compliance            = "fisma"
-      clearance_level       = var.clearance_level
-      environment           = var.environment
-      agency                = var.agency_name
-      system_categorization = var.system_categorization
-    }
+  # Government security requirements
+  enable_versioning = true
+  enable_encryption = true
+  audit_logging     = true
+  data_residency    = "us_gov"
+  retention_policy  = "10y" # Extended retention for government records
+
+  tags = {
+    sector                = "government"
+    compliance            = "fisma"
+    clearance_level       = var.clearance_level
+    environment           = var.environment
+    agency                = var.agency_name
+    system_categorization = var.system_categorization
   }
 }
 

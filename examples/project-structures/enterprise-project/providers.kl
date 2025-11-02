@@ -1,7 +1,25 @@
 # Enterprise Project - Provider Configuration
 # Full enterprise-grade provider setup with version constraints and advanced configurations
 
-# === KOLUMN GOVERNANCE PROVIDER (REQUIRED FIRST) ===
+# === STATE STORAGE PROVIDER (REQUIRED FIRST) ===
+provider "schemabounce" "state" {
+  api_url        = var.schemabounce_api_url
+  api_key        = var.schemabounce_api_key
+  environment_id = var.environment_id
+
+  # Mark as state backend
+  store_backend = true
+  primary       = true
+
+  # Enterprise state management features
+  enable_versioning = true
+  enable_encryption = true
+  audit_logging     = true
+  data_residency    = var.data_residency
+  retention_policy  = var.state_retention_policy
+}
+
+# === KOLUMN GOVERNANCE PROVIDER ===
 provider "kolumn" {
   # Enterprise governance features
   governance_enabled = true
@@ -11,12 +29,6 @@ provider "kolumn" {
   # Multi-environment configuration
   environment = var.environment
   workspace   = var.workspace
-
-  # Enterprise features
-  state_backend = {
-    type   = var.state_backend_type
-    config = var.state_backend_config
-  }
 
   # Policy enforcement
   policy_enforcement = var.enable_policy_enforcement
