@@ -6,21 +6,22 @@ state {
   backend "schemabounce" {
     # SchemaBounce API configuration
     api_url = "http://localhost:8081"
-    api_key = var.schemabounce_api_key
+    jwt     = var.schemabounce_jwt
+    # api_key = var.schemabounce_api_key  # Legacy fallback
     environment_id = var.environment_id
-    business_id = var.business_id
+    business_id    = var.business_id
 
     # Enterprise features
     enable_versioning = true
     enable_encryption = true
-    audit_logging = true
-    data_residency = "us"
-    retention_policy = "1y"
+    audit_logging     = true
+    data_residency    = "us"
+    retention_policy  = "1y"
 
     # Database-based locking configuration
     lock_database_provider = "postgres"
-    lock_database_url = var.lock_database_url
-    lock_table_name = "kolumn_schemabounce_lock"
+    lock_database_url      = var.lock_database_url
+    lock_table_name        = "kolumn_schemabounce_lock"
   }
 }
 

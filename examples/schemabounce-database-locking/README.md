@@ -39,7 +39,8 @@ state {
   backend "schemabounce" {
     # SchemaBounce API settings (required)
     api_url = "http://localhost:8081"
-    api_key = var.schemabounce_api_key
+    jwt = var.schemabounce_jwt
+    # api_key = var.schemabounce_api_key  # Legacy fallback
     environment_id = var.environment_id
 
     # Database-based locking (MANDATORY FIELDS)
@@ -132,27 +133,28 @@ SELECT is_locked FROM kolumn_schemabounce_lock WHERE id = 'state_lock'
 
 ## Usage Examples
 
-### Environment Variables Setup
+### Supplying Credentials Safely
+Preferred: keep secrets out of files by using `klvars` placeholders and CLI overrides:
+
 ```bash
-export KOLUMN_SCHEMABOUNCE_API_KEY="sk-your-api-key"
-export KOLUMN_ENVIRONMENT_ID="env_your-environment-id"
-export KOLUMN_LOCK_DATABASE_URL="postgres://user:pass@localhost:5432/locks"
-export POSTGRES_USERNAME="kolumn_user"
-export POSTGRES_PASSWORD="secure_password"
-```
+# environments/dev.klvars
+lock_database_provider = "postgres"
+environment_id        = "env_dev"
+# lock_database_url and tokens are provided at runtime
 
-### Running Kolumn Commands
-```bash
-# Initialize with database locking
-kolumn init
+# Local (JWT + lock DB URL from environment/secret store)
+kolumn plan  -var-file=environments/dev.klvars \
+  --var "schemabounce_jwt=$SCHEMABOUNCE_JWT" \
+  --var "lock_database_url=$LOCK_DATABASE_URL"
 
-# Plan changes (acquires lock automatically)
-kolumn plan
+kolumn apply -var-file=environments/dev.klvars \
+  --var "schemabounce_jwt=$SCHEMABOUNCE_JWT" \
+  --var "lock_database_url=$LOCK_DATABASE_URL"
 
-# Apply changes (lock is held during apply)
-kolumn apply
-
-# Locks are automatically released after operations complete
+# GitHub Actions
+kolumn apply -var-file=environments/dev.klvars \
+  --var "schemabounce_jwt=${{ secrets.SCHEMABOUNCE_JWT }}" \
+  --var "lock_database_url=${{ secrets.LOCK_DATABASE_URL }}"
 ```
 
 ### Concurrent Access Behavior
