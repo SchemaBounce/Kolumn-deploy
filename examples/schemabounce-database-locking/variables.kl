@@ -1,10 +1,17 @@
 # Variables for SchemaBounce Database Locking Example
 
 # SchemaBounce API credentials
-variable "schemabounce_api_key" {
-  description = "SchemaBounce API key"
+variable "schemabounce_jwt" {
+  description = "SchemaBounce JWT (preferred authentication)"
   type        = "string"
   sensitive   = true
+}
+
+variable "schemabounce_api_key" {
+  description = "SchemaBounce API key (legacy fallback)"
+  type        = "string"
+  sensitive   = true
+  default     = ""
 }
 
 variable "environment_id" {

@@ -7,7 +7,7 @@ This directory contains examples for configuring Kolumn to use SchemaBounce as t
 The SchemaBounce backend provides enterprise-grade state management with the following features:
 
 - **Cloud-native**: Fully managed state storage
-- **Secure**: API key authentication with HTTPS
+- **Secure**: JWT bearer authentication (API key fallback) with HTTPS
 - **Versioned**: Built-in state versioning support  
 - **Encrypted**: State encryption at rest and in transit
 - **Multi-tenant**: Support for multiple businesses/environments
@@ -21,7 +21,8 @@ The SchemaBounce backend provides enterprise-grade state management with the fol
 state = {
   backend = "schemabounce"
   config = {
-    api_key        = "${var.schemabounce_api_key}"
+    jwt            = "${var.schemabounce_jwt}"          # Preferred auth (JWT issued by Core API)
+    # api_key      = "${var.schemabounce_api_key}"      # Legacy fallback
     environment_id = "env_production_123" 
     api_url        = "https://api.schemabounce.com"
   }
@@ -30,7 +31,7 @@ state = {
 
 ### Required Fields
 
-- `api_key`: Your SchemaBounce API key for authentication
+- `jwt`: SchemaBounce-issued JWT for authentication (`api_key` supported for legacy tokens)
 - `environment_id`: Unique identifier for your environment
 
 ### Optional Fields
@@ -59,16 +60,36 @@ The SchemaBounce backend maintains backward compatibility with legacy field name
 
 ## Environment Variables
 
-You can use environment variables for sensitive configuration:
+Preferred pattern: keep secrets out of files; pass them at runtime with `--var`.
 
-```bash
-export KOLUMN_SCHEMABOUNCE_API_KEY="your-api-key-here"
+```hcl
+# environments/dev.klvars
+schemabounce_jwt = ""  # leave empty and inject via --var
+# schemabounce_api_key = ""  # legacy fallback; also inject via --var if needed
 ```
 
 ## Examples
 
 - `main.kl`: Complete SchemaBounce backend configuration
 - `legacy_migration.kl`: Migration from legacy configuration format
+
+## Passing secrets without storing them (preferred)
+
+You can override sensitive variables at the CLI so they never hit disk:
+
+```bash
+# Local
+kolumn apply -var-file=environments/dev.klvars \
+  --var schemabounce_jwt="$SCHEMABOUNCE_JWT"
+
+# GitHub Actions
+kolumn apply -var-file=environments/dev.klvars \
+  --var schemabounce_jwt="${{ secrets.SCHEMABOUNCE_JWT }}"
+
+# Optional: if you still rely on legacy API keys
+kolumn apply -var-file=environments/dev.klvars \
+  --var schemabounce_api_key="${{ secrets.SCHEMABOUNCE_API_KEY }}"
+```
 
 ## API Endpoints
 
@@ -101,8 +122,8 @@ Note: State locking is not supported by the SchemaBounce API. Operations are ato
 
 If you get authentication errors:
 
-1. Verify your API key is correct
-2. Ensure the API key has permissions for the specified environment
+1. Verify your JWT is valid and not expired (or API key if still using legacy auth)
+2. Ensure the token has permissions for the specified environment
 3. Check that the `environment_id` exists in your SchemaBounce account
 
 ### Connection Issues

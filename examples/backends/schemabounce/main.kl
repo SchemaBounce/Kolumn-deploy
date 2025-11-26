@@ -5,8 +5,11 @@
 state = {
   backend = "schemabounce"
   config = {
-    # Required: API key for authentication
-    api_key = "${var.schemabounce_api_key}"
+    # Preferred: JWT for authentication
+    jwt = "${var.schemabounce_jwt}"
+
+    # Legacy fallback if JWTs are not available yet
+    # api_key = "${var.schemabounce_api_key}"
 
     # Required: Environment ID (identifies your environment in SchemaBounce)
     environment_id = "env_production_123"
@@ -59,10 +62,18 @@ create "postgres_table" "users" {
 }
 
 # Variables
-variable "schemabounce_api_key" {
-  description = "API key for SchemaBounce"
+variable "schemabounce_jwt" {
+  description = "JWT for SchemaBounce Core API"
   type        = string
   sensitive   = true
+}
+
+# Optional legacy fallback variable if you still use API keys
+variable "schemabounce_api_key" {
+  description = "API key for SchemaBounce (legacy auth)"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "postgres_host" {
