@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kolumn 0.1.71-beta - Infrastructure-as-Code for the Modern Data Stack</title>
+    <title>Kolumn - Schema-as-Configuration for Databases</title>
     <style>
         /* Art Deco + 70s Audio Equipment Theme - Matching SchemaBounce Frontend */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 
         :root {
             /* Primary Gold/Brass colors */
@@ -33,7 +34,7 @@
             --card-border: #C0B090;
 
             /* Code blocks */
-            --code-bg: #2d2d2d;
+            --code-bg: #1c1c1c;
 
             /* Gradients */
             --hero-gradient: linear-gradient(135deg, #D4AF37 0%, #E5C048 50%, #C9A532 100%);
@@ -126,26 +127,111 @@
 
         /* Hero Section */
         .hero {
-            padding: 5rem 0;
+            padding: 4rem 0 3rem;
             text-align: center;
         }
 
         .hero h1 {
-            font-size: 3.5rem;
+            font-size: 3.25rem;
             font-weight: 800;
             margin-bottom: 1.5rem;
             color: var(--brand-primary);
             line-height: 1.2;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .hero-subtitle {
             font-size: 1.25rem;
             color: var(--text-secondary);
-            margin-bottom: 3rem;
-            max-width: 600px;
+            margin-bottom: 2rem;
+            max-width: 650px;
             margin-left: auto;
             margin-right: auto;
+        }
+
+        /* Code Example Section */
+        .code-section {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .code-section h3 {
+            color: var(--brand-primary);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        .code-block {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            border: 1px solid var(--brand-tertiary);
+        }
+
+        .code-block pre {
+            margin: 0;
+            font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #e8e6e3;
+        }
+
+        .code-block .keyword { color: #D4AF37; font-weight: 500; }
+        .code-block .string { color: #FF8833; }
+        .code-block .comment { color: #6b7280; font-style: italic; }
+        .code-block .type { color: #B8976F; }
+        .code-block .attr { color: #e8e6e3; }
+
+        /* Providers Section */
+        .providers-section {
+            padding: 3rem 0;
+        }
+
+        .providers-section h2 {
+            text-align: center;
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: var(--brand-primary);
+        }
+
+        .providers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .provider-card {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .provider-card:hover {
+            border-color: var(--brand-primary);
+            transform: translateY(-2px);
+        }
+
+        .provider-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .provider-type {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 0.25rem;
         }
 
         /* Install Section */
@@ -187,9 +273,6 @@
             transition: all 0.2s ease;
             font-family: inherit;
             font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
         }
 
         .platform-tab:hover {
@@ -216,11 +299,10 @@
             color: #e8e6e3;
             padding: 1.25rem 1.5rem;
             border-radius: 8px;
-            font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', monospace;
             font-size: 0.9rem;
             margin: 1rem 0;
             border: 1px solid var(--brand-tertiary);
-            position: relative;
             overflow-x: auto;
             white-space: nowrap;
         }
@@ -233,10 +315,6 @@
 
         .install-command.powershell::before {
             content: 'PS> ';
-        }
-
-        .install-command.cmd::before {
-            content: 'C:\\> ';
         }
 
         .install-note {
@@ -314,14 +392,14 @@
 
         /* Features Grid */
         .features {
-            padding: 4rem 0;
+            padding: 3rem 0;
         }
 
         .features h2 {
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 1.75rem;
             font-weight: 700;
-            margin-bottom: 3rem;
+            margin-bottom: 2rem;
             color: var(--brand-primary);
         }
 
@@ -333,10 +411,9 @@
 
         .feature-card {
             background: var(--card-bg);
-            backdrop-filter: blur(20px);
             border: 2px solid var(--card-border);
             border-radius: 12px;
-            padding: 2rem;
+            padding: 1.5rem;
             box-shadow: var(--shadow-md);
             transition: all 0.3s ease;
         }
@@ -347,58 +424,82 @@
             border-color: var(--brand-primary);
         }
 
-        .feature-icon {
-            width: 48px;
-            height: 48px;
-            background: var(--hero-gradient);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-primary);
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            box-shadow: var(--shadow-gold);
-            border: 1px solid var(--brand-primary);
-        }
-
         .feature-title {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.5rem;
             color: var(--brand-primary);
         }
 
         .feature-description {
             color: var(--text-secondary);
             line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        /* Workflow Section */
+        .workflow-section {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .workflow-section h3 {
+            color: var(--brand-primary);
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-size: 1.25rem;
+        }
+
+        .workflow-steps {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .workflow-step {
+            background: var(--hero-gradient);
+            color: var(--text-primary);
+            padding: 0.75rem 1.25rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: 1px solid var(--brand-primary);
+        }
+
+        .workflow-arrow {
+            color: var(--brand-secondary);
+            font-size: 1.25rem;
         }
 
         /* Links Section */
         .links-section {
             background: var(--card-bg);
-            backdrop-filter: blur(20px);
             border: 2px solid var(--card-border);
             border-radius: 12px;
-            padding: 2.5rem;
+            padding: 2rem;
             margin: 3rem 0;
             box-shadow: var(--shadow-lg);
             text-align: center;
         }
 
         .links-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            display: flex;
             gap: 1rem;
-            margin-top: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
         }
 
         .link-button {
             display: inline-block;
             background: var(--hero-gradient);
             color: var(--text-primary);
-            padding: 1rem 2rem;
+            padding: 0.875rem 1.75rem;
             border-radius: 6px;
             text-decoration: none;
             font-weight: 600;
@@ -429,10 +530,10 @@
             padding: 2rem 0;
             color: var(--text-light);
             border-top: 2px solid var(--border-light);
-            margin-top: 4rem;
+            margin-top: 3rem;
         }
 
-        /* Art Deco decorative elements */
+        /* Art Deco divider */
         .ad-divider {
             display: flex;
             align-items: center;
@@ -458,7 +559,7 @@
         /* Responsive */
         @media (max-width: 768px) {
             .hero h1 {
-                font-size: 2.5rem;
+                font-size: 2.25rem;
             }
 
             .features-grid {
@@ -477,6 +578,18 @@
 
             .platform-tab {
                 justify-content: center;
+            }
+
+            .workflow-steps {
+                flex-direction: column;
+            }
+
+            .workflow-arrow {
+                transform: rotate(90deg);
+            }
+
+            .providers-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
     </style>
@@ -498,10 +611,136 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h1>Infrastructure-as-Code<br>for the Modern Data Stack</h1>
+            <h1>Schema-as-Configuration<br>for Databases</h1>
             <p class="hero-subtitle">
-                Unified management for databases, streaming, ETL, orchestration, and storage with enterprise governance and AI-powered insights.
+                Fastest path from schema drift to safe migration. Define your database schema in HCL, detect drift, generate SQL, and apply changes with confidence.
             </p>
+        </div>
+    </section>
+
+    <!-- Code Example -->
+    <section class="container">
+        <div class="code-section">
+            <h3>Define schemas in simple HCL configuration</h3>
+            <div class="code-block">
+<pre><span class="comment"># main.kl - Define your database schema</span>
+<span class="keyword">provider</span> <span class="string">"postgres"</span> {
+  host     = <span class="string">"localhost"</span>
+  port     = <span class="type">5432</span>
+  database = <span class="string">"myapp"</span>
+  username = <span class="attr">var.db_user</span>
+  password = <span class="attr">var.db_password</span>
+}
+
+<span class="keyword">create</span> <span class="string">"postgres_table"</span> <span class="string">"users"</span> {
+  name   = <span class="string">"users"</span>
+  schema = <span class="string">"public"</span>
+
+  <span class="keyword">column</span> <span class="string">"id"</span> {
+    type        = <span class="string">"bigserial"</span>
+    primary_key = <span class="type">true</span>
+  }
+
+  <span class="keyword">column</span> <span class="string">"email"</span> {
+    type     = <span class="string">"varchar(255)"</span>
+    not_null = <span class="type">true</span>
+    unique   = <span class="type">true</span>
+  }
+
+  <span class="keyword">column</span> <span class="string">"created_at"</span> {
+    type    = <span class="string">"timestamptz"</span>
+    default = <span class="string">"now()"</span>
+  }
+}</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow -->
+    <section class="container">
+        <div class="workflow-section">
+            <h3>Simple CLI Workflow</h3>
+            <div class="workflow-steps">
+                <span class="workflow-step">kolumn init</span>
+                <span class="workflow-arrow">→</span>
+                <span class="workflow-step">kolumn plan</span>
+                <span class="workflow-arrow">→</span>
+                <span class="workflow-step">kolumn apply</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Providers -->
+    <section class="providers-section">
+        <div class="container">
+            <h2>Supported Providers</h2>
+            <div class="providers-grid">
+                <div class="provider-card">
+                    <div class="provider-name">PostgreSQL</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">MySQL</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">SQLite</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">MSSQL</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">Snowflake</div>
+                    <div class="provider-type">Warehouse</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">BigQuery</div>
+                    <div class="provider-type">Warehouse</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">Redshift</div>
+                    <div class="provider-type">Warehouse</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">MongoDB</div>
+                    <div class="provider-type">NoSQL</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2>Why Kolumn?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3 class="feature-title">Schema Drift Detection</h3>
+                    <p class="feature-description">Compare your config against live databases. Instantly see what changed, what's unmanaged, and what needs attention.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Safe SQL Generation</h3>
+                    <p class="feature-description">Review generated SQL before applying. Risk scoring highlights potentially dangerous changes so you can proceed with confidence.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Multi-Environment</h3>
+                    <p class="feature-description">Manage dev, staging, and production with the same config. Variables and environment files keep credentials separate.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Rollback Support</h3>
+                    <p class="feature-description">Every migration generates rollback SQL. Undo changes quickly when something goes wrong.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">CI/CD Ready</h3>
+                    <p class="feature-description">Run plan in CI to catch drift early. Block risky PRs before they hit production. Integrate with GitHub Actions, GitLab CI, or any pipeline.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Audit Trail</h3>
+                    <p class="feature-description">Every compare and apply is logged. Know who changed what and when for compliance and debugging.</p>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -512,30 +751,22 @@
 
             <!-- Platform Tabs -->
             <div class="platform-tabs">
-                <button class="platform-tab active" onclick="showPlatform('linux')">
-                    <span>Linux</span>
-                </button>
-                <button class="platform-tab" onclick="showPlatform('macos')">
-                    <span>macOS</span>
-                </button>
-                <button class="platform-tab" onclick="showPlatform('windows')">
-                    <span>Windows</span>
-                </button>
-                <button class="platform-tab" onclick="showPlatform('wsl')">
-                    <span>WSL</span>
-                </button>
+                <button class="platform-tab active" onclick="showPlatform('linux')">Linux</button>
+                <button class="platform-tab" onclick="showPlatform('macos')">macOS</button>
+                <button class="platform-tab" onclick="showPlatform('windows')">Windows</button>
+                <button class="platform-tab" onclick="showPlatform('wsl')">WSL</button>
             </div>
 
             <!-- Linux -->
             <div id="platform-linux" class="platform-content active">
                 <div class="install-command">curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash</div>
-                <p class="install-note">Supports AMD64 and ARM64 architectures. Installs to <code>~/.local/bin/kolumn</code></p>
+                <p class="install-note">Supports AMD64 and ARM64. Installs to <code>~/.local/bin/kolumn</code></p>
             </div>
 
             <!-- macOS -->
             <div id="platform-macos" class="platform-content">
                 <div class="install-command">curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash</div>
-                <p class="install-note">Supports Intel (AMD64) and Apple Silicon (ARM64). Installs to <code>~/.local/bin/kolumn</code></p>
+                <p class="install-note">Supports Intel and Apple Silicon. Installs to <code>~/.local/bin/kolumn</code></p>
             </div>
 
             <!-- Windows Native -->
@@ -557,7 +788,7 @@
                 </div>
 
                 <div class="install-steps">
-                    <h4>Option 2: PowerShell Install Script</h4>
+                    <h4>Option 2: PowerShell</h4>
                     <div class="install-command powershell">irm https://schemabounce.github.io/Kolumn-deploy/install.ps1 | iex</div>
                 </div>
 
@@ -566,12 +797,11 @@
                 </div>
 
                 <div class="install-steps">
-                    <h4>Option 3: Manual Installation</h4>
+                    <h4>Option 3: Manual</h4>
                     <ol>
-                        <li>Download the Windows executable from the releases page</li>
-                        <li>Rename to <code>kolumn.exe</code> and move to a directory in your PATH</li>
-                        <li>Or add the download location to your PATH environment variable</li>
-                        <li>Open a new terminal and run <code>kolumn version</code> to verify</li>
+                        <li>Download from the releases page</li>
+                        <li>Rename to <code>kolumn.exe</code> and add to PATH</li>
+                        <li>Run <code>kolumn version</code> to verify</li>
                     </ol>
                 </div>
             </div>
@@ -580,53 +810,12 @@
             <div id="platform-wsl" class="platform-content">
                 <div class="install-command">curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash</div>
                 <div class="install-steps">
-                    <h4>WSL Setup Notes</h4>
+                    <h4>WSL Notes</h4>
                     <ol>
-                        <li>Ensure WSL 2 is installed: <code>wsl --install</code></li>
-                        <li>Open your WSL terminal (Ubuntu, Debian, etc.)</li>
+                        <li>Install WSL 2: <code>wsl --install</code></li>
+                        <li>Open your WSL terminal</li>
                         <li>Run the install command above</li>
-                        <li>Add to PATH if needed: <code>export PATH="$HOME/.local/bin:$PATH"</code></li>
                     </ol>
-                </div>
-                <p class="install-note">WSL provides the best Linux compatibility on Windows for development workflows.</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features">
-        <div class="container">
-            <h2>Why Choose Kolumn?</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">DB</div>
-                    <h3 class="feature-title">Unified Database Management</h3>
-                    <p class="feature-description">Support for PostgreSQL, MySQL, SQLite, MongoDB, DynamoDB, BigQuery, Snowflake, and more through a single interface.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">SD</div>
-                    <h3 class="feature-title">Schema Drift Detection</h3>
-                    <p class="feature-description">Automatically detect and track schema changes across environments with Git-style versioning and rollback capabilities.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">ETL</div>
-                    <h3 class="feature-title">ETL/Streaming Integration</h3>
-                    <p class="feature-description">Native support for dbt, Airbyte, Fivetran, Kafka, Kinesis, and other modern data pipeline tools.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">IaC</div>
-                    <h3 class="feature-title">Infrastructure as Code</h3>
-                    <p class="feature-description">Terraform-style HCL configuration for your entire data stack with plan, apply, and destroy workflows.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">SEC</div>
-                    <h3 class="feature-title">Enterprise Security</h3>
-                    <p class="feature-description">Role-based access control, audit logging, and compliance features for enterprise-grade data governance.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">AI</div>
-                    <h3 class="feature-title">AI-Powered Analytics</h3>
-                    <p class="feature-description">Built-in AI assistance for optimization recommendations, performance insights, and predictive maintenance.</p>
                 </div>
             </div>
         </div>
@@ -635,14 +824,13 @@
     <!-- Links Section -->
     <section class="container">
         <div class="links-section">
-            <h2 style="margin-bottom: 1rem; color: var(--brand-primary);">Get Started</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 2rem;">
-                Everything you need to start managing your data infrastructure as code.
+            <h2 style="margin-bottom: 0.5rem; color: var(--brand-primary);">Get Started</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Check drift in 5 minutes. Define, compare, apply.
             </p>
             <div class="links-grid">
                 <a href="https://github.com/schemabounce/Kolumn-deploy/releases" class="link-button">Releases</a>
                 <a href="https://github.com/schemabounce/Kolumn-deploy/tree/main/examples" class="link-button secondary">Examples</a>
-                <a href="https://github.com/schemabounce/Kolumn-deploy/archive/refs/heads/main.zip" class="link-button secondary">Download All</a>
             </div>
         </div>
     </section>
@@ -650,26 +838,19 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 SchemaBounce. Infrastructure-as-Code for the Modern Data Stack.</p>
+            <p>&copy; 2024 SchemaBounce. Schema-as-Configuration for Databases.</p>
         </div>
     </footer>
 
     <script>
         function showPlatform(platform) {
-            // Hide all platform content
             document.querySelectorAll('.platform-content').forEach(el => {
                 el.classList.remove('active');
             });
-
-            // Remove active from all tabs
             document.querySelectorAll('.platform-tab').forEach(el => {
                 el.classList.remove('active');
             });
-
-            // Show selected platform
             document.getElementById('platform-' + platform).classList.add('active');
-
-            // Mark selected tab as active
             event.currentTarget.classList.add('active');
         }
     </script>
