@@ -26,17 +26,17 @@ create "postgres_table" "users" {
   schema = "public"
   name   = "users"
 
-  column "id" {
+  id = {
     type        = "BIGSERIAL"
     primary_key = true
   }
 
-  column "email" {
+  email = {
     type   = "VARCHAR(255)"
     unique = true
   }
 
-  column "created_at" {
+  created_at = {
     type    = "TIMESTAMP"
     default = "CURRENT_TIMESTAMP"
   }
@@ -46,17 +46,17 @@ create "postgres_table" "orders" {
   schema = "public"
   name   = "orders"
 
-  column "id" {
+  id = {
     type        = "BIGSERIAL"
     primary_key = true
   }
 
-  column "user_id" {
+  user_id = {
     type       = "BIGINT"
     references = postgres_table.users.id
   }
 
-  column "amount" {
+  amount = {
     type = "DECIMAL(10,2)"
   }
 }

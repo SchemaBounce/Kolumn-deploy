@@ -40,18 +40,18 @@ create "postgres_table" "users" {
   schema   = "public"
   name     = "users"
 
-  column "id" {
+  id = {
     type        = "bigserial"
     primary_key = true
   }
 
-  column "email" {
+  email = {
     type     = "varchar(255)"
     not_null = true
     unique   = true
   }
 
-  column "created_at" {
+  created_at = {
     type    = "timestamp with time zone"
     default = "CURRENT_TIMESTAMP"
   }

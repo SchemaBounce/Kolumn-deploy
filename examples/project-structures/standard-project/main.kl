@@ -6,41 +6,41 @@ create "kolumn_data_object" "user_schema" {
   name        = "Standard User Schema"
   description = "User schema for standard project structure"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "username" {
+  username = {
     type            = "VARCHAR(50)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.public]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.pii]
   }
 
-  column "password_hash" {
+  password_hash = {
     type            = "VARCHAR(255)"
     nullable        = false
     classifications = [kolumn_classification.sensitive]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
     classifications = [kolumn_classification.public]
   }
 
-  column "updated_at" {
+  updated_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
@@ -57,46 +57,46 @@ create "kolumn_data_object" "post_schema" {
   name        = "Standard Post Schema"
   description = "Post schema for content management"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "title" {
+  title = {
     type            = "VARCHAR(200)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "content" {
+  content = {
     type            = "TEXT"
     nullable        = true
     classifications = [kolumn_classification.public]
   }
 
-  column "author_id" {
+  author_id = {
     type            = "BIGINT"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "status" {
+  status = {
     type            = "VARCHAR(20)"
     nullable        = false
     default         = "draft"
     classifications = [kolumn_classification.public]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
     classifications = [kolumn_classification.public]
   }
 
-  column "updated_at" {
+  updated_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"

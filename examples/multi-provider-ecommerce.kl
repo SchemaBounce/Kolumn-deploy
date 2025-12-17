@@ -129,13 +129,13 @@ create "kolumn_classification" "public" {
 create "kolumn_data_object" "customer" {
   description = "Universal customer data model"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     primary_key     = true
     classifications = [kolumn_classification.public]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     unique          = true
     classifications = [kolumn_classification.pii_low]
@@ -145,34 +145,34 @@ create "kolumn_data_object" "customer" {
     }
   }
 
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     classifications = [kolumn_classification.pii_low]
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     classifications = [kolumn_classification.pii_low]
   }
 
-  column "phone" {
+  phone = {
     type            = "VARCHAR(20)"
     classifications = [kolumn_classification.pii_high]
   }
 
-  column "payment_method_id" {
+  payment_method_id = {
     type                = "VARCHAR(255)"
     classifications     = [kolumn_classification.pii_high, kolumn_classification.financial]
     encryption_required = true
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMPTZ"
     default         = "NOW()"
     classifications = [kolumn_classification.public]
   }
 
-  column "updated_at" {
+  updated_at = {
     type            = "TIMESTAMPTZ"
     default         = "NOW()"
     classifications = [kolumn_classification.public]
@@ -237,44 +237,44 @@ create "kolumn_data_object" "customer" {
 create "kolumn_data_object" "product" {
   description = "Universal product catalog model"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     primary_key     = true
     classifications = [kolumn_classification.public]
   }
 
-  column "sku" {
+  sku = {
     type            = "VARCHAR(50)"
     unique          = true
     classifications = [kolumn_classification.public]
   }
 
-  column "name" {
+  name = {
     type            = "VARCHAR(200)"
     classifications = [kolumn_classification.public]
   }
 
-  column "description" {
+  description = {
     type            = "TEXT"
     classifications = [kolumn_classification.public]
   }
 
-  column "price" {
+  price = {
     type            = "DECIMAL(10,2)"
     classifications = [kolumn_classification.financial]
   }
 
-  column "category" {
+  category = {
     type            = "VARCHAR(100)"
     classifications = [kolumn_classification.public]
   }
 
-  column "inventory_count" {
+  inventory_count = {
     type            = "INTEGER"
     classifications = [kolumn_classification.public]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMPTZ"
     default         = "NOW()"
     classifications = [kolumn_classification.public]
@@ -323,19 +323,19 @@ create "kolumn_data_object" "product" {
 create "kolumn_data_object" "order" {
   description = "Universal order transaction model"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     primary_key     = true
     classifications = [kolumn_classification.public]
   }
 
-  column "customer_id" {
+  customer_id = {
     type            = "BIGINT"
     foreign_key     = "customer.id"
     classifications = [kolumn_classification.pii_low]
   }
 
-  column "status" {
+  status = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.public]
     validation = {
@@ -343,22 +343,22 @@ create "kolumn_data_object" "order" {
     }
   }
 
-  column "total_amount" {
+  total_amount = {
     type            = "DECIMAL(12,2)"
     classifications = [kolumn_classification.financial]
   }
 
-  column "payment_status" {
+  payment_status = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.financial]
   }
 
-  column "shipping_address" {
+  shipping_address = {
     type            = "JSONB"
     classifications = [kolumn_classification.pii_low]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMPTZ"
     default         = "NOW()"
     classifications = [kolumn_classification.public]
@@ -415,18 +415,18 @@ create "kolumn_data_object" "order" {
 create "kolumn_data_object" "user_event" {
   description = "High-volume user interaction events"
 
-  column "event_id" {
+  event_id = {
     type            = "UUID"
     primary_key     = true
     classifications = [kolumn_classification.public]
   }
 
-  column "user_id" {
+  user_id = {
     type            = "BIGINT"
     classifications = [kolumn_classification.pii_low]
   }
 
-  column "event_type" {
+  event_type = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.event_data]
     validation = {
@@ -434,12 +434,12 @@ create "kolumn_data_object" "user_event" {
     }
   }
 
-  column "properties" {
+  properties = {
     type            = "JSONB"
     classifications = [kolumn_classification.event_data]
   }
 
-  column "timestamp" {
+  timestamp = {
     type            = "TIMESTAMPTZ"
     default         = "NOW()"
     classifications = [kolumn_classification.public]

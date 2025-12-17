@@ -95,14 +95,14 @@ create "kolumn_data_object" "citizen_record" {
   name        = "Citizen Services Record Schema"
   description = "Citizen data with Privacy Act protection"
 
-  column "citizen_id" {
+  citizen_id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.government_identifier]
   }
 
-  column "ssn" {
+  ssn = {
     type            = "VARCHAR(11)"
     nullable        = true
     classifications = [kolumn_classification.pii, kolumn_classification.restricted]
@@ -115,7 +115,7 @@ create "kolumn_data_object" "citizen_record" {
     }
   }
 
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.pii]
@@ -125,7 +125,7 @@ create "kolumn_data_object" "citizen_record" {
     }
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.pii]
@@ -135,7 +135,7 @@ create "kolumn_data_object" "citizen_record" {
     }
   }
 
-  column "date_of_birth" {
+  date_of_birth = {
     type            = "DATE"
     nullable        = false
     classifications = [kolumn_classification.pii]
@@ -145,7 +145,7 @@ create "kolumn_data_object" "citizen_record" {
     }
   }
 
-  column "address" {
+  address = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.pii]
@@ -155,7 +155,7 @@ create "kolumn_data_object" "citizen_record" {
     }
   }
 
-  column "security_clearance" {
+  security_clearance = {
     type            = "VARCHAR(20)"
     nullable        = true
     classifications = [kolumn_classification.security_relevant]
@@ -166,19 +166,19 @@ create "kolumn_data_object" "citizen_record" {
     }
   }
 
-  column "service_interactions" {
+  service_interactions = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.official_use]
   }
 
-  column "created_at" {
+  created_at = {
     type     = "TIMESTAMP"
     nullable = false
     default  = "CURRENT_TIMESTAMP"
   }
 
-  column "audit_trail" {
+  audit_trail = {
     type            = "JSONB"
     nullable        = false
     classifications = [kolumn_classification.audit]
@@ -197,37 +197,37 @@ create "kolumn_data_object" "security_event" {
   name        = "Security Operations Schema"
   description = "Security events and threat monitoring data"
 
-  column "event_id" {
+  event_id = {
     type        = "BIGINT"
     nullable    = false
     primary_key = true
   }
 
-  column "event_type" {
+  event_type = {
     type            = "VARCHAR(50)"
     nullable        = false
     classifications = [kolumn_classification.security_relevant]
   }
 
-  column "severity" {
+  severity = {
     type            = "VARCHAR(20)"
     nullable        = false
     classifications = [kolumn_classification.security_relevant]
   }
 
-  column "source_ip" {
+  source_ip = {
     type            = "INET"
     nullable        = true
     classifications = [kolumn_classification.security_relevant]
   }
 
-  column "user_agent" {
+  user_agent = {
     type            = "TEXT"
     nullable        = true
     classifications = [kolumn_classification.security_relevant]
   }
 
-  column "threat_indicators" {
+  threat_indicators = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.classified]
@@ -238,13 +238,13 @@ create "kolumn_data_object" "security_event" {
     }
   }
 
-  column "response_actions" {
+  response_actions = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.official_use]
   }
 
-  column "occurred_at" {
+  occurred_at = {
     type     = "TIMESTAMP"
     nullable = false
   }

@@ -135,17 +135,17 @@ create "postgres_table" "user_analytics" {
   }
 
   # Add analytics-specific columns
-  column "first_login" {
+  first_login = {
     type     = "TIMESTAMP"
     nullable = true
   }
 
-  column "last_activity" {
+  last_activity = {
     type     = "TIMESTAMP"
     nullable = true
   }
 
-  column "total_orders" {
+  total_orders = {
     type    = "INTEGER"
     default = 0
   }
@@ -171,7 +171,7 @@ create "postgres_table" "user_archive" {
   }
 
   # Archive-specific metadata
-  column "archived_at" {
+  archived_at = {
     type    = "TIMESTAMP"
     default = "CURRENT_TIMESTAMP"
   }
@@ -393,7 +393,7 @@ create "postgres_table" "user_analytics_public" {
   }
 
   # Add analytics columns
-  column "page_views" {
+  page_views = {
     type    = "INTEGER"
     default = 0
   }
@@ -527,7 +527,7 @@ create "postgres_table" "user_development" {
   }
 
   # Add development-specific columns
-  column "dev_notes" {
+  dev_notes = {
     type     = "TEXT"
     nullable = true
   }
@@ -561,12 +561,12 @@ create "postgres_table" "user_warehouse" {
   }
 
   # Warehouse-specific columns
-  column "etl_batch_id" {
+  etl_batch_id = {
     type     = "BIGINT"
     nullable = false
   }
 
-  column "warehouse_inserted_at" {
+  warehouse_inserted_at = {
     type    = "TIMESTAMP"
     default = "CURRENT_TIMESTAMP"
   }
@@ -634,12 +634,12 @@ create "postgres_table" "user_api_response" {
   }
 
   # API-specific metadata
-  column "api_version" {
+  api_version = {
     type    = "VARCHAR(10)"
     default = "v2"
   }
 
-  column "response_timestamp" {
+  response_timestamp = {
     type    = "BIGINT"
     default = "extract(epoch from now()) * 1000"
   }

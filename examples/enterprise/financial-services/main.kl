@@ -75,14 +75,14 @@ create "kolumn_data_object" "trading_position" {
   name        = "Trading Position Schema"
   description = "Core trading position data with SOX compliance"
 
-  column "position_id" {
+  position_id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "trader_id" {
+  trader_id = {
     type            = "VARCHAR(50)"
     nullable        = false
     classifications = [kolumn_classification.pii]
@@ -92,31 +92,31 @@ create "kolumn_data_object" "trading_position" {
     }
   }
 
-  column "security_symbol" {
+  security_symbol = {
     type            = "VARCHAR(20)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "quantity" {
+  quantity = {
     type            = "DECIMAL(18,8)"
     nullable        = false
     classifications = [kolumn_classification.confidential]
   }
 
-  column "price" {
+  price = {
     type            = "DECIMAL(18,4)"
     nullable        = false
     classifications = [kolumn_classification.confidential]
   }
 
-  column "trade_timestamp" {
+  trade_timestamp = {
     type     = "TIMESTAMP"
     nullable = false
     default  = "CURRENT_TIMESTAMP"
   }
 
-  column "audit_trail" {
+  audit_trail = {
     type            = "JSONB"
     nullable        = false
     classifications = [kolumn_classification.audit]
@@ -135,31 +135,31 @@ create "kolumn_data_object" "risk_metrics" {
   name        = "Risk Metrics Schema"
   description = "Risk management and compliance metrics"
 
-  column "metric_id" {
+  metric_id = {
     type        = "BIGINT"
     nullable    = false
     primary_key = true
   }
 
-  column "portfolio_id" {
+  portfolio_id = {
     type            = "VARCHAR(50)"
     nullable        = false
     classifications = [kolumn_classification.confidential]
   }
 
-  column "var_95" {
+  var_95 = {
     type            = "DECIMAL(18,4)"
     nullable        = true
     classifications = [kolumn_classification.confidential]
   }
 
-  column "stress_test_result" {
+  stress_test_result = {
     type            = "DECIMAL(18,4)"
     nullable        = true
     classifications = [kolumn_classification.confidential]
   }
 
-  column "calculated_at" {
+  calculated_at = {
     type     = "TIMESTAMP"
     nullable = false
     default  = "CURRENT_TIMESTAMP"

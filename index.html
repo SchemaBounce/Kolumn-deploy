@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kolumn - Schema-as-Configuration for Databases</title>
+    <title>Kolumn - Schema-as-Configuration for Data & Streaming</title>
     <style>
         /* Art Deco + 70s Audio Equipment Theme - Matching SchemaBounce Frontend */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -186,6 +186,161 @@
         .code-block .comment { color: #6b7280; font-style: italic; }
         .code-block .type { color: #B8976F; }
         .code-block .attr { color: #e8e6e3; }
+
+        /* Data Flow */
+        .flow-section {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .flow-title {
+            color: var(--brand-primary);
+            text-align: center;
+            font-size: 1.35rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .flow-subtitle {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .flow-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .flow-tab {
+            padding: 0.65rem 1.25rem;
+            border: 2px solid var(--border-light);
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+
+        .flow-tab:hover {
+            border-color: var(--brand-primary);
+            color: var(--brand-primary);
+        }
+
+        .flow-tab.active {
+            background: var(--hero-gradient);
+            border-color: var(--brand-primary);
+            color: var(--text-primary);
+        }
+
+        .flow-content {
+            display: none;
+        }
+
+        .flow-content.active {
+            display: block;
+        }
+
+        .flow-rail {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .flow-node {
+            flex: 1 1 140px;
+            min-width: 140px;
+            background: rgba(26, 26, 24, 0.92);
+            border: 2px solid var(--card-border);
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: var(--shadow-md);
+            color: #e8e6e3;
+            text-align: center;
+        }
+
+        .flow-node h4 {
+            margin-bottom: 0.4rem;
+            color: var(--brand-primary);
+            font-size: 1rem;
+        }
+
+        .flow-node p {
+            font-size: 0.9rem;
+            color: #c9c7c1;
+        }
+
+        .flow-arrow {
+            font-size: 1.4rem;
+            color: var(--brand-secondary);
+        }
+
+        /* Replication Examples */
+        .replication-section {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0 3rem;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .replication-section h3 {
+            color: var(--brand-primary);
+            text-align: center;
+            margin-bottom: 0.5rem;
+            font-size: 1.35rem;
+        }
+
+        .replication-subtitle {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .replication-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .replication-card {
+            background: rgba(26, 26, 24, 0.92);
+            border: 2px solid var(--card-border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            box-shadow: var(--shadow-md);
+            color: #e8e6e3;
+        }
+
+        .replication-card .card-title {
+            color: var(--brand-primary);
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .replication-card .card-note {
+            color: var(--text-secondary);
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .replication-card .code-block {
+            max-height: 520px;
+        }
 
         /* Providers Section */
         .providers-section {
@@ -591,6 +746,18 @@
             .providers-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+
+            .replication-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-rail {
+                flex-direction: column;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
         }
     </style>
 </head>
@@ -611,136 +778,10 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h1>Schema-as-Configuration<br>for Databases</h1>
+            <h1>Schema-as-Configuration<br>for Data &amp; Streaming</h1>
             <p class="hero-subtitle">
-                Fastest path from schema drift to safe migration. Define your database schema in HCL, detect drift, generate SQL, and apply changes with confidence.
+                Fastest path from schema drift to safe change: define schemas in HCL, detect drift, generate SQL, and ship database + streaming updates with confidence.
             </p>
-        </div>
-    </section>
-
-    <!-- Code Example -->
-    <section class="container">
-        <div class="code-section">
-            <h3>Define schemas in simple HCL configuration</h3>
-            <div class="code-block">
-<pre><span class="comment"># main.kl - Define your database schema</span>
-<span class="keyword">provider</span> <span class="string">"postgres"</span> {
-  host     = <span class="string">"localhost"</span>
-  port     = <span class="type">5432</span>
-  database = <span class="string">"myapp"</span>
-  username = <span class="attr">var.db_user</span>
-  password = <span class="attr">var.db_password</span>
-}
-
-<span class="keyword">create</span> <span class="string">"postgres_table"</span> <span class="string">"users"</span> {
-  name   = <span class="string">"users"</span>
-  schema = <span class="string">"public"</span>
-
-  <span class="keyword">column</span> <span class="string">"id"</span> {
-    type        = <span class="string">"bigserial"</span>
-    primary_key = <span class="type">true</span>
-  }
-
-  <span class="keyword">column</span> <span class="string">"email"</span> {
-    type     = <span class="string">"varchar(255)"</span>
-    not_null = <span class="type">true</span>
-    unique   = <span class="type">true</span>
-  }
-
-  <span class="keyword">column</span> <span class="string">"created_at"</span> {
-    type    = <span class="string">"timestamptz"</span>
-    default = <span class="string">"now()"</span>
-  }
-}</pre>
-            </div>
-        </div>
-    </section>
-
-    <!-- Workflow -->
-    <section class="container">
-        <div class="workflow-section">
-            <h3>Simple CLI Workflow</h3>
-            <div class="workflow-steps">
-                <span class="workflow-step">kolumn init</span>
-                <span class="workflow-arrow">→</span>
-                <span class="workflow-step">kolumn plan</span>
-                <span class="workflow-arrow">→</span>
-                <span class="workflow-step">kolumn apply</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- Providers -->
-    <section class="providers-section">
-        <div class="container">
-            <h2>Supported Providers</h2>
-            <div class="providers-grid">
-                <div class="provider-card">
-                    <div class="provider-name">PostgreSQL</div>
-                    <div class="provider-type">Database</div>
-                </div>
-                <div class="provider-card">
-                    <div class="provider-name">MySQL</div>
-                    <div class="provider-type">Database</div>
-                </div>
-                <div class="provider-card">
-                    <div class="provider-name">SQLite</div>
-                    <div class="provider-type">Database</div>
-                </div>
-                <div class="provider-card">
-                    <div class="provider-name">MSSQL</div>
-                    <div class="provider-type">Database</div>
-                </div>
-                <div class="provider-card">
-                    <div class="provider-name">Snowflake</div>
-                    <div class="provider-type">Warehouse</div>
-                </div>
-                <div class="provider-card">
-                    <div class="provider-name">BigQuery</div>
-                    <div class="provider-type">Warehouse</div>
-                </div>
-                <div class="provider-card">
-                    <div class="provider-name">Redshift</div>
-                    <div class="provider-type">Warehouse</div>
-                </div>
-                <div class="provider-card">
-                    <div class="provider-name">MongoDB</div>
-                    <div class="provider-type">NoSQL</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features">
-        <div class="container">
-            <h2>Why Kolumn?</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <h3 class="feature-title">Schema Drift Detection</h3>
-                    <p class="feature-description">Compare your config against live databases. Instantly see what changed, what's unmanaged, and what needs attention.</p>
-                </div>
-                <div class="feature-card">
-                    <h3 class="feature-title">Safe SQL Generation</h3>
-                    <p class="feature-description">Review generated SQL before applying. Risk scoring highlights potentially dangerous changes so you can proceed with confidence.</p>
-                </div>
-                <div class="feature-card">
-                    <h3 class="feature-title">Multi-Environment</h3>
-                    <p class="feature-description">Manage dev, staging, and production with the same config. Variables and environment files keep credentials separate.</p>
-                </div>
-                <div class="feature-card">
-                    <h3 class="feature-title">Rollback Support</h3>
-                    <p class="feature-description">Every migration generates rollback SQL. Undo changes quickly when something goes wrong.</p>
-                </div>
-                <div class="feature-card">
-                    <h3 class="feature-title">CI/CD Ready</h3>
-                    <p class="feature-description">Run plan in CI to catch drift early. Block risky PRs before they hit production. Integrate with GitHub Actions, GitLab CI, or any pipeline.</p>
-                </div>
-                <div class="feature-card">
-                    <h3 class="feature-title">Audit Trail</h3>
-                    <p class="feature-description">Every compare and apply is logged. Know who changed what and when for compliance and debugging.</p>
-                </div>
-            </div>
         </div>
     </section>
 
@@ -821,6 +862,452 @@
         </div>
     </section>
 
+    <!-- Code Example -->
+    <section class="container">
+        <div class="code-section">
+            <h3>Define schemas in simple HCL configuration</h3>
+            <div class="code-block">
+<pre><span class="comment"># main.kl - Define your database schema</span>
+<span class="keyword">provider</span> <span class="string">"postgres"</span> {
+  host     = <span class="string">"localhost"</span>
+  port     = <span class="type">5432</span>
+  database = <span class="string">"myapp"</span>
+  username = <span class="attr">var.db_user</span>
+  password = <span class="attr">var.db_password</span>
+}
+
+<span class="keyword">create</span> <span class="string">"postgres_table"</span> <span class="string">"users"</span> {
+  name   = <span class="string">"users"</span>
+  schema = <span class="string">"public"</span>
+
+  <span class="keyword">columns</span> = {
+    <span class="attr">id</span> = {
+      type        = <span class="string">"bigserial"</span>
+      primary_key = <span class="type">true</span>
+    }
+
+    <span class="attr">email</span> = {
+      type     = <span class="string">"varchar(255)"</span>
+      not_null = <span class="type">true</span>
+      unique   = <span class="type">true</span>
+    }
+
+    <span class="attr">created_at</span> = {
+      type    = <span class="string">"timestamptz"</span>
+      default = <span class="string">"now()"</span>
+    }
+  }
+}</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Flow -->
+    <section class="container">
+        <div class="flow-section">
+            <div class="flow-title">What the Kolumn snippet does</div>
+            <p class="flow-subtitle">From HCL to SQL with drift detection, risk scoring, controlled apply, and state.</p>
+
+            <div class="flow-tabs">
+                <button class="flow-tab active" onclick="showFlow('plan', this)">Plan</button>
+                <button class="flow-tab" onclick="showFlow('risk', this)">Risk scoring</button>
+                <button class="flow-tab" onclick="showFlow('apply', this)">Apply</button>
+                <button class="flow-tab" onclick="showFlow('state', this)">State</button>
+            </div>
+
+            <div id="flow-plan" class="flow-content active">
+                <div class="flow-rail">
+                    <div class="flow-node">
+                        <h4>1) Compare</h4>
+                        <p><code>kolumn plan</code> diffs HCL vs live DB, finds drift/unmanaged objects.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>2) SQL generation</h4>
+                        <p>Builds ordered DDL (CREATE/ALTER) plus rollback SQL for every step.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>3) Outputs</h4>
+                        <p>Shows a plan summary: create table users, add unique index on email, etc.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flow-risk" class="flow-content">
+                <div class="flow-rail">
+                    <div class="flow-node">
+                        <h4>Risk scoring</h4>
+                        <p>Each change is labeled low/medium/high (drops, rewrites, locking changes).</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Guards</h4>
+                        <p>High-risk steps call out why: "Drop column email is destructive", "Rewrite table".</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Approval cue</h4>
+                        <p>You decide to proceed, edit config, or split the change before applying.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flow-apply" class="flow-content">
+                <div class="flow-rail">
+                    <div class="flow-node">
+                        <h4>Execution plan</h4>
+                        <p>Runs the generated SQL in order with transactional safety where supported.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Safety checks</h4>
+                        <p>Stops on errors, respects lock-sensitive operations, surfaces rollback SQL.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Outcome</h4>
+                        <p>Reports success/failure per statement; warns on partial applies if any.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flow-state" class="flow-content">
+                <div class="flow-rail">
+                    <div class="flow-node">
+                        <h4>State file</h4>
+                        <p>Kolumn records the post-apply state (tables, columns, checks, indexes).</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Next run</h4>
+                        <p>Future <code>plan</code> runs diff against state + live DB to find new drift.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Audit</h4>
+                        <p>Plan/apply logs with timestamps and SQL are kept for review/compliance.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Streaming Replication Example -->
+    <section class="container">
+        <div class="replication-section">
+            <h3>MSSQL → Snowflake streaming replication</h3>
+            <p class="replication-subtitle">
+                Stream CDC from MSSQL into Snowflake with auto-schema creation, merge batching, and drift-safe routing filters.
+            </p>
+            <div class="replication-grid">
+                <div class="replication-card">
+                    <div class="card-title">Kolumn config</div>
+                    <div class="code-block">
+<pre><span class="comment"># main.kl - stream CDC from MSSQL into Snowflake (end-to-end)</span>
+<span class="keyword">provider</span> <span class="string">"mssql"</span> {
+  host     = <span class="string">"mssql.internal"</span>
+  database = <span class="string">"orders"</span>
+  username = <span class="attr">var.mssql_user</span>
+  password = <span class="attr">var.mssql_password</span>
+}
+
+<span class="keyword">provider</span> <span class="string">"snowflake"</span> {
+  account   = <span class="attr">var.snowflake_account</span>
+  database  = <span class="string">"ANALYTICS"</span>
+  schema    = <span class="string">"CDC"</span>
+  warehouse = <span class="string">"COMPUTE_WH"</span>
+  role      = <span class="string">"CDC_SYNC"</span>
+}
+
+<span class="comment"># Source table with PII column</span>
+<span class="keyword">create</span> <span class="string">"mssql_table"</span> <span class="string">"users"</span> {
+  name   = <span class="string">"users"</span>
+  schema = <span class="string">"dbo"</span>
+
+  <span class="keyword">columns</span> = {
+    <span class="attr">id</span> = {
+      type        = <span class="string">"uniqueidentifier"</span>
+      default     = <span class="string">"NEWSEQUENTIALID()"</span>
+      primary_key = <span class="type">true</span>
+    }
+    <span class="attr">email</span> = {
+      type     = <span class="string">"varchar(255)"</span>
+      not_null = <span class="type">true</span>
+      unique   = <span class="type">true</span>
+    }
+    <span class="attr">created_at</span> = {
+      type    = <span class="string">"datetime2"</span>
+      default = <span class="string">"SYSUTCDATETIME()"</span>
+    }
+  }
+}
+
+<span class="comment"># Snowflake roles/users and masking for PII</span>
+<span class="keyword">create</span> <span class="string">"snowflake_role"</span> <span class="string">"cdc_consumer"</span> {
+  name = <span class="string">"CDC_CONSUMER"</span>
+}
+
+<span class="keyword">create</span> <span class="string">"snowflake_user"</span> <span class="string">"cdc_sync_user"</span> {
+  name         = <span class="string">"CDC_SYNC_USER"</span>
+  default_role = <span class="attr">snowflake_role.cdc_consumer.name</span>
+  password     = <span class="attr">var.snowflake_password</span>
+}
+
+<span class="keyword">create</span> <span class="string">"snowflake_masking_policy"</span> <span class="string">"mask_email"</span> {
+  name = <span class="string">"MASK_EMAIL"</span>
+  body = <span class="string">"CASE WHEN CURRENT_ROLE() = 'CDC_CONSUMER' THEN email ELSE REGEXP_REPLACE(email, '(.).+(@.*)', '\\\\1***\\\\2') END"</span>
+}
+
+<span class="comment"># Snowflake landing table with masking applied</span>
+<span class="keyword">create</span> <span class="string">"snowflake_table"</span> <span class="string">"users_replica"</span> {
+  database = <span class="string">"ANALYTICS"</span>
+  schema   = <span class="string">"CDC"</span>
+  name     = <span class="string">"USERS"</span>
+
+  <span class="keyword">columns</span> = {
+    <span class="attr">id</span> = {
+      type        = <span class="string">"BINARY(16)"</span>
+      primary_key = <span class="type">true</span>
+    }
+    <span class="attr">email</span> = {
+      type           = <span class="string">"VARCHAR"</span>
+      masking_policy = <span class="attr">snowflake_masking_policy.mask_email.name</span>
+    }
+    <span class="attr">created_at</span> = {
+      type = <span class="string">"TIMESTAMP_NTZ"</span>
+    }
+  }
+}
+
+<span class="keyword">create</span> <span class="string">"stream_sink"</span> <span class="string">"snowflake_replica"</span> {
+  type = <span class="string">"snowflake"</span>
+  connection_info = {
+    account   = <span class="attr">var.snowflake_account</span>
+    user      = <span class="string">"CDC_SYNC_USER"</span>
+    password  = <span class="attr">var.snowflake_password</span>
+    database  = <span class="string">"ANALYTICS"</span>
+    schema    = <span class="string">"CDC"</span>
+    warehouse = <span class="string">"COMPUTE_WH"</span>
+  }
+  batch_mode    = <span class="string">"merge"</span>
+  buffer_size   = <span class="type">1000</span>
+  create_tables = <span class="type">true</span>
+}
+
+<span class="keyword">create</span> <span class="string">"stream_route"</span> <span class="string">"mssql_orders_to_snowflake"</span> {
+  source = {
+    type        = <span class="string">"mssql_cdc"</span>
+    database    = <span class="string">"orders"</span>
+    slot_name   = <span class="string">"cdc_orders_slot"</span>
+    publication = <span class="string">"cdc_orders_publication"</span>
+  }
+
+  sink = <span class="attr">stream_sink.snowflake_replica.id</span>
+
+  filter {
+    event_types = [<span class="string">"DML"</span>]
+    conditions  = [<span class="string">"schema NOT IN ('cdc', 'sys')"</span>]
+  }
+
+  throughput_targets {
+    target_tps   = <span class="type">1000</span>
+    worker_count = <span class="type">1</span>
+  }
+
+  <span class="comment"># Optional: allow DDL table creates from CDC (if desired)</span>
+  <span class="comment"># filter {</span>
+  <span class="comment">#   event_types = ["DDL", "DML"]</span>
+  <span class="comment">#   conditions  = ["operation IN ('CREATE TABLE','ALTER TABLE','DROP TABLE')"]</span>
+  <span class="comment"># }</span>
+}</pre>
+                    </div>
+                    <p class="card-note">PII columns (e.g., <code>email</code>) can be classified in Kolumn so Snowflake masking/role grants apply on arrival.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Streaming Data Flow -->
+    <section class="container">
+        <div class="flow-section">
+            <div class="flow-title">Data flow: MSSQL CDC to Snowflake</div>
+            <p class="flow-subtitle">How events travel from source tables to Snowflake with Kolumn + streaming.</p>
+
+            <div class="flow-tabs">
+                <button class="flow-tab active" onclick="showFlow('cdc', this)">CDC path</button>
+                <button class="flow-tab" onclick="showFlow('governance', this)">Governance</button>
+                <button class="flow-tab" onclick="showFlow('observability', this)">Observability</button>
+            </div>
+
+            <div id="flow-cdc" class="flow-content active">
+                <div class="flow-rail">
+                    <div class="flow-node">
+                        <h4>1) MSSQL CDC</h4>
+                        <p>Source changes captured from <strong>orders</strong> via MSSQL CDC.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>2) SchemaBounce</h4>
+                        <p>Events flow through the SchemaBounce streaming service, aligned to Kolumn config.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>3) Snowflake</h4>
+                        <p>CDC rows land in <strong>ANALYTICS.CDC</strong>; downstream models consume curated views.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flow-governance" class="flow-content">
+                <div class="flow-rail">
+                    <div class="flow-node">
+                        <h4>Classifications</h4>
+                        <p>Kolumn tags columns (PII/financial) and propagates policies to Snowflake.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Masking/roles</h4>
+                        <p>Snowflake roles, masking policies, and access filters generated from HCL.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Lineage</h4>
+                        <p>Data objects track source → warehouse lineage for audits and impact analysis.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flow-observability" class="flow-content">
+                <div class="flow-rail">
+                    <div class="flow-node">
+                        <h4>Metrics</h4>
+                        <p>Per-step throughput, latency, retries, and queue depth exported to Grafana.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>DLQ</h4>
+                        <p>Failed events land in DLQ with filters + retry paths; exports for forensics.</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node">
+                        <h4>Audit/state</h4>
+                        <p>Plan/apply logs + Kolumn state track schema and migration history end-to-end.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Providers -->
+    <section class="providers-section">
+        <div class="container">
+            <h2>Supported Providers</h2>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.95rem;">
+                Create + discover + state/RPC wiring across databases, warehouses, lakehouses, and NoSQL/time-series engines.
+            </p>
+            <div class="providers-grid">
+                <div class="provider-card">
+                    <div class="provider-name">PostgreSQL</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">MySQL</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">SQLite</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">CockroachDB</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">MSSQL</div>
+                    <div class="provider-type">Database</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">Snowflake</div>
+                    <div class="provider-type">Warehouse</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">BigQuery</div>
+                    <div class="provider-type">Warehouse</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">Databricks</div>
+                    <div class="provider-type">Lakehouse</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">Redshift</div>
+                    <div class="provider-type">Warehouse</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">DuckDB</div>
+                    <div class="provider-type">OLAP</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">MongoDB</div>
+                    <div class="provider-type">NoSQL</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">DynamoDB</div>
+                    <div class="provider-type">NoSQL</div>
+                </div>
+                <div class="provider-card">
+                    <div class="provider-name">InfluxDB</div>
+                    <div class="provider-type">Time-series</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2>Why Kolumn?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3 class="feature-title">Schema Drift Detection</h3>
+                    <p class="feature-description">Compare your config against live databases. Instantly see what changed, what's unmanaged, and what needs attention.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Safe SQL Generation</h3>
+                    <p class="feature-description">Review generated SQL before applying. Risk scoring highlights potentially dangerous changes so you can proceed with confidence.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Multi-Environment</h3>
+                    <p class="feature-description">Manage dev, staging, and production with the same config. Variables and environment files keep credentials separate.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Rollback Support</h3>
+                    <p class="feature-description">Plans include rollback notes: simple creates map to drops; complex changes (type rewrites) include guidance and may need backups for full recovery.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">CI/CD Ready</h3>
+                    <p class="feature-description">Run plan in CI to catch drift early. Block risky PRs before they hit production. Integrate with GitHub Actions, GitLab CI, or any pipeline.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Audit Trail</h3>
+                    <p class="feature-description">Every compare and apply is logged. Know who changed what and when for compliance and debugging.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Transformation Migrations</h3>
+                    <p class="feature-description">Structured forward/backward migrations (no raw SQL): prechecks, provider-run steps, rollback paths, and optional quarantine/backup hints recorded in state.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Risk Scoring & Guardrails</h3>
+                    <p class="feature-description">Plans flag high-risk steps (drops/rewrites), enforce prechecks, and let you pause, approve, or split changes before apply.</p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Provider Coverage</h3>
+                    <p class="feature-description">13 engines supported with create + discover + state/RPC wiring: Postgres, MySQL, MSSQL, SQLite, CockroachDB, Snowflake, BigQuery, Databricks, Redshift, DuckDB, MongoDB, DynamoDB, InfluxDB.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Links Section -->
     <section class="container">
         <div class="links-section">
@@ -852,6 +1339,13 @@
             });
             document.getElementById('platform-' + platform).classList.add('active');
             event.currentTarget.classList.add('active');
+        }
+
+        function showFlow(flow, el) {
+            document.querySelectorAll('.flow-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.flow-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('flow-' + flow).classList.add('active');
+            el.classList.add('active');
         }
     </script>
 </body>

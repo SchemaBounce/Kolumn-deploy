@@ -48,7 +48,7 @@ create "kolumn_data_object" "demo_user_schema" {
   description = "Full enterprise user schema with comprehensive PII detection and business intelligence"
 
   # Core identity columns
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
@@ -56,7 +56,7 @@ create "kolumn_data_object" "demo_user_schema" {
   }
 
   # Contact information (PII)
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     nullable        = false
     unique          = true
@@ -64,53 +64,53 @@ create "kolumn_data_object" "demo_user_schema" {
   }
 
   # Personal information
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.personal]
   }
 
-  column "middle_name" {
+  middle_name = {
     type            = "VARCHAR(100)"
     nullable        = true
     classifications = [kolumn_classification.personal]
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.personal]
   }
 
   # Contact PII
-  column "phone" {
+  phone = {
     type            = "VARCHAR(20)"
     nullable        = true
     classifications = [kolumn_classification.pii]
   }
 
   # 🆕 NEW BUSINESS COLUMNS: Different data types and purposes
-  column "user_tier" {
+  user_tier = {
     type            = "VARCHAR(20)"
     nullable        = false
     default         = "standard"
     classifications = [kolumn_classification.public]
   }
 
-  column "annual_revenue" {
+  annual_revenue = {
     type            = "DECIMAL(15,2)"
     nullable        = true
     classifications = [kolumn_classification.financial]
   }
 
-  column "account_balance" {
+  account_balance = {
     type            = "DECIMAL(12,2)"
     nullable        = false
     default         = "0.00"
     classifications = [kolumn_classification.financial]
   }
 
-  column "is_verified" {
+  is_verified = {
     type            = "BOOLEAN"
     nullable        = false
     default         = "false"
@@ -118,47 +118,47 @@ create "kolumn_data_object" "demo_user_schema" {
   }
 
   # 🛡️ NEW PII COLUMNS: High sensitivity data
-  column "social_security_number" {
+  social_security_number = {
     type            = "VARCHAR(50)"
     nullable        = true
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
-  column "date_of_birth" {
+  date_of_birth = {
     type            = "DATE"
     nullable        = true
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
   # 📊 NEW ANALYTICS COLUMNS: JSON and array data
-  column "preferences" {
+  preferences = {
     type            = "JSONB"
     nullable        = false
     default         = "{}"
     classifications = [kolumn_classification.public]
   }
 
-  column "tags" {
+  tags = {
     type            = "VARCHAR[]"
     nullable        = true
     classifications = [kolumn_classification.public]
   }
 
   # 🕒 TEMPORAL COLUMNS: Enhanced tracking
-  column "last_login_at" {
+  last_login_at = {
     type            = "TIMESTAMP"
     nullable        = true
     classifications = [kolumn_classification.public]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
     classifications = [kolumn_classification.public]
   }
 
-  column "updated_at" {
+  updated_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
@@ -355,23 +355,23 @@ create "postgres_table" "demo_user_analytics" {
   }
 
   # Enhanced analytics columns
-  column "total_sessions" {
+  total_sessions = {
     type    = "INTEGER"
     default = 0
   }
 
-  column "lifetime_value" {
+  lifetime_value = {
     type     = "DECIMAL(15,2)"
     nullable = true
   }
 
-  column "last_activity" {
+  last_activity = {
     type     = "TIMESTAMP"
     nullable = true
   }
 
   # 📊 COMPUTED COLUMNS: Based on available data
-  column "customer_segment" {
+  customer_segment = {
     type     = "VARCHAR(50)"
     computed = true
     formula  = "CASE WHEN user_tier = 'enterprise' THEN 'enterprise' WHEN annual_revenue > 100000 THEN 'high_value' ELSE 'standard' END"

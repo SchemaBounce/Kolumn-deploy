@@ -949,46 +949,46 @@ create "kolumn_audit_reporter" "enterprise_audit" {
 create "kolumn_data_object" "customer" {
   name = "customer"
 
-  column "id" {
+  id = {
     type        = "BIGINT"
     primary_key = true
     # No classification = no encryption for non-sensitive IDs
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     unique          = true
     classifications = [kolumn_classification.pii.name]
     # Encryption and GDPR compliance auto-applied from PII classification
   }
 
-  column "phone" {
+  phone = {
     type            = "VARCHAR(20)"
     classifications = [kolumn_classification.pii.name]
   }
 
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     classifications = [kolumn_classification.pii.name]
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     classifications = [kolumn_classification.pii.name]
   }
 
-  column "total_spent" {
+  total_spent = {
     type            = "DECIMAL(12,2)"
     classifications = [kolumn_classification.financial.name]
     # Financial encryption and PCI compliance auto-applied
   }
 
-  column "status" {
+  status = {
     type            = "VARCHAR(20)"
     classifications = [kolumn_classification.public.name]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     default         = "CURRENT_TIMESTAMP"
     classifications = [kolumn_classification.public.name]

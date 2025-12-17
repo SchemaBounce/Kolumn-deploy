@@ -130,14 +130,14 @@ create "kolumn_data_object" "customer" {
   description = "Universal customer schema for all providers"
   version     = "2.1.0"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     primary_key     = true
     auto_increment  = true
     classifications = [kolumn_classification.public]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     unique          = true
     nullable        = false
@@ -149,7 +149,7 @@ create "kolumn_data_object" "customer" {
     }
   }
 
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.pii]
@@ -160,13 +160,13 @@ create "kolumn_data_object" "customer" {
     }
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.pii]
   }
 
-  column "phone" {
+  phone = {
     type            = "VARCHAR(20)"
     nullable        = true
     classifications = [kolumn_classification.pii]
@@ -175,13 +175,13 @@ create "kolumn_data_object" "customer" {
     }
   }
 
-  column "date_of_birth" {
+  date_of_birth = {
     type            = "DATE"
     nullable        = true
     classifications = [kolumn_classification.pii]
   }
 
-  column "account_status" {
+  account_status = {
     type            = "VARCHAR(20)"
     nullable        = false
     default         = "active"
@@ -191,14 +191,14 @@ create "kolumn_data_object" "customer" {
     }
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMPTZ"
     nullable        = false
     default         = "NOW()"
     classifications = [kolumn_classification.public]
   }
 
-  column "updated_at" {
+  updated_at = {
     type            = "TIMESTAMPTZ"
     nullable        = false
     default         = "NOW()"
@@ -243,21 +243,21 @@ create "kolumn_data_object" "transaction" {
   description = "Universal transaction schema with financial compliance"
   version     = "1.3.0"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     primary_key     = true
     auto_increment  = true
     classifications = [kolumn_classification.public]
   }
 
-  column "customer_id" {
+  customer_id = {
     type            = "BIGINT"
     nullable        = false
     foreign_key     = "customer.id"
     classifications = [kolumn_classification.pii]
   }
 
-  column "amount" {
+  amount = {
     type            = "DECIMAL(15,2)"
     nullable        = false
     classifications = [kolumn_classification.financial]
@@ -268,7 +268,7 @@ create "kolumn_data_object" "transaction" {
     }
   }
 
-  column "currency" {
+  currency = {
     type            = "CHAR(3)"
     nullable        = false
     default         = "USD"
@@ -278,7 +278,7 @@ create "kolumn_data_object" "transaction" {
     }
   }
 
-  column "transaction_type" {
+  transaction_type = {
     type            = "VARCHAR(50)"
     nullable        = false
     classifications = [kolumn_classification.financial]
@@ -287,7 +287,7 @@ create "kolumn_data_object" "transaction" {
     }
   }
 
-  column "payment_method" {
+  payment_method = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.financial, kolumn_classification.pii]
@@ -296,13 +296,13 @@ create "kolumn_data_object" "transaction" {
     }
   }
 
-  column "merchant_id" {
+  merchant_id = {
     type            = "VARCHAR(100)"
     nullable        = true
     classifications = [kolumn_classification.internal]
   }
 
-  column "status" {
+  status = {
     type            = "VARCHAR(20)"
     nullable        = false
     default         = "pending"
@@ -312,14 +312,14 @@ create "kolumn_data_object" "transaction" {
     }
   }
 
-  column "processed_at" {
+  processed_at = {
     type            = "TIMESTAMPTZ"
     nullable        = false
     default         = "NOW()"
     classifications = [kolumn_classification.public]
   }
 
-  column "metadata" {
+  metadata = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.internal]
@@ -352,25 +352,25 @@ create "kolumn_data_object" "user_activity" {
   description = "High-volume user interaction analytics"
   version     = "1.0.5"
 
-  column "event_id" {
+  event_id = {
     type            = "UUID"
     primary_key     = true
     classifications = [kolumn_classification.public]
   }
 
-  column "user_id" {
+  user_id = {
     type            = "BIGINT"
     nullable        = true # Anonymous events allowed
     classifications = [kolumn_classification.pii]
   }
 
-  column "session_id" {
+  session_id = {
     type            = "UUID"
     nullable        = false
     classifications = [kolumn_classification.analytics]
   }
 
-  column "event_type" {
+  event_type = {
     type            = "VARCHAR(50)"
     nullable        = false
     classifications = [kolumn_classification.analytics]
@@ -379,31 +379,31 @@ create "kolumn_data_object" "user_activity" {
     }
   }
 
-  column "page_url" {
+  page_url = {
     type            = "TEXT"
     nullable        = true
     classifications = [kolumn_classification.analytics]
   }
 
-  column "user_agent" {
+  user_agent = {
     type            = "TEXT"
     nullable        = true
     classifications = [kolumn_classification.analytics]
   }
 
-  column "ip_address" {
+  ip_address = {
     type            = "INET"
     nullable        = true
     classifications = [kolumn_classification.pii] # Can be PII in some jurisdictions
   }
 
-  column "properties" {
+  properties = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.analytics]
   }
 
-  column "timestamp" {
+  timestamp = {
     type            = "TIMESTAMPTZ"
     nullable        = false
     default         = "NOW()"

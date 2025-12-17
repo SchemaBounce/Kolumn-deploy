@@ -168,63 +168,63 @@ create "kolumn_data_object" "customer_profile" {
   name        = "customer_profile"
   description = "Comprehensive customer profile with multi-tier data classification"
 
-  column "customer_id" {
+  customer_id = {
     type            = "UUID"
     primary_key     = true
     classifications = [kolumn_classification.public_data]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
-  column "phone_number" {
+  phone_number = {
     type            = "VARCHAR(20)"
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
-  column "full_name" {
+  full_name = {
     type            = "VARCHAR(200)"
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
-  column "date_of_birth" {
+  date_of_birth = {
     type            = "DATE"
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
-  column "social_security_number" {
+  social_security_number = {
     type            = "VARCHAR(11)"
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
-  column "address" {
+  address = {
     type            = "TEXT"
     classifications = [kolumn_classification.highly_sensitive_pii]
   }
 
-  column "credit_score" {
+  credit_score = {
     type            = "INTEGER"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "account_balance" {
+  account_balance = {
     type            = "DECIMAL(15,2)"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "customer_segment" {
+  customer_segment = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.business_confidential]
   }
 
-  column "marketing_preferences" {
+  marketing_preferences = {
     type            = "JSONB"
     classifications = [kolumn_classification.business_confidential]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     classifications = [kolumn_classification.public_data]
   }
@@ -243,63 +243,63 @@ create "kolumn_data_object" "financial_transaction" {
   name        = "financial_transaction"
   description = "Financial transaction with comprehensive compliance controls"
 
-  column "transaction_id" {
+  transaction_id = {
     type            = "UUID"
     primary_key     = true
     classifications = [kolumn_classification.business_confidential]
   }
 
-  column "customer_id" {
+  customer_id = {
     type            = "UUID"
     classifications = [kolumn_classification.business_confidential]
   }
 
-  column "account_number" {
+  account_number = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "transaction_amount" {
+  transaction_amount = {
     type            = "DECIMAL(15,2)"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "currency" {
+  currency = {
     type            = "CHAR(3)"
     classifications = [kolumn_classification.public_data]
   }
 
-  column "payment_method" {
+  payment_method = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "merchant_id" {
+  merchant_id = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.business_confidential]
   }
 
-  column "transaction_type" {
+  transaction_type = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.business_confidential]
   }
 
-  column "fraud_score" {
+  fraud_score = {
     type            = "DECIMAL(3,2)"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "risk_category" {
+  risk_category = {
     type            = "VARCHAR(20)"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "regulatory_flags" {
+  regulatory_flags = {
     type            = "JSONB"
     classifications = [kolumn_classification.financial_data]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     classifications = [kolumn_classification.business_confidential]
   }
