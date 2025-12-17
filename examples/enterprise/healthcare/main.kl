@@ -88,14 +88,14 @@ create "kolumn_data_object" "patient_record" {
   name        = "Patient Medical Record Schema"
   description = "Core patient data with HIPAA PHI protection"
 
-  column "patient_id" {
+  patient_id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "mrn" {
+  mrn = {
     type            = "VARCHAR(50)"
     nullable        = false
     unique          = true
@@ -107,7 +107,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.phi]
@@ -117,7 +117,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.phi]
@@ -127,7 +127,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "date_of_birth" {
+  date_of_birth = {
     type            = "DATE"
     nullable        = false
     classifications = [kolumn_classification.phi]
@@ -137,7 +137,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "ssn" {
+  ssn = {
     type            = "VARCHAR(11)"
     nullable        = true
     classifications = [kolumn_classification.phi, kolumn_classification.restricted]
@@ -148,7 +148,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "phone_number" {
+  phone_number = {
     type            = "VARCHAR(20)"
     nullable        = true
     classifications = [kolumn_classification.phi]
@@ -158,7 +158,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     nullable        = true
     classifications = [kolumn_classification.phi]
@@ -168,7 +168,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "emergency_contact" {
+  emergency_contact = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.phi]
@@ -178,7 +178,7 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "insurance_info" {
+  insurance_info = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.phi, kolumn_classification.financial]
@@ -188,19 +188,19 @@ create "kolumn_data_object" "patient_record" {
     }
   }
 
-  column "created_at" {
+  created_at = {
     type     = "TIMESTAMP"
     nullable = false
     default  = "CURRENT_TIMESTAMP"
   }
 
-  column "updated_at" {
+  updated_at = {
     type     = "TIMESTAMP"
     nullable = false
     default  = "CURRENT_TIMESTAMP"
   }
 
-  column "audit_trail" {
+  audit_trail = {
     type            = "JSONB"
     nullable        = false
     classifications = [kolumn_classification.audit]
@@ -219,37 +219,37 @@ create "kolumn_data_object" "clinical_record" {
   name        = "Clinical Data Schema"
   description = "Clinical procedures, diagnostics, and treatment data"
 
-  column "record_id" {
+  record_id = {
     type        = "BIGINT"
     nullable    = false
     primary_key = true
   }
 
-  column "patient_id" {
+  patient_id = {
     type            = "BIGINT"
     nullable        = false
     classifications = [kolumn_classification.identifier]
   }
 
-  column "encounter_id" {
+  encounter_id = {
     type            = "VARCHAR(50)"
     nullable        = false
     classifications = [kolumn_classification.identifier]
   }
 
-  column "procedure_code" {
+  procedure_code = {
     type            = "VARCHAR(20)"
     nullable        = true
     classifications = [kolumn_classification.medical]
   }
 
-  column "diagnosis_code" {
+  diagnosis_code = {
     type            = "VARCHAR(20)"
     nullable        = true
     classifications = [kolumn_classification.medical]
   }
 
-  column "clinical_notes" {
+  clinical_notes = {
     type            = "TEXT"
     nullable        = true
     classifications = [kolumn_classification.phi, kolumn_classification.medical]
@@ -259,7 +259,7 @@ create "kolumn_data_object" "clinical_record" {
     }
   }
 
-  column "lab_results" {
+  lab_results = {
     type            = "JSONB"
     nullable        = true
     classifications = [kolumn_classification.phi, kolumn_classification.medical]
@@ -269,18 +269,18 @@ create "kolumn_data_object" "clinical_record" {
     }
   }
 
-  column "physician_id" {
+  physician_id = {
     type            = "VARCHAR(50)"
     nullable        = false
     classifications = [kolumn_classification.identifier]
   }
 
-  column "treatment_date" {
+  treatment_date = {
     type     = "TIMESTAMP"
     nullable = false
   }
 
-  column "location" {
+  location = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.public]

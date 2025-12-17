@@ -48,46 +48,46 @@ create "kolumn_data_object" "demo_user_schema" {
   description = "EVOLVED schema with automatic PII detection and security classification"
 
   # Base column definitions
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.pii] # Automatic PII detection
   }
 
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "middle_name" {
+  middle_name = {
     type            = "VARCHAR(100)"
     nullable        = true
     classifications = [kolumn_classification.public]
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
   # 🛡️ NEW PII COLUMN: Automatically detected as sensitive
-  column "phone" {
+  phone = {
     type            = "VARCHAR(20)"
     nullable        = true
     classifications = [kolumn_classification.pii] # Automatic PII detection
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"

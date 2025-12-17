@@ -15,27 +15,27 @@ create "kolumn_data_object" "user_schema" {
   name        = "Minimal User Schema"
   description = "Simple user schema for minimal project demonstration"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "name" {
+  name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.pii]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"

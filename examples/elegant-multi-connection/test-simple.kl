@@ -5,21 +5,21 @@ create "kolumn_data_object" "user_schema" {
   name        = "Simple Test User Schema"
   description = "Basic user schema for multi-connection testing"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.pii]
   }
 
-  column "name" {
+  name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = [kolumn_classification.public]

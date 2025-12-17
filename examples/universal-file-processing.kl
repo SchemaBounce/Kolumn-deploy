@@ -22,13 +22,13 @@
 create "kolumn_data_object" "users" {
   description = "User data model shared across SQL, Python, and Java"
 
-  column "id" {
+  id = {
     type           = "BIGSERIAL"
     primary_key    = true
     auto_increment = true
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     unique          = true
     nullable        = false
@@ -39,13 +39,13 @@ create "kolumn_data_object" "users" {
     }
   }
 
-  column "name" {
+  name = {
     type            = "VARCHAR(100)"
     nullable        = false
     classifications = ["pii"]
   }
 
-  column "department" {
+  department = {
     type     = "VARCHAR(50)"
     nullable = true
     validation = {
@@ -53,13 +53,13 @@ create "kolumn_data_object" "users" {
     }
   }
 
-  column "created_at" {
+  created_at = {
     type     = "TIMESTAMPTZ"
     default  = "NOW()"
     nullable = false
   }
 
-  column "last_login_at" {
+  last_login_at = {
     type     = "TIMESTAMPTZ"
     nullable = true
   }
@@ -100,24 +100,24 @@ create "kolumn_data_object" "users" {
 create "kolumn_data_object" "orders" {
   description = "Order transactions with financial data"
 
-  column "id" {
+  id = {
     type        = "BIGSERIAL"
     primary_key = true
   }
 
-  column "user_id" {
+  user_id = {
     type        = "BIGINT"
     foreign_key = "users.id"
     nullable    = false
   }
 
-  column "amount" {
+  amount = {
     type            = "DECIMAL(12,2)"
     nullable        = false
     classifications = ["financial"]
   }
 
-  column "status" {
+  status = {
     type     = "VARCHAR(20)"
     nullable = false
     default  = "pending"
@@ -126,7 +126,7 @@ create "kolumn_data_object" "orders" {
     }
   }
 
-  column "created_at" {
+  created_at = {
     type     = "TIMESTAMPTZ"
     default  = "NOW()"
     nullable = false

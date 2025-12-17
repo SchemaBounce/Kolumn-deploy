@@ -115,38 +115,38 @@ create "kolumn_data_object" "customer" {
   name        = "customer"
   description = "Universal customer data structure across all systems"
 
-  column "customer_id" {
+  customer_id = {
     type            = "UUID"
     primary_key     = true
     classifications = [kolumn_classification.public]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     classifications = [kolumn_classification.pii]
   }
 
-  column "phone" {
+  phone = {
     type            = "VARCHAR(20)"
     classifications = [kolumn_classification.pii]
   }
 
-  column "first_name" {
+  first_name = {
     type            = "VARCHAR(100)"
     classifications = [kolumn_classification.pii]
   }
 
-  column "last_name" {
+  last_name = {
     type            = "VARCHAR(100)"
     classifications = [kolumn_classification.pii]
   }
 
-  column "date_of_birth" {
+  date_of_birth = {
     type            = "DATE"
     classifications = [kolumn_classification.pii]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     classifications = [kolumn_classification.internal]
   }
@@ -179,38 +179,38 @@ create "kolumn_data_object" "transaction" {
   name        = "transaction"
   description = "Universal transaction data structure with financial compliance"
 
-  column "transaction_id" {
+  transaction_id = {
     type            = "UUID"
     primary_key     = true
     classifications = [kolumn_classification.internal]
   }
 
-  column "customer_id" {
+  customer_id = {
     type            = "UUID"
     classifications = [kolumn_classification.internal]
   }
 
-  column "amount" {
+  amount = {
     type            = "DECIMAL(15,2)"
     classifications = [kolumn_classification.financial]
   }
 
-  column "currency" {
+  currency = {
     type            = "CHAR(3)"
     classifications = [kolumn_classification.internal]
   }
 
-  column "payment_method" {
+  payment_method = {
     type            = "VARCHAR(50)"
     classifications = [kolumn_classification.financial]
   }
 
-  column "status" {
+  status = {
     type            = "VARCHAR(20)"
     classifications = [kolumn_classification.internal]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     classifications = [kolumn_classification.internal]
   }

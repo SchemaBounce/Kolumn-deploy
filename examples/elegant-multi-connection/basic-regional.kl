@@ -87,35 +87,35 @@ create "kolumn_data_object" "user_schema" {
   name        = "Regional User Schema"
   description = "Universal user schema for multi-regional deployment"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "email" {
+  email = {
     type            = "VARCHAR(255)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.pii]
   }
 
-  column "username" {
+  username = {
     type            = "VARCHAR(50)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.public]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
     classifications = [kolumn_classification.public]
   }
 
-  column "updated_at" {
+  updated_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
@@ -133,46 +133,46 @@ create "kolumn_data_object" "product_schema" {
   name        = "Regional Product Schema"
   description = "Universal product schema for multi-regional deployment"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "name" {
+  name = {
     type            = "VARCHAR(255)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "description" {
+  description = {
     type            = "TEXT"
     nullable        = true
     classifications = [kolumn_classification.public]
   }
 
-  column "price" {
+  price = {
     type            = "DECIMAL(10,2)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "currency" {
+  currency = {
     type            = "CHAR(3)"
     nullable        = false
     default         = "USD"
     classifications = [kolumn_classification.public]
   }
 
-  column "status" {
+  status = {
     type            = "VARCHAR(20)"
     nullable        = false
     default         = "active"
     classifications = [kolumn_classification.public]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
@@ -184,47 +184,47 @@ create "kolumn_data_object" "order_schema" {
   name        = "Regional Order Schema"
   description = "Universal order schema for multi-regional deployment"
 
-  column "id" {
+  id = {
     type            = "BIGINT"
     nullable        = false
     primary_key     = true
     classifications = [kolumn_classification.identifier]
   }
 
-  column "user_id" {
+  user_id = {
     type            = "BIGINT"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "order_number" {
+  order_number = {
     type            = "VARCHAR(50)"
     nullable        = false
     unique          = true
     classifications = [kolumn_classification.public]
   }
 
-  column "total_amount" {
+  total_amount = {
     type            = "DECIMAL(10,2)"
     nullable        = false
     classifications = [kolumn_classification.public]
   }
 
-  column "currency" {
+  currency = {
     type            = "CHAR(3)"
     nullable        = false
     default         = "USD"
     classifications = [kolumn_classification.public]
   }
 
-  column "status" {
+  status = {
     type            = "VARCHAR(20)"
     nullable        = false
     default         = "pending"
     classifications = [kolumn_classification.public]
   }
 
-  column "created_at" {
+  created_at = {
     type            = "TIMESTAMP"
     nullable        = false
     default         = "CURRENT_TIMESTAMP"
