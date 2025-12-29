@@ -135,19 +135,21 @@ create "postgres_table" "user_analytics" {
   }
 
   # Add analytics-specific columns
-  first_login = {
-    type     = "TIMESTAMP"
-    nullable = true
-  }
+  columns = {
+    first_login = {
+      type     = "TIMESTAMP"
+      nullable = true
+    }
 
-  last_activity = {
-    type     = "TIMESTAMP"
-    nullable = true
-  }
+    last_activity = {
+      type     = "TIMESTAMP"
+      nullable = true
+    }
 
-  total_orders = {
-    type    = "INTEGER"
-    default = 0
+    total_orders = {
+      type    = "INTEGER"
+      default = 0
+    }
   }
 
   # 📊 METADATA: Link back to source for traceability
@@ -171,9 +173,11 @@ create "postgres_table" "user_archive" {
   }
 
   # Archive-specific metadata
-  archived_at = {
-    type    = "TIMESTAMP"
-    default = "CURRENT_TIMESTAMP"
+  columns = {
+    archived_at = {
+      type    = "TIMESTAMP"
+      default = "CURRENT_TIMESTAMP"
+    }
   }
 
   metadata = {
@@ -393,9 +397,11 @@ create "postgres_table" "user_analytics_public" {
   }
 
   # Add analytics columns
-  page_views = {
-    type    = "INTEGER"
-    default = 0
+  columns = {
+    page_views = {
+      type    = "INTEGER"
+      default = 0
+    }
   }
 
   metadata = {
@@ -527,9 +533,11 @@ create "postgres_table" "user_development" {
   }
 
   # Add development-specific columns
-  dev_notes = {
-    type     = "TEXT"
-    nullable = true
+  columns = {
+    dev_notes = {
+      type     = "TEXT"
+      nullable = true
+    }
   }
 
   metadata = {
@@ -561,14 +569,16 @@ create "postgres_table" "user_warehouse" {
   }
 
   # Warehouse-specific columns
-  etl_batch_id = {
-    type     = "BIGINT"
-    nullable = false
-  }
+  columns = {
+    etl_batch_id = {
+      type     = "BIGINT"
+      nullable = false
+    }
 
-  warehouse_inserted_at = {
-    type    = "TIMESTAMP"
-    default = "CURRENT_TIMESTAMP"
+    warehouse_inserted_at = {
+      type    = "TIMESTAMP"
+      default = "CURRENT_TIMESTAMP"
+    }
   }
 
   metadata = {
@@ -634,14 +644,16 @@ create "postgres_table" "user_api_response" {
   }
 
   # API-specific metadata
-  api_version = {
-    type    = "VARCHAR(10)"
-    default = "v2"
-  }
+  columns = {
+    api_version = {
+      type    = "VARCHAR(10)"
+      default = "v2"
+    }
 
-  response_timestamp = {
-    type    = "BIGINT"
-    default = "extract(epoch from now()) * 1000"
+    response_timestamp = {
+      type    = "BIGINT"
+      default = "extract(epoch from now()) * 1000"
+    }
   }
 
   metadata = {

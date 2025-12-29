@@ -355,26 +355,28 @@ create "postgres_table" "demo_user_analytics" {
   }
 
   # Enhanced analytics columns
-  total_sessions = {
-    type    = "INTEGER"
-    default = 0
-  }
+  columns = {
+    total_sessions = {
+      type    = "INTEGER"
+      default = 0
+    }
 
-  lifetime_value = {
-    type     = "DECIMAL(15,2)"
-    nullable = true
-  }
+    lifetime_value = {
+      type     = "DECIMAL(15,2)"
+      nullable = true
+    }
 
-  last_activity = {
-    type     = "TIMESTAMP"
-    nullable = true
-  }
+    last_activity = {
+      type     = "TIMESTAMP"
+      nullable = true
+    }
 
-  # 📊 COMPUTED COLUMNS: Based on available data
-  customer_segment = {
-    type     = "VARCHAR(50)"
-    computed = true
-    formula  = "CASE WHEN user_tier = 'enterprise' THEN 'enterprise' WHEN annual_revenue > 100000 THEN 'high_value' ELSE 'standard' END"
+    # 📊 COMPUTED COLUMNS: Based on available data
+    customer_segment = {
+      type     = "VARCHAR(50)"
+      computed = true
+      formula  = "CASE WHEN user_tier = 'enterprise' THEN 'enterprise' WHEN annual_revenue > 100000 THEN 'high_value' ELSE 'standard' END"
+    }
   }
 
   # 🛡️ ADVANCED AUDIT CONFIGURATION

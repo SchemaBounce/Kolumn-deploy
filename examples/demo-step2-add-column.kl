@@ -181,14 +181,16 @@ create "postgres_table" "demo_user_analytics" {
   }
 
   # Analytics-specific columns (unchanged)
-  total_sessions = {
-    type    = "INTEGER"
-    default = 0
-  }
+  columns = {
+    total_sessions = {
+      type    = "INTEGER"
+      default = 0
+    }
 
-  last_activity = {
-    type     = "TIMESTAMP"
-    nullable = true
+    last_activity = {
+      type     = "TIMESTAMP"
+      nullable = true
+    }
   }
 }
 
