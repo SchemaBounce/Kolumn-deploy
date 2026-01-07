@@ -5,24 +5,26 @@ create "kolumn_data_object" "user_schema" {
   name        = "Simple Test User Schema"
   description = "Basic user schema for multi-connection testing"
 
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
+  columns = {
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.pii]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.pii]
+    }
 
-  name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
+    name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
   }
 
   metadata = {
@@ -71,22 +73,13 @@ provider "postgres" "multi" {
   password = "password"
 }
 
-# ✅ CORRECT: Table references data object with dynamic blocks
+# ✅ CORRECT: Table references data object directly
 create "postgres_table" "users" {
   provider   = postgres.multi # Auto-scales to all connections
   depends_on = []
 
   name = "users"
-
-  # Pull columns from data object
-  dynamic "column" {
-    for_each = kolumn_data_object.user_schema.columns
-    content {
-      name        = column.value.name
-      type        = column.value.type == "BIGINT" && column.value.primary_key ? "BIGSERIAL" : column.value.type
-      nullable    = column.value.nullable
-      primary_key = column.value.primary_key
-      unique      = column.value.unique
-    }
-  }
+  columns = transform_columns(kolumn_data_object.user_schema.columns, {
+    id = { type = "BIGSERIAL" }
+  })
 }

@@ -75,51 +75,53 @@ create "kolumn_data_object" "trading_position" {
   name        = "Trading Position Schema"
   description = "Core trading position data with SOX compliance"
 
-  position_id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
-
-  trader_id = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    classifications = [kolumn_classification.pii]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+  columns = {
+    position_id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
     }
-  }
 
-  security_symbol = {
-    type            = "VARCHAR(20)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    trader_id = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      classifications = [kolumn_classification.pii]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
+    }
 
-  quantity = {
-    type            = "DECIMAL(18,8)"
-    nullable        = false
-    classifications = [kolumn_classification.confidential]
-  }
+    security_symbol = {
+      type            = "VARCHAR(20)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  price = {
-    type            = "DECIMAL(18,4)"
-    nullable        = false
-    classifications = [kolumn_classification.confidential]
-  }
+    quantity = {
+      type            = "DECIMAL(18,8)"
+      nullable        = false
+      classifications = [kolumn_classification.confidential]
+    }
 
-  trade_timestamp = {
-    type     = "TIMESTAMP"
-    nullable = false
-    default  = "CURRENT_TIMESTAMP"
-  }
+    price = {
+      type            = "DECIMAL(18,4)"
+      nullable        = false
+      classifications = [kolumn_classification.confidential]
+    }
 
-  audit_trail = {
-    type            = "JSONB"
-    nullable        = false
-    classifications = [kolumn_classification.audit]
+    trade_timestamp = {
+      type     = "TIMESTAMP"
+      nullable = false
+      default  = "CURRENT_TIMESTAMP"
+    }
+
+    audit_trail = {
+      type            = "JSONB"
+      nullable        = false
+      classifications = [kolumn_classification.audit]
+    }
   }
 
   config = {
@@ -135,34 +137,36 @@ create "kolumn_data_object" "risk_metrics" {
   name        = "Risk Metrics Schema"
   description = "Risk management and compliance metrics"
 
-  metric_id = {
-    type        = "BIGINT"
-    nullable    = false
-    primary_key = true
-  }
+  columns = {
+    metric_id = {
+      type        = "BIGINT"
+      nullable    = false
+      primary_key = true
+    }
 
-  portfolio_id = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    classifications = [kolumn_classification.confidential]
-  }
+    portfolio_id = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      classifications = [kolumn_classification.confidential]
+    }
 
-  var_95 = {
-    type            = "DECIMAL(18,4)"
-    nullable        = true
-    classifications = [kolumn_classification.confidential]
-  }
+    var_95 = {
+      type            = "DECIMAL(18,4)"
+      nullable        = true
+      classifications = [kolumn_classification.confidential]
+    }
 
-  stress_test_result = {
-    type            = "DECIMAL(18,4)"
-    nullable        = true
-    classifications = [kolumn_classification.confidential]
-  }
+    stress_test_result = {
+      type            = "DECIMAL(18,4)"
+      nullable        = true
+      classifications = [kolumn_classification.confidential]
+    }
 
-  calculated_at = {
-    type     = "TIMESTAMP"
-    nullable = false
-    default  = "CURRENT_TIMESTAMP"
+    calculated_at = {
+      type     = "TIMESTAMP"
+      nullable = false
+      default  = "CURRENT_TIMESTAMP"
+    }
   }
 }
 
@@ -492,17 +496,16 @@ create "kafka_topic" "trade_executions" {
   }
 
   # Schema from trading position data object
-  dynamic "schema_field" {
-    for_each = select_columns(
+  schema_fields = [
+    for col in select_columns(
       kolumn_data_object.trading_position.columns,
       ["position_id", "security_symbol", "quantity", "price", "trade_timestamp"]
-    )
-    content {
-      name     = schema_field.value.name
-      type     = schema_field.value.type == "BIGINT" ? "long" : schema_field.value.type == "VARCHAR(20)" ? "string" : schema_field.value.type == "DECIMAL(18,8)" ? "double" : schema_field.value.type == "DECIMAL(18,4)" ? "double" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
-      nullable = schema_field.value.nullable
+      ) : {
+      name     = col.name
+      type     = col.type == "BIGINT" ? "long" : col.type == "VARCHAR(20)" ? "string" : col.type == "DECIMAL(18,8)" ? "double" : col.type == "DECIMAL(18,4)" ? "double" : col.type == "TIMESTAMP" ? "long" : "string"
+      nullable = col.nullable
     }
-  }
+  ]
 }
 
 # === RBAC CONFIGURATION ===

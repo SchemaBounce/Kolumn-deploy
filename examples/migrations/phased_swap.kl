@@ -1,0 +1,226 @@
+# Phased Swap Migration Example
+# Demonstrates zero-downtime column replacement using dual-write pattern
+#
+# Use case: Replacing a column with a new version (e.g., changing from
+# storing raw values to encrypted values, or restructuring data format)
+# without downtime by using triggers for dual-write during transition.
+#
+# Pattern:
+#   1. Add new column
+#   2. Create trigger for dual-write (old -> new)
+#   3. Backfill existing data
+#   4. Validate data consistency
+#   5. Swap application to use new column
+#   6. Drop trigger and old column
+#
+# Run with:
+#   kolumn migration plan --target encrypt_ssn_column
+#   kolumn migration apply --target encrypt_ssn_column
+#   kolumn migration rollback --target encrypt_ssn_column
+
+# -----------------------------------------------------------------------------
+# Provider Configuration
+# -----------------------------------------------------------------------------
+
+provider "postgres" "primary" {
+  host     = "localhost"
+  port     = 5432
+  database = "myapp"
+  username = var.db_username
+  password = var.db_password
+}
+
+# -----------------------------------------------------------------------------
+# Target Table
+# -----------------------------------------------------------------------------
+
+create "postgres_table" "employees" {
+  provider = postgres.primary
+  schema   = "public"
+  name     = "employees"
+
+  columns = {
+    id = {
+      type        = "bigserial"
+      primary_key = true
+    }
+
+    name = {
+      type     = "varchar(255)"
+      not_null = true
+    }
+
+    email = {
+      type     = "varchar(255)"
+      not_null = true
+      unique   = true
+    }
+
+    # Original column (will be replaced)
+    # ssn = { type = "varchar(11)" }
+
+    # New encrypted column (target after migration)
+    ssn_encrypted = {
+      type     = "bytea"
+      not_null = true
+    }
+
+    department_id = {
+      type       = "bigint"
+      references = "departments.id"
+      on_delete  = "SET NULL"
+    }
+
+    created_at = {
+      type    = "timestamptz"
+      default = "now()"
+    }
+
+    updated_at = {
+      type    = "timestamptz"
+      default = "now()"
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Migration: Phased Column Swap (SSN -> Encrypted SSN)
+# -----------------------------------------------------------------------------
+
+migration "phased_swap" "encrypt_ssn_column" {
+  provider = postgres.primary
+  resource = postgres_table.employees
+
+  forward {
+    prechecks = [
+      # Verify encryption function exists
+      "function_exists schema=public function=encrypt_ssn",
+      # Verify decryption function exists for rollback
+      "function_exists schema=public function=decrypt_ssn",
+      # Check current row count for time estimation
+      "estimate_row_count table=employees warn_threshold=100000"
+    ]
+
+    steps = [
+      # Phase 1: Add new encrypted column
+      "add_column table=employees column=ssn_encrypted type=bytea nullable=true",
+
+      # Phase 2: Create dual-write trigger (new writes go to both columns)
+      "create_trigger table=employees trigger=trg_dual_write_ssn timing=before events=insert,update body=NEW.ssn_encrypted:=encrypt_ssn(NEW.ssn);RETURN_NEW;",
+
+      # Phase 3: Backfill existing data
+      "backfill_column table=employees column=ssn_encrypted expression=encrypt_ssn(ssn) batch_size=5000 sleep_ms=100",
+
+      # Phase 4: Validate all rows have encrypted value
+      "validate_column table=employees column=ssn_encrypted condition=NOT_NULL",
+
+      # Phase 5: Set NOT NULL constraint
+      "alter_column_nullable table=employees column=ssn_encrypted nullable=false",
+
+      # Phase 6: Create index on new column if needed
+      "add_index table=employees columns=ssn_encrypted method=btree unique=false",
+
+      # Phase 7: Drop trigger (application should now use new column)
+      "drop_trigger table=employees trigger=trg_dual_write_ssn",
+
+      # Phase 8: Rename old column to backup
+      "rename_column table=employees column=ssn to=ssn_plaintext_backup",
+
+      # Phase 9: Rename new column to original name
+      "rename_column table=employees column=ssn_encrypted to=ssn"
+    ]
+  }
+
+  backward {
+    steps = [
+      # Reverse the column swap
+      "rename_column table=employees column=ssn to=ssn_encrypted",
+      "rename_column table=employees column=ssn_plaintext_backup to=ssn",
+
+      # Recreate dual-write trigger for reverse direction
+      "create_trigger table=employees trigger=trg_dual_write_ssn_reverse timing=before events=insert,update body=NEW.ssn:=decrypt_ssn(NEW.ssn_encrypted);RETURN_NEW;",
+
+      # Drop the encrypted column
+      "drop_index table=employees index=idx_employees_ssn_encrypted",
+      "drop_column table=employees column=ssn_encrypted",
+
+      # Drop the reverse trigger
+      "drop_trigger table=employees trigger=trg_dual_write_ssn_reverse"
+    ]
+  }
+
+  safety {
+    quarantine     = true
+    quarantine_ttl = "30d" # Keep quarantine longer for sensitive data migrations
+    lock_table     = false # No locking - using triggers for consistency
+    timeout        = "2h"  # Allow plenty of time for large tables
+    require_backup = true
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Migration: Table Swap Pattern (Replace Entire Table)
+# -----------------------------------------------------------------------------
+
+migration "phased_swap" "restructure_audit_logs" {
+  provider = postgres.primary
+  resource = postgres_table.audit_logs
+
+  forward {
+    prechecks = [
+      "table_exists table=audit_logs",
+      "estimate_row_count table=audit_logs warn_threshold=10000000"
+    ]
+
+    steps = [
+      # Create shadow table with new structure
+      "create_shadow_table table=audit_logs shadow=audit_logs_new columns=id:bigserial,event_type:varchar(50),payload:jsonb,created_at:timestamptz,user_id:bigint",
+
+      # Create trigger to copy writes to shadow
+      "create_trigger table=audit_logs trigger=trg_shadow_copy timing=after events=insert body=INSERT_INTO_audit_logs_new(event_type,payload,created_at,user_id)VALUES(NEW.event_type,NEW.payload::jsonb,NEW.created_at,NEW.user_id);",
+
+      # Backfill existing data to shadow table
+      "backfill_shadow table=audit_logs shadow=audit_logs_new transform=payload::jsonb batch_size=50000 sleep_ms=200",
+
+      # Validate row counts match
+      "validate_row_count table=audit_logs shadow=audit_logs_new tolerance=100",
+
+      # Swap tables atomically
+      "swap_shadow_table table=audit_logs shadow=audit_logs_new backup=audit_logs_backup",
+
+      # Drop backup after successful swap (with delay for safety)
+      "drop_table table=audit_logs_backup delay=5m"
+    ]
+  }
+
+  backward {
+    steps = [
+      # Restore from backup if it still exists
+      "restore_shadow_table table=audit_logs backup=audit_logs_backup"
+    ]
+  }
+
+  safety {
+    quarantine     = true
+    quarantine_ttl = "7d"
+    lock_table     = false
+    timeout        = "4h"
+    require_backup = true
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Variables
+# -----------------------------------------------------------------------------
+
+variable "db_username" {
+  description = "Database username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
+}

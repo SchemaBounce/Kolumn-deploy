@@ -47,122 +47,125 @@ create "kolumn_data_object" "demo_user_schema" {
   name        = "Demo User Schema - Complete Evolution"
   description = "Full enterprise user schema with comprehensive PII detection and business intelligence"
 
-  # Core identity columns
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
+  # Column definitions using map-based syntax
+  columns = {
+    # Core identity columns
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
+    }
 
-  # Contact information (PII)
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.pii]
-  }
+    # Contact information (PII)
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.pii]
+    }
 
-  # Personal information
-  first_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.personal]
-  }
+    # Personal information
+    first_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.personal]
+    }
 
-  middle_name = {
-    type            = "VARCHAR(100)"
-    nullable        = true
-    classifications = [kolumn_classification.personal]
-  }
+    middle_name = {
+      type            = "VARCHAR(100)"
+      nullable        = true
+      classifications = [kolumn_classification.personal]
+    }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.personal]
-  }
+    last_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.personal]
+    }
 
-  # Contact PII
-  phone = {
-    type            = "VARCHAR(20)"
-    nullable        = true
-    classifications = [kolumn_classification.pii]
-  }
+    # Contact PII
+    phone = {
+      type            = "VARCHAR(20)"
+      nullable        = true
+      classifications = [kolumn_classification.pii]
+    }
 
-  # 🆕 NEW BUSINESS COLUMNS: Different data types and purposes
-  user_tier = {
-    type            = "VARCHAR(20)"
-    nullable        = false
-    default         = "standard"
-    classifications = [kolumn_classification.public]
-  }
+    # 🆕 NEW BUSINESS COLUMNS: Different data types and purposes
+    user_tier = {
+      type            = "VARCHAR(20)"
+      nullable        = false
+      default         = "standard"
+      classifications = [kolumn_classification.public]
+    }
 
-  annual_revenue = {
-    type            = "DECIMAL(15,2)"
-    nullable        = true
-    classifications = [kolumn_classification.financial]
-  }
+    annual_revenue = {
+      type            = "DECIMAL(15,2)"
+      nullable        = true
+      classifications = [kolumn_classification.financial]
+    }
 
-  account_balance = {
-    type            = "DECIMAL(12,2)"
-    nullable        = false
-    default         = "0.00"
-    classifications = [kolumn_classification.financial]
-  }
+    account_balance = {
+      type            = "DECIMAL(12,2)"
+      nullable        = false
+      default         = "0.00"
+      classifications = [kolumn_classification.financial]
+    }
 
-  is_verified = {
-    type            = "BOOLEAN"
-    nullable        = false
-    default         = "false"
-    classifications = [kolumn_classification.public]
-  }
+    is_verified = {
+      type            = "BOOLEAN"
+      nullable        = false
+      default         = "false"
+      classifications = [kolumn_classification.public]
+    }
 
-  # 🛡️ NEW PII COLUMNS: High sensitivity data
-  social_security_number = {
-    type            = "VARCHAR(50)"
-    nullable        = true
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    # 🛡️ NEW PII COLUMNS: High sensitivity data
+    social_security_number = {
+      type            = "VARCHAR(50)"
+      nullable        = true
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  date_of_birth = {
-    type            = "DATE"
-    nullable        = true
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    date_of_birth = {
+      type            = "DATE"
+      nullable        = true
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  # 📊 NEW ANALYTICS COLUMNS: JSON and array data
-  preferences = {
-    type            = "JSONB"
-    nullable        = false
-    default         = "{}"
-    classifications = [kolumn_classification.public]
-  }
+    # 📊 NEW ANALYTICS COLUMNS: JSON and array data
+    preferences = {
+      type            = "JSONB"
+      nullable        = false
+      default         = "{}"
+      classifications = [kolumn_classification.public]
+    }
 
-  tags = {
-    type            = "VARCHAR[]"
-    nullable        = true
-    classifications = [kolumn_classification.public]
-  }
+    tags = {
+      type            = "VARCHAR[]"
+      nullable        = true
+      classifications = [kolumn_classification.public]
+    }
 
-  # 🕒 TEMPORAL COLUMNS: Enhanced tracking
-  last_login_at = {
-    type            = "TIMESTAMP"
-    nullable        = true
-    classifications = [kolumn_classification.public]
-  }
+    # 🕒 TEMPORAL COLUMNS: Enhanced tracking
+    last_login_at = {
+      type            = "TIMESTAMP"
+      nullable        = true
+      classifications = [kolumn_classification.public]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
-  }
+    created_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
 
-  updated_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
+    updated_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   metadata = {
@@ -431,18 +434,13 @@ create "kafka_topic" "demo_user_events" {
   }
 
   # 📊 SAFE PUBLIC FIELDS: No PII or financial data
-  dynamic "schema_field" {
-    for_each = {
-      for name, col in kolumn_data_object.demo_user_schema.columns : name => col
-      if contains(col.classifications, kolumn_classification.public) ||
-      contains(col.classifications, kolumn_classification.personal)
-    }
-    content {
-      name     = schema_field.value.name
-      type     = startswith(schema_field.value.type, "VARCHAR") ? "string" : schema_field.value.type == "BIGINT" ? "long" : schema_field.value.type == "BOOLEAN" ? "boolean" : schema_field.value.type == "TIMESTAMP" ? "long" : schema_field.value.type == "DATE" ? "int" : startswith(schema_field.value.type, "DECIMAL") ? "double" : schema_field.value.type == "JSONB" ? "string" : schema_field.value.type == "VARCHAR[]" ? "array" : "string"
-      nullable = schema_field.value.nullable
-    }
-  }
+  schema_fields = [
+    for name, col in kolumn_data_object.demo_user_schema.columns : {
+      name     = col.name
+      type     = startswith(col.type, "VARCHAR") ? "string" : col.type == "BIGINT" ? "long" : col.type == "BOOLEAN" ? "boolean" : col.type == "TIMESTAMP" ? "long" : col.type == "DATE" ? "int" : startswith(col.type, "DECIMAL") ? "double" : col.type == "JSONB" ? "string" : col.type == "VARCHAR[]" ? "array" : "string"
+      nullable = col.nullable
+    } if contains(col.classifications, kolumn_classification.public) || contains(col.classifications, kolumn_classification.personal)
+  ]
 
   # 🛡️ PII HASHES: Privacy-safe analytics identifiers
   dynamic "pii_hash_field" {

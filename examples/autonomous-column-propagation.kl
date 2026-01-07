@@ -33,20 +33,13 @@ create "kolumn_data_object" "user_schema" {
   description = "Universal user schema derived from PostgreSQL discovery"
 
   # ⚡ AUTONOMOUS MAGIC: Dynamically inherit ALL columns from discovered table
-  dynamic "column" {
-    for_each = discover.postgres_table.source_users.columns
-    content {
-      name     = column.key
-      type     = column.value.type
-      nullable = column.value.nullable
-      default  = column.value.default
-
-      # 🛡️ SECURITY: Auto-classify sensitive columns  
-      classifications = contains(["email", "phone", "ssn"], column.key) ? [
-        kolumn_classification.pii
-        ] : [
-        kolumn_classification.public
-      ]
+  columns = {
+    for col_name, col in discover.postgres_table.source_users.columns : col_name => {
+      name            = col_name
+      type            = col.type
+      nullable        = col.nullable
+      default         = col.default
+      classifications = contains(["email", "phone", "ssn"], col_name) ? [kolumn_classification.pii] : [kolumn_classification.public]
     }
   }
 
@@ -122,35 +115,16 @@ discover "kolumn_file" "user_processing_dag" {
 # Analytics table that inherits structure from source but adds computed columns
 create "postgres_table" "user_analytics" {
   # ⚡ AUTONOMOUS MAGIC: Inherits ALL columns from the source user schema
-  dynamic "column" {
-    for_each = kolumn_data_object.user_schema.columns
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-
-      # 🛡️ SECURITY: Auto-apply encryption based on classification
-      encrypted = contains(column.value.classifications, kolumn_classification.pii)
-    }
-  }
+  columns = [
+    for col in kolumn_data_object.user_schema.columns : merge(col, {
+      encrypted = contains(col.classifications, kolumn_classification.pii)
+    })
+  ]
 
   # Add analytics-specific columns
-  columns = {
-    first_login = {
-      type     = "TIMESTAMP"
-      nullable = true
-    }
-
-    last_activity = {
-      type     = "TIMESTAMP"
-      nullable = true
-    }
-
-    total_orders = {
-      type    = "INTEGER"
-      default = 0
-    }
-  }
+  first_login   = { type = "TIMESTAMP", nullable = true }
+  last_activity = { type = "TIMESTAMP", nullable = true }
+  total_orders  = { type = "INTEGER", default = 0 }
 
   # 📊 METADATA: Link back to source for traceability
   metadata = {
@@ -163,22 +137,10 @@ create "postgres_table" "user_analytics" {
 # Archive table for historical user data (same schema, different retention)
 create "postgres_table" "user_archive" {
   # ⚡ AUTONOMOUS MAGIC: Exact same columns as source user schema
-  dynamic "column" {
-    for_each = kolumn_data_object.user_schema.columns
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-    }
-  }
+  columns = kolumn_data_object.user_schema.columns
 
   # Archive-specific metadata
-  columns = {
-    archived_at = {
-      type    = "TIMESTAMP"
-      default = "CURRENT_TIMESTAMP"
-    }
-  }
+  archived_at = { type = "TIMESTAMP", default = "CURRENT_TIMESTAMP" }
 
   metadata = {
     source_schema    = kolumn_data_object.user_schema.name
@@ -213,14 +175,9 @@ create "kafka_topic" "user_events" {
   }
 
   # Dynamic fields from data object
-  dynamic "schema_field" {
-    for_each = kolumn_data_object.user_schema.columns
-    content {
-      name     = schema_field.value.name
-      type     = schema_field.value.type == "VARCHAR" ? "string" : schema_field.value.type == "INTEGER" ? "int" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
-      nullable = schema_field.value.nullable
-    }
-  }
+  schema_fields = transform_columns(kolumn_data_object.user_schema.columns, {
+    id = { type = "long" }
+  })
 
   metadata = {
     source_schema = kolumn_data_object.user_schema.name
@@ -383,26 +340,15 @@ create "kolumn_monitor" "schema_drift" {
 # Create a public-only analytics table (excluding PII)
 create "postgres_table" "user_analytics_public" {
   # ⚡ NEW: Use select_columns to pull only non-PII columns
-  dynamic "column" {
-    for_each = select_columns(
+  columns = add_columns(
+    select_columns(
       kolumn_data_object.user_schema.columns,
-      [for col in kolumn_data_object.user_schema.columns : col.name
-      if !contains(col.classifications, kolumn_classification.pii)]
-    )
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
+      [for col in kolumn_data_object.user_schema.columns : col.name if !contains(col.classifications, kolumn_classification.pii)]
+    ),
+    {
+      page_views = { type = "INTEGER", default = 0 }
     }
-  }
-
-  # Add analytics columns
-  columns = {
-    page_views = {
-      type    = "INTEGER"
-      default = 0
-    }
-  }
+  )
 
   metadata = {
     purpose        = "Public analytics without PII"
@@ -413,25 +359,16 @@ create "postgres_table" "user_analytics_public" {
 # Create a secure vault table with transformed PII columns
 create "postgres_table" "user_vault" {
   # ⚡ NEW: Use transform_columns to add encryption to PII fields
-  dynamic "column" {
-    for_each = transform_columns(
-      kolumn_data_object.user_schema.columns,
-      {
-        # Transform PII columns to add encryption
-        for col_name, col in kolumn_data_object.user_schema.columns : col_name => {
-          encrypted      = contains(col.classifications, kolumn_classification.pii)
-          audit_required = contains(col.classifications, kolumn_classification.pii)
-          storage_type   = contains(col.classifications, kolumn_classification.pii) ? "encrypted_text" : col.type
-        } if contains(col.classifications, kolumn_classification.pii)
-      }
-    )
-    content {
-      name      = column.value.name
-      type      = lookup(column.value, "storage_type", column.value.type)
-      nullable  = column.value.nullable
-      encrypted = lookup(column.value, "encrypted", false)
+  columns = transform_columns(
+    kolumn_data_object.user_schema.columns,
+    {
+      for col_name, col in kolumn_data_object.user_schema.columns : col_name => {
+        encrypted      = contains(col.classifications, kolumn_classification.pii)
+        audit_required = contains(col.classifications, kolumn_classification.pii)
+        storage_type   = contains(col.classifications, kolumn_classification.pii) ? "encrypted_text" : col.type
+      } if contains(col.classifications, kolumn_classification.pii)
     }
-  }
+  )
 
   metadata = {
     purpose        = "Secure PII storage with encryption"
@@ -446,11 +383,10 @@ create "kafka_topic" "user_events_external" {
   replication_factor = 2
 
   # ⚡ NEW: Use rename_columns to create API-friendly field names
-  dynamic "schema_field" {
-    for_each = rename_columns(
+  schema_fields = [
+    for col in rename_columns(
       exclude_columns(kolumn_data_object.user_schema.columns,
-        [for col in kolumn_data_object.user_schema.columns : col.name
-        if contains(col.classifications, kolumn_classification.pii)]
+        [for c in kolumn_data_object.user_schema.columns : c.name if contains(c.classifications, kolumn_classification.pii)]
       ),
       {
         "user_id"    = "id"
@@ -459,13 +395,12 @@ create "kafka_topic" "user_events_external" {
         "created_at" = "createdAt"
         "updated_at" = "updatedAt"
       }
-    )
-    content {
-      name     = schema_field.value.name
-      type     = schema_field.value.type == "VARCHAR" ? "string" : schema_field.value.type == "INTEGER" ? "int" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
-      nullable = schema_field.value.nullable
+      ) : {
+      name     = col.name
+      type     = col.type == "VARCHAR" ? "string" : col.type == "INTEGER" ? "int" : col.type == "TIMESTAMP" ? "long" : "string"
+      nullable = col.nullable
     }
-  }
+  ]
 
   metadata = {
     purpose     = "External API events with renamed fields"
@@ -476,37 +411,14 @@ create "kafka_topic" "user_events_external" {
 # Create a reporting table with additional computed columns
 create "postgres_table" "user_reporting" {
   # ⚡ NEW: Use add_columns to extend the base schema with reporting fields
-  dynamic "column" {
-    for_each = add_columns(
-      kolumn_data_object.user_schema.columns,
-      {
-        "reporting_period" = {
-          name     = "reporting_period"
-          type     = "VARCHAR(10)"
-          nullable = false
-          default  = "current"
-        }
-        "calculated_age" = {
-          name     = "calculated_age"
-          type     = "INTEGER"
-          nullable = true
-          computed = true
-        }
-        "user_segment" = {
-          name     = "user_segment"
-          type     = "VARCHAR(20)"
-          nullable = false
-          default  = "standard"
-        }
-      }
-    )
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-      default  = lookup(column.value, "default", null)
+  columns = add_columns(
+    kolumn_data_object.user_schema.columns,
+    {
+      reporting_period = { type = "VARCHAR(10)", nullable = false, default = "current" }
+      calculated_age   = { type = "INTEGER", nullable = true, computed = true }
+      user_segment     = { type = "VARCHAR(20)", nullable = false, default = "standard" }
     }
-  }
+  )
 
   metadata = {
     purpose          = "Extended schema for business reporting"
@@ -517,28 +429,18 @@ create "postgres_table" "user_reporting" {
 # Create a filtered development table (only specific columns)
 create "postgres_table" "user_development" {
   # ⚡ NEW: Use filter_columns to include only development-safe columns
-  dynamic "column" {
-    for_each = filter_columns(
+  columns = [
+    for col in filter_columns(
       kolumn_data_object.user_schema.columns,
       {
         # Only include columns that are not classified as PII
         "classifications" = [kolumn_classification.public]
       }
-    )
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = true # Make all columns nullable for dev safety
-    }
-  }
+    ) : merge(col, { nullable = true })
+  ]
 
   # Add development-specific columns
-  columns = {
-    dev_notes = {
-      type     = "TEXT"
-      nullable = true
-    }
-  }
+  dev_notes = { type = "TEXT", nullable = true }
 
   metadata = {
     purpose     = "Development-safe user data"
@@ -549,37 +451,19 @@ create "postgres_table" "user_development" {
 # Create a data warehouse table with universal enhancements
 create "postgres_table" "user_warehouse" {
   # ⚡ NEW: Use map_columns to apply warehouse-specific properties to all columns
-  dynamic "column" {
-    for_each = map_columns(
-      kolumn_data_object.user_schema.columns,
-      {
-        "indexed"             = true # Add indexing to all columns
-        "compressed"          = true # Enable compression
-        "warehouse_optimized" = true
-        "partition_candidate" = false # Can be overridden per column
-      }
-    )
-    content {
-      name       = column.value.name
-      type       = column.value.type
-      nullable   = column.value.nullable
-      indexed    = column.value.indexed
-      compressed = column.value.compressed
+  columns = map_columns(
+    kolumn_data_object.user_schema.columns,
+    {
+      "indexed"             = true # Add indexing to all columns
+      "compressed"          = true # Enable compression
+      "warehouse_optimized" = true
+      "partition_candidate" = false # Can be overridden per column
     }
-  }
+  )
 
   # Warehouse-specific columns
-  columns = {
-    etl_batch_id = {
-      type     = "BIGINT"
-      nullable = false
-    }
-
-    warehouse_inserted_at = {
-      type    = "TIMESTAMP"
-      default = "CURRENT_TIMESTAMP"
-    }
-  }
+  etl_batch_id          = { type = "BIGINT", nullable = false }
+  warehouse_inserted_at = { type = "TIMESTAMP", default = "CURRENT_TIMESTAMP" }
 
   metadata = {
     purpose            = "Data warehouse optimized user data"
@@ -595,66 +479,43 @@ create "postgres_table" "user_warehouse" {
 # Create an API response table with complex column manipulations
 create "postgres_table" "user_api_response" {
   # ⚡ CHAINED OPERATIONS: Demonstrate multiple operations in sequence
-  dynamic "column" {
-    # Step 1: Start with base schema
-    # Step 2: Exclude PII columns
-    # Step 3: Rename for API compatibility  
-    # Step 4: Add API metadata to all columns
-    # Step 5: Transform specific columns for API format
-    for_each = transform_columns(
-      map_columns(
-        rename_columns(
-          exclude_columns(
-            kolumn_data_object.user_schema.columns,
-            [for col in kolumn_data_object.user_schema.columns : col.name
-            if contains(col.classifications, kolumn_classification.pii)]
-          ),
-          {
-            "user_id"    = "userId"
-            "first_name" = "firstName"
-            "last_name"  = "lastName"
-            "created_at" = "createdAt"
-            "updated_at" = "updatedAt"
-          }
+  columns = transform_columns(
+    map_columns(
+      rename_columns(
+        exclude_columns(
+          kolumn_data_object.user_schema.columns,
+          [for col in kolumn_data_object.user_schema.columns : col.name if contains(col.classifications, kolumn_classification.pii)]
         ),
         {
-          "api_exposed"       = true
-          "json_serializable" = true
-          "api_version"       = "v2"
+          "user_id"    = "userId"
+          "first_name" = "firstName"
+          "last_name"  = "lastName"
+          "created_at" = "createdAt"
+          "updated_at" = "updatedAt"
         }
       ),
       {
-        # Transform timestamp columns to Unix epoch for APIs
-        "createdAt" = {
-          type    = "BIGINT"
-          comment = "Unix timestamp in milliseconds"
-        }
-        "updatedAt" = {
-          type    = "BIGINT"
-          comment = "Unix timestamp in milliseconds"
-        }
+        "api_exposed"       = true
+        "json_serializable" = true
+        "api_version"       = "v2"
       }
-    )
-    content {
-      name     = column.value.name
-      type     = column.value.type
-      nullable = column.value.nullable
-      comment  = lookup(column.value, "comment", "API field derived from source schema")
+    ),
+    {
+      # Transform timestamp columns to Unix epoch for APIs
+      "createdAt" = {
+        type    = "BIGINT"
+        comment = "Unix timestamp in milliseconds"
+      }
+      "updatedAt" = {
+        type    = "BIGINT"
+        comment = "Unix timestamp in milliseconds"
+      }
     }
-  }
+  )
 
   # API-specific metadata
-  columns = {
-    api_version = {
-      type    = "VARCHAR(10)"
-      default = "v2"
-    }
-
-    response_timestamp = {
-      type    = "BIGINT"
-      default = "extract(epoch from now()) * 1000"
-    }
-  }
+  api_version        = { type = "VARCHAR(10)", default = "v2" }
+  response_timestamp = { type = "BIGINT", default = "extract(epoch from now()) * 1000" }
 
   metadata = {
     purpose = "API response with chained column transformations"

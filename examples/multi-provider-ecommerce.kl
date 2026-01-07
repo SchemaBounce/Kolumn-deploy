@@ -129,53 +129,55 @@ create "kolumn_classification" "public" {
 create "kolumn_data_object" "customer" {
   description = "Universal customer data model"
 
-  id = {
-    type            = "BIGINT"
-    primary_key     = true
-    classifications = [kolumn_classification.public]
-  }
-
-  email = {
-    type            = "VARCHAR(255)"
-    unique          = true
-    classifications = [kolumn_classification.pii_low]
-    validation = {
-      format   = "email"
-      required = true
+  columns = {
+    id = {
+      type            = "BIGINT"
+      primary_key     = true
+      classifications = [kolumn_classification.public]
     }
-  }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    classifications = [kolumn_classification.pii_low]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      unique          = true
+      classifications = [kolumn_classification.pii_low]
+      validation = {
+        format   = "email"
+        required = true
+      }
+    }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    classifications = [kolumn_classification.pii_low]
-  }
+    first_name = {
+      type            = "VARCHAR(100)"
+      classifications = [kolumn_classification.pii_low]
+    }
 
-  phone = {
-    type            = "VARCHAR(20)"
-    classifications = [kolumn_classification.pii_high]
-  }
+    last_name = {
+      type            = "VARCHAR(100)"
+      classifications = [kolumn_classification.pii_low]
+    }
 
-  payment_method_id = {
-    type                = "VARCHAR(255)"
-    classifications     = [kolumn_classification.pii_high, kolumn_classification.financial]
-    encryption_required = true
-  }
+    phone = {
+      type            = "VARCHAR(20)"
+      classifications = [kolumn_classification.pii_high]
+    }
 
-  created_at = {
-    type            = "TIMESTAMPTZ"
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
-  }
+    payment_method_id = {
+      type                = "VARCHAR(255)"
+      classifications     = [kolumn_classification.pii_high, kolumn_classification.financial]
+      encryption_required = true
+    }
 
-  updated_at = {
-    type            = "TIMESTAMPTZ"
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
+    created_at = {
+      type            = "TIMESTAMPTZ"
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
+
+    updated_at = {
+      type            = "TIMESTAMPTZ"
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   # Provider-specific configurations
@@ -237,47 +239,49 @@ create "kolumn_data_object" "customer" {
 create "kolumn_data_object" "product" {
   description = "Universal product catalog model"
 
-  id = {
-    type            = "BIGINT"
-    primary_key     = true
-    classifications = [kolumn_classification.public]
-  }
+  columns = {
+    id = {
+      type            = "BIGINT"
+      primary_key     = true
+      classifications = [kolumn_classification.public]
+    }
 
-  sku = {
-    type            = "VARCHAR(50)"
-    unique          = true
-    classifications = [kolumn_classification.public]
-  }
+    sku = {
+      type            = "VARCHAR(50)"
+      unique          = true
+      classifications = [kolumn_classification.public]
+    }
 
-  name = {
-    type            = "VARCHAR(200)"
-    classifications = [kolumn_classification.public]
-  }
+    name = {
+      type            = "VARCHAR(200)"
+      classifications = [kolumn_classification.public]
+    }
 
-  description = {
-    type            = "TEXT"
-    classifications = [kolumn_classification.public]
-  }
+    description = {
+      type            = "TEXT"
+      classifications = [kolumn_classification.public]
+    }
 
-  price = {
-    type            = "DECIMAL(10,2)"
-    classifications = [kolumn_classification.financial]
-  }
+    price = {
+      type            = "DECIMAL(10,2)"
+      classifications = [kolumn_classification.financial]
+    }
 
-  category = {
-    type            = "VARCHAR(100)"
-    classifications = [kolumn_classification.public]
-  }
+    category = {
+      type            = "VARCHAR(100)"
+      classifications = [kolumn_classification.public]
+    }
 
-  inventory_count = {
-    type            = "INTEGER"
-    classifications = [kolumn_classification.public]
-  }
+    inventory_count = {
+      type            = "INTEGER"
+      classifications = [kolumn_classification.public]
+    }
 
-  created_at = {
-    type            = "TIMESTAMPTZ"
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
+    created_at = {
+      type            = "TIMESTAMPTZ"
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   config = {
@@ -323,45 +327,47 @@ create "kolumn_data_object" "product" {
 create "kolumn_data_object" "order" {
   description = "Universal order transaction model"
 
-  id = {
-    type            = "BIGINT"
-    primary_key     = true
-    classifications = [kolumn_classification.public]
-  }
-
-  customer_id = {
-    type            = "BIGINT"
-    foreign_key     = "customer.id"
-    classifications = [kolumn_classification.pii_low]
-  }
-
-  status = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.public]
-    validation = {
-      enum = ["pending", "processing", "shipped", "delivered", "cancelled"]
+  columns = {
+    id = {
+      type            = "BIGINT"
+      primary_key     = true
+      classifications = [kolumn_classification.public]
     }
-  }
 
-  total_amount = {
-    type            = "DECIMAL(12,2)"
-    classifications = [kolumn_classification.financial]
-  }
+    customer_id = {
+      type            = "BIGINT"
+      foreign_key     = "customer.id"
+      classifications = [kolumn_classification.pii_low]
+    }
 
-  payment_status = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.financial]
-  }
+    status = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.public]
+      validation = {
+        enum = ["pending", "processing", "shipped", "delivered", "cancelled"]
+      }
+    }
 
-  shipping_address = {
-    type            = "JSONB"
-    classifications = [kolumn_classification.pii_low]
-  }
+    total_amount = {
+      type            = "DECIMAL(12,2)"
+      classifications = [kolumn_classification.financial]
+    }
 
-  created_at = {
-    type            = "TIMESTAMPTZ"
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
+    payment_status = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.financial]
+    }
+
+    shipping_address = {
+      type            = "JSONB"
+      classifications = [kolumn_classification.pii_low]
+    }
+
+    created_at = {
+      type            = "TIMESTAMPTZ"
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   config = {
@@ -415,34 +421,36 @@ create "kolumn_data_object" "order" {
 create "kolumn_data_object" "user_event" {
   description = "High-volume user interaction events"
 
-  event_id = {
-    type            = "UUID"
-    primary_key     = true
-    classifications = [kolumn_classification.public]
-  }
-
-  user_id = {
-    type            = "BIGINT"
-    classifications = [kolumn_classification.pii_low]
-  }
-
-  event_type = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.event_data]
-    validation = {
-      enum = ["page_view", "product_view", "add_to_cart", "purchase", "search"]
+  columns = {
+    event_id = {
+      type            = "UUID"
+      primary_key     = true
+      classifications = [kolumn_classification.public]
     }
-  }
 
-  properties = {
-    type            = "JSONB"
-    classifications = [kolumn_classification.event_data]
-  }
+    user_id = {
+      type            = "BIGINT"
+      classifications = [kolumn_classification.pii_low]
+    }
 
-  timestamp = {
-    type            = "TIMESTAMPTZ"
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
+    event_type = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.event_data]
+      validation = {
+        enum = ["page_view", "product_view", "add_to_cart", "purchase", "search"]
+      }
+    }
+
+    properties = {
+      type            = "JSONB"
+      classifications = [kolumn_classification.event_data]
+    }
+
+    timestamp = {
+      type            = "TIMESTAMPTZ"
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   config = {

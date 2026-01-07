@@ -115,40 +115,42 @@ create "kolumn_data_object" "customer" {
   name        = "customer"
   description = "Universal customer data structure across all systems"
 
-  customer_id = {
-    type            = "UUID"
-    primary_key     = true
-    classifications = [kolumn_classification.public]
-  }
+  columns = {
+    customer_id = {
+      type            = "UUID"
+      primary_key     = true
+      classifications = [kolumn_classification.public]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    classifications = [kolumn_classification.pii]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      classifications = [kolumn_classification.pii]
+    }
 
-  phone = {
-    type            = "VARCHAR(20)"
-    classifications = [kolumn_classification.pii]
-  }
+    phone = {
+      type            = "VARCHAR(20)"
+      classifications = [kolumn_classification.pii]
+    }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    classifications = [kolumn_classification.pii]
-  }
+    first_name = {
+      type            = "VARCHAR(100)"
+      classifications = [kolumn_classification.pii]
+    }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    classifications = [kolumn_classification.pii]
-  }
+    last_name = {
+      type            = "VARCHAR(100)"
+      classifications = [kolumn_classification.pii]
+    }
 
-  date_of_birth = {
-    type            = "DATE"
-    classifications = [kolumn_classification.pii]
-  }
+    date_of_birth = {
+      type            = "DATE"
+      classifications = [kolumn_classification.pii]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    classifications = [kolumn_classification.internal]
+    created_at = {
+      type            = "TIMESTAMP"
+      classifications = [kolumn_classification.internal]
+    }
   }
 
   # Provider-specific configurations

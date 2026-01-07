@@ -41,23 +41,19 @@ discover "postgres_table" "source_users" {
 ```hcl
 # Convert discovery into reusable schema
 create "kolumn_data_object" "user_schema" {
-  # ⚡ AUTONOMOUS: Dynamically inherits ALL columns
-  dynamic "column" {
-    for_each = discover.postgres_table.source_users.columns
-    content {
-      name = column.key
-      type = column.value.type
-      # 🛡️ AUTO-PII: Classifies sensitive data automatically
-      classifications = contains(["email", "phone", "ssn"], column.key) ? [
-        kolumn_classification.pii
-      ] : [kolumn_classification.public]
+  # ⚡ AUTONOMOUS: Dynamically inherits ALL columns (concise map style)
+  columns = {
+    for col_name, col in discover.postgres_table.source_users.columns : col_name => {
+      name            = col_name
+      type            = col.type
+      classifications = contains(["email", "phone", "ssn"], col_name) ? [kolumn_classification.pii] : [kolumn_classification.public]
     }
   }
 }
 ```
 
 ### Step 3: Everything Else Inherits Automatically
-- **Related Tables**: Use `dynamic "column"` blocks to inherit schema
+- **Related Tables**: Use column maps to inherit schema directly (`columns = kolumn_data_object.user_schema.columns`)
 - **Kafka Topics**: Schema registry auto-updates with new fields
 - **DAGs**: Processing logic adapts to new column structure
 - **SQL Files**: Get new columns via `${user_columns}` interpolation

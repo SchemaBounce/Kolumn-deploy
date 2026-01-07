@@ -48,50 +48,52 @@ create "kolumn_data_object" "demo_user_schema" {
   description = "EVOLVED schema with automatic PII detection and security classification"
 
   # Base column definitions
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
+  columns = {
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.pii] # Automatic PII detection
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.pii] # Automatic PII detection
+    }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    first_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  middle_name = {
-    type            = "VARCHAR(100)"
-    nullable        = true
-    classifications = [kolumn_classification.public]
-  }
+    middle_name = {
+      type            = "VARCHAR(100)"
+      nullable        = true
+      classifications = [kolumn_classification.public]
+    }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    last_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  # 🛡️ NEW PII COLUMN: Automatically detected as sensitive
-  phone = {
-    type            = "VARCHAR(20)"
-    nullable        = true
-    classifications = [kolumn_classification.pii] # Automatic PII detection
-  }
+    # 🛡️ NEW PII COLUMN: Automatically detected as sensitive
+    phone = {
+      type            = "VARCHAR(20)"
+      nullable        = true
+      classifications = [kolumn_classification.pii] # Automatic PII detection
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
+    created_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   metadata = {

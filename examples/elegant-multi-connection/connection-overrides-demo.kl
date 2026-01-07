@@ -48,30 +48,32 @@ create "kolumn_data_object" "regional_user_schema" {
   name        = "Regional User Schema"
   description = "Universal user schema for multi-region deployment with compliance"
 
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = ["identifier"]
-  }
+  columns = {
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = ["identifier"]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    unique          = true
-    classifications = ["pii"]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      unique          = true
+      classifications = ["pii"]
+    }
 
-  name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = ["pii"]
-  }
+    name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = ["pii"]
+    }
 
-  created_at = {
-    type     = "TIMESTAMP"
-    nullable = false
-    default  = "CURRENT_TIMESTAMP"
+    created_at = {
+      type     = "TIMESTAMP"
+      nullable = false
+      default  = "CURRENT_TIMESTAMP"
+    }
   }
 }
 
@@ -188,33 +190,10 @@ create "postgres_table" "orders" {
   provider   = postgres.regional
   depends_on = []
 
-  id = {
-    type        = "bigserial"
-    primary_key = true
-  }
-
-  user_id = {
-    type     = "bigint"
-    not_null = true
-  }
-
-  total_amount = {
-    type     = "decimal(10,2)"
-    not_null = true
-  }
-
-  created_at = {
-    type    = "timestamp"
-    default = "CURRENT_TIMESTAMP"
-  }
-
-  # Foreign key to users table
-  foreign_key {
-    columns            = ["user_id"]
-    references_table   = "users"
-    references_columns = ["id"]
-    on_delete          = "CASCADE"
-  }
+  id           = { type = "bigserial", primary_key = true }
+  user_id      = { type = "bigint", not_null = true, references = "users.id", on_delete = "CASCADE" }
+  total_amount = { type = "decimal(10,2)", not_null = true }
+  created_at   = { type = "timestamp", default = "CURRENT_TIMESTAMP" }
 
   # Connection-specific overrides for compliance
   connection_overrides = {

@@ -130,79 +130,81 @@ create "kolumn_data_object" "customer" {
   description = "Universal customer schema for all providers"
   version     = "2.1.0"
 
-  id = {
-    type            = "BIGINT"
-    primary_key     = true
-    auto_increment  = true
-    classifications = [kolumn_classification.public]
-  }
-
-  email = {
-    type            = "VARCHAR(255)"
-    unique          = true
-    nullable        = false
-    classifications = [kolumn_classification.pii]
-    validation = {
-      format     = "email"
-      required   = true
-      max_length = 255
+  columns = {
+    id = {
+      type            = "BIGINT"
+      primary_key     = true
+      auto_increment  = true
+      classifications = [kolumn_classification.public]
     }
-  }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.pii]
-    validation = {
-      required   = true
-      min_length = 1
-      max_length = 100
+    email = {
+      type            = "VARCHAR(255)"
+      unique          = true
+      nullable        = false
+      classifications = [kolumn_classification.pii]
+      validation = {
+        format     = "email"
+        required   = true
+        max_length = 255
+      }
     }
-  }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.pii]
-  }
-
-  phone = {
-    type            = "VARCHAR(20)"
-    nullable        = true
-    classifications = [kolumn_classification.pii]
-    validation = {
-      pattern = "^\\+?[1-9]\\d{1,14}$" # E.164 format
+    first_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.pii]
+      validation = {
+        required   = true
+        min_length = 1
+        max_length = 100
+      }
     }
-  }
 
-  date_of_birth = {
-    type            = "DATE"
-    nullable        = true
-    classifications = [kolumn_classification.pii]
-  }
-
-  account_status = {
-    type            = "VARCHAR(20)"
-    nullable        = false
-    default         = "active"
-    classifications = [kolumn_classification.internal]
-    validation = {
-      enum = ["active", "suspended", "closed", "pending_verification"]
+    last_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.pii]
     }
-  }
 
-  created_at = {
-    type            = "TIMESTAMPTZ"
-    nullable        = false
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
-  }
+    phone = {
+      type            = "VARCHAR(20)"
+      nullable        = true
+      classifications = [kolumn_classification.pii]
+      validation = {
+        pattern = "^\\+?[1-9]\\d{1,14}$" # E.164 format
+      }
+    }
 
-  updated_at = {
-    type            = "TIMESTAMPTZ"
-    nullable        = false
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
+    date_of_birth = {
+      type            = "DATE"
+      nullable        = true
+      classifications = [kolumn_classification.pii]
+    }
+
+    account_status = {
+      type            = "VARCHAR(20)"
+      nullable        = false
+      default         = "active"
+      classifications = [kolumn_classification.internal]
+      validation = {
+        enum = ["active", "suspended", "closed", "pending_verification"]
+      }
+    }
+
+    created_at = {
+      type            = "TIMESTAMPTZ"
+      nullable        = false
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
+
+    updated_at = {
+      type            = "TIMESTAMPTZ"
+      nullable        = false
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   # Cross-provider configuration hints
@@ -243,86 +245,88 @@ create "kolumn_data_object" "transaction" {
   description = "Universal transaction schema with financial compliance"
   version     = "1.3.0"
 
-  id = {
-    type            = "BIGINT"
-    primary_key     = true
-    auto_increment  = true
-    classifications = [kolumn_classification.public]
-  }
-
-  customer_id = {
-    type            = "BIGINT"
-    nullable        = false
-    foreign_key     = "customer.id"
-    classifications = [kolumn_classification.pii]
-  }
-
-  amount = {
-    type            = "DECIMAL(15,2)"
-    nullable        = false
-    classifications = [kolumn_classification.financial]
-    validation = {
-      min_value = 0.01
-      max_value = 1000000.00
-      precision = 2
+  columns = {
+    id = {
+      type            = "BIGINT"
+      primary_key     = true
+      auto_increment  = true
+      classifications = [kolumn_classification.public]
     }
-  }
 
-  currency = {
-    type            = "CHAR(3)"
-    nullable        = false
-    default         = "USD"
-    classifications = [kolumn_classification.financial]
-    validation = {
-      enum = ["USD", "EUR", "GBP", "CAD", "JPY", "AUD"]
+    customer_id = {
+      type            = "BIGINT"
+      nullable        = false
+      foreign_key     = "customer.id"
+      classifications = [kolumn_classification.pii]
     }
-  }
 
-  transaction_type = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    classifications = [kolumn_classification.financial]
-    validation = {
-      enum = ["purchase", "refund", "fee", "interest", "dividend", "transfer"]
+    amount = {
+      type            = "DECIMAL(15,2)"
+      nullable        = false
+      classifications = [kolumn_classification.financial]
+      validation = {
+        min_value = 0.01
+        max_value = 1000000.00
+        precision = 2
+      }
     }
-  }
 
-  payment_method = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.financial, kolumn_classification.pii]
-    validation = {
-      enum = ["credit_card", "debit_card", "bank_transfer", "paypal", "apple_pay", "google_pay"]
+    currency = {
+      type            = "CHAR(3)"
+      nullable        = false
+      default         = "USD"
+      classifications = [kolumn_classification.financial]
+      validation = {
+        enum = ["USD", "EUR", "GBP", "CAD", "JPY", "AUD"]
+      }
     }
-  }
 
-  merchant_id = {
-    type            = "VARCHAR(100)"
-    nullable        = true
-    classifications = [kolumn_classification.internal]
-  }
-
-  status = {
-    type            = "VARCHAR(20)"
-    nullable        = false
-    default         = "pending"
-    classifications = [kolumn_classification.financial]
-    validation = {
-      enum = ["pending", "processing", "completed", "failed", "refunded", "disputed"]
+    transaction_type = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      classifications = [kolumn_classification.financial]
+      validation = {
+        enum = ["purchase", "refund", "fee", "interest", "dividend", "transfer"]
+      }
     }
-  }
 
-  processed_at = {
-    type            = "TIMESTAMPTZ"
-    nullable        = false
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
-  }
+    payment_method = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.financial, kolumn_classification.pii]
+      validation = {
+        enum = ["credit_card", "debit_card", "bank_transfer", "paypal", "apple_pay", "google_pay"]
+      }
+    }
 
-  metadata = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.internal]
+    merchant_id = {
+      type            = "VARCHAR(100)"
+      nullable        = true
+      classifications = [kolumn_classification.internal]
+    }
+
+    status = {
+      type            = "VARCHAR(20)"
+      nullable        = false
+      default         = "pending"
+      classifications = [kolumn_classification.financial]
+      validation = {
+        enum = ["pending", "processing", "completed", "failed", "refunded", "disputed"]
+      }
+    }
+
+    processed_at = {
+      type            = "TIMESTAMPTZ"
+      nullable        = false
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
+
+    metadata = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.internal]
+    }
   }
 
   config = {
@@ -352,62 +356,64 @@ create "kolumn_data_object" "user_activity" {
   description = "High-volume user interaction analytics"
   version     = "1.0.5"
 
-  event_id = {
-    type            = "UUID"
-    primary_key     = true
-    classifications = [kolumn_classification.public]
-  }
-
-  user_id = {
-    type            = "BIGINT"
-    nullable        = true # Anonymous events allowed
-    classifications = [kolumn_classification.pii]
-  }
-
-  session_id = {
-    type            = "UUID"
-    nullable        = false
-    classifications = [kolumn_classification.analytics]
-  }
-
-  event_type = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    classifications = [kolumn_classification.analytics]
-    validation = {
-      enum = ["page_view", "click", "search", "purchase", "login", "logout", "error"]
+  columns = {
+    event_id = {
+      type            = "UUID"
+      primary_key     = true
+      classifications = [kolumn_classification.public]
     }
-  }
 
-  page_url = {
-    type            = "TEXT"
-    nullable        = true
-    classifications = [kolumn_classification.analytics]
-  }
+    user_id = {
+      type            = "BIGINT"
+      nullable        = true # Anonymous events allowed
+      classifications = [kolumn_classification.pii]
+    }
 
-  user_agent = {
-    type            = "TEXT"
-    nullable        = true
-    classifications = [kolumn_classification.analytics]
-  }
+    session_id = {
+      type            = "UUID"
+      nullable        = false
+      classifications = [kolumn_classification.analytics]
+    }
 
-  ip_address = {
-    type            = "INET"
-    nullable        = true
-    classifications = [kolumn_classification.pii] # Can be PII in some jurisdictions
-  }
+    event_type = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      classifications = [kolumn_classification.analytics]
+      validation = {
+        enum = ["page_view", "click", "search", "purchase", "login", "logout", "error"]
+      }
+    }
 
-  properties = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.analytics]
-  }
+    page_url = {
+      type            = "TEXT"
+      nullable        = true
+      classifications = [kolumn_classification.analytics]
+    }
 
-  timestamp = {
-    type            = "TIMESTAMPTZ"
-    nullable        = false
-    default         = "NOW()"
-    classifications = [kolumn_classification.public]
+    user_agent = {
+      type            = "TEXT"
+      nullable        = true
+      classifications = [kolumn_classification.analytics]
+    }
+
+    ip_address = {
+      type            = "INET"
+      nullable        = true
+      classifications = [kolumn_classification.pii] # Can be PII in some jurisdictions
+    }
+
+    properties = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.analytics]
+    }
+
+    timestamp = {
+      type            = "TIMESTAMPTZ"
+      nullable        = false
+      default         = "NOW()"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   config = {

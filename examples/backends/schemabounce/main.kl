@@ -44,23 +44,9 @@ provider "postgres" "production" {
 create "postgres_table" "users" {
   provider = postgres.production
 
-  columns = {
-    id = {
-      type        = "bigserial"
-      primary_key = true
-    }
-
-    email = {
-      type     = "varchar(255)"
-      not_null = true
-      unique   = true
-    }
-
-    created_at = {
-      type    = "timestamp"
-      default = "CURRENT_TIMESTAMP"
-    }
-  }
+  id         = { type = "bigserial", primary_key = true }
+  email      = { type = "varchar(255)", not_null = true, unique = true }
+  created_at = { type = "timestamp", default = "CURRENT_TIMESTAMP" }
 }
 
 # Variables
