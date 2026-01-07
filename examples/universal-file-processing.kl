@@ -22,46 +22,48 @@
 create "kolumn_data_object" "users" {
   description = "User data model shared across SQL, Python, and Java"
 
-  id = {
-    type           = "BIGSERIAL"
-    primary_key    = true
-    auto_increment = true
-  }
-
-  email = {
-    type            = "VARCHAR(255)"
-    unique          = true
-    nullable        = false
-    classifications = ["pii"]
-    validation = {
-      format   = "email"
-      required = true
+  columns = {
+    id = {
+      type           = "BIGSERIAL"
+      primary_key    = true
+      auto_increment = true
     }
-  }
 
-  name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = ["pii"]
-  }
-
-  department = {
-    type     = "VARCHAR(50)"
-    nullable = true
-    validation = {
-      enum = ["engineering", "sales", "marketing", "hr", "finance"]
+    email = {
+      type            = "VARCHAR(255)"
+      unique          = true
+      nullable        = false
+      classifications = ["pii"]
+      validation = {
+        format   = "email"
+        required = true
+      }
     }
-  }
 
-  created_at = {
-    type     = "TIMESTAMPTZ"
-    default  = "NOW()"
-    nullable = false
-  }
+    name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = ["pii"]
+    }
 
-  last_login_at = {
-    type     = "TIMESTAMPTZ"
-    nullable = true
+    department = {
+      type     = "VARCHAR(50)"
+      nullable = true
+      validation = {
+        enum = ["engineering", "sales", "marketing", "hr", "finance"]
+      }
+    }
+
+    created_at = {
+      type     = "TIMESTAMPTZ"
+      default  = "NOW()"
+      nullable = false
+    }
+
+    last_login_at = {
+      type     = "TIMESTAMPTZ"
+      nullable = true
+    }
   }
 
   # Multi-provider configuration
@@ -100,36 +102,38 @@ create "kolumn_data_object" "users" {
 create "kolumn_data_object" "orders" {
   description = "Order transactions with financial data"
 
-  id = {
-    type        = "BIGSERIAL"
-    primary_key = true
-  }
-
-  user_id = {
-    type        = "BIGINT"
-    foreign_key = "users.id"
-    nullable    = false
-  }
-
-  amount = {
-    type            = "DECIMAL(12,2)"
-    nullable        = false
-    classifications = ["financial"]
-  }
-
-  status = {
-    type     = "VARCHAR(20)"
-    nullable = false
-    default  = "pending"
-    validation = {
-      enum = ["pending", "processing", "completed", "failed", "refunded"]
+  columns = {
+    id = {
+      type        = "BIGSERIAL"
+      primary_key = true
     }
-  }
 
-  created_at = {
-    type     = "TIMESTAMPTZ"
-    default  = "NOW()"
-    nullable = false
+    user_id = {
+      type        = "BIGINT"
+      foreign_key = "users.id"
+      nullable    = false
+    }
+
+    amount = {
+      type            = "DECIMAL(12,2)"
+      nullable        = false
+      classifications = ["financial"]
+    }
+
+    status = {
+      type     = "VARCHAR(20)"
+      nullable = false
+      default  = "pending"
+      validation = {
+        enum = ["pending", "processing", "completed", "failed", "refunded"]
+      }
+    }
+
+    created_at = {
+      type     = "TIMESTAMPTZ"
+      default  = "NOW()"
+      nullable = false
+    }
   }
 
   config = {

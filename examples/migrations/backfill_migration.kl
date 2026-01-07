@@ -1,0 +1,175 @@
+# Backfill Migration Example
+# Demonstrates adding a new column and backfilling data from existing columns
+#
+# Use case: Adding a computed column (e.g., full_name from first_name + last_name)
+# or denormalizing data for performance.
+#
+# Run with:
+#   kolumn migration plan --target add_full_name_column
+#   kolumn migration apply --target add_full_name_column
+#   kolumn migration rollback --target add_full_name_column
+
+# -----------------------------------------------------------------------------
+# Provider Configuration
+# -----------------------------------------------------------------------------
+
+provider "postgres" "primary" {
+  host     = "localhost"
+  port     = 5432
+  database = "myapp"
+  username = var.db_username
+  password = var.db_password
+}
+
+# -----------------------------------------------------------------------------
+# Target Table
+# -----------------------------------------------------------------------------
+
+create "postgres_table" "customers" {
+  provider = postgres.primary
+  schema   = "public"
+  name     = "customers"
+
+  columns = {
+    id = {
+      type        = "bigserial"
+      primary_key = true
+    }
+
+    first_name = {
+      type     = "varchar(100)"
+      not_null = true
+    }
+
+    last_name = {
+      type     = "varchar(100)"
+      not_null = true
+    }
+
+    # New column to be added and backfilled
+    full_name = {
+      type     = "varchar(201)"
+      not_null = true
+    }
+
+    email = {
+      type     = "varchar(255)"
+      not_null = true
+      unique   = true
+    }
+
+    created_at = {
+      type    = "timestamptz"
+      default = "now()"
+    }
+  }
+
+  indexes = ["full_name", "email"]
+}
+
+# -----------------------------------------------------------------------------
+# Migration: Add and Backfill Column
+# -----------------------------------------------------------------------------
+
+migration "backfill" "add_full_name_column" {
+  provider = postgres.primary
+  resource = postgres_table.customers
+  column   = "full_name"
+
+  # Forward migration: add column and backfill
+  forward {
+    prechecks = [
+      # Estimate row count to warn about long-running backfills
+      "estimate_row_count table=customers warn_threshold=1000000"
+    ]
+
+    steps = [
+      # Step 1: Add the column as nullable first
+      "add_column table=customers column=full_name type=varchar(201) nullable=true",
+
+      # Step 2: Backfill existing rows in batches to avoid locking
+      "backfill_column table=customers column=full_name expression=first_name||' '||last_name batch_size=10000 sleep_ms=100",
+
+      # Step 3: Set NOT NULL constraint after backfill
+      "alter_column_nullable table=customers column=full_name nullable=false",
+
+      # Step 4: Add index for the new column
+      "add_index table=customers columns=full_name method=btree"
+    ]
+  }
+
+  # Backward migration: remove the column
+  backward {
+    steps = [
+      "drop_index table=customers index=idx_customers_full_name",
+      "drop_column table=customers column=full_name"
+    ]
+  }
+
+  safety {
+    quarantine     = true
+    quarantine_ttl = "7d"
+    lock_table     = false # Don't lock - we're using batched backfill
+    timeout        = "30m" # Allow longer timeout for large tables
+    require_backup = true
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Migration: Add Denormalized Count Column
+# -----------------------------------------------------------------------------
+
+migration "backfill" "add_order_count_column" {
+  provider = postgres.primary
+  resource = postgres_table.customers
+  column   = "order_count"
+
+  forward {
+    prechecks = [
+      "table_exists table=orders",
+      "estimate_row_count table=customers warn_threshold=500000"
+    ]
+
+    steps = [
+      # Add the counter column
+      "add_column table=customers column=order_count type=integer default=0 nullable=false",
+
+      # Backfill from orders table using subquery
+      "backfill_column table=customers column=order_count expression=(SELECT COUNT(*) FROM orders WHERE orders.customer_id = customers.id) batch_size=5000 sleep_ms=50",
+
+      # Add index for filtering by order count
+      "add_index table=customers columns=order_count method=btree"
+    ]
+  }
+
+  backward {
+    steps = [
+      "drop_index table=customers index=idx_customers_order_count",
+      "drop_column table=customers column=order_count"
+    ]
+  }
+
+  safety {
+    quarantine     = true
+    quarantine_ttl = "14d" # Keep longer for denormalized data
+    lock_table     = false
+    timeout        = "1h" # Aggregation backfills can take longer
+    require_backup = true
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Variables
+# -----------------------------------------------------------------------------
+
+variable "db_username" {
+  description = "Database username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
+}

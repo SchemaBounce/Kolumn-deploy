@@ -72,38 +72,40 @@ create "kolumn_data_object" "demo_user_schema" {
   name        = "Demo User Schema"
   description = "Baseline user schema for autonomous propagation demo"
 
-  # ✅ CORRECT: Use proper column blocks for schema definition
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
+  # ✅ CORRECT: Use map-based column syntax
+  columns = {
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.pii]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.pii]
+    }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    first_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    last_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
+    created_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   metadata = {
@@ -197,17 +199,8 @@ create "postgres_table" "demo_user_analytics" {
   }
 
   # Add analytics-specific columns
-  columns = {
-    total_sessions = {
-      type    = "INTEGER"
-      default = 0
-    }
-
-    last_activity = {
-      type     = "TIMESTAMP"
-      nullable = true
-    }
-  }
+  total_sessions = { type = "INTEGER", default = 0 }
+  last_activity  = { type = "TIMESTAMP", nullable = true }
 }
 
 # Kafka topic with schema derived from our data object
@@ -232,14 +225,13 @@ create "kafka_topic" "demo_user_events" {
   }
 
   # Dynamic fields from data object
-  dynamic "schema_field" {
-    for_each = kolumn_data_object.demo_user_schema.columns
-    content {
-      name     = schema_field.value.name
-      type     = schema_field.value.type == "VARCHAR(255)" ? "string" : schema_field.value.type == "VARCHAR(100)" ? "string" : schema_field.value.type == "BIGINT" ? "long" : schema_field.value.type == "TIMESTAMP" ? "long" : "string"
-      nullable = schema_field.value.nullable
+  schema_fields = [
+    for col in kolumn_data_object.demo_user_schema.columns : {
+      name     = col.name
+      type     = col.type == "VARCHAR(255)" ? "string" : col.type == "VARCHAR(100)" ? "string" : col.type == "BIGINT" ? "long" : col.type == "TIMESTAMP" ? "long" : "string"
+      nullable = col.nullable
     }
-  }
+  ]
 }
 
 # File discovery for SQL that uses our schema

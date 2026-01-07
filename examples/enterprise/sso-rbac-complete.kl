@@ -949,49 +949,51 @@ create "kolumn_audit_reporter" "enterprise_audit" {
 create "kolumn_data_object" "customer" {
   name = "customer"
 
-  id = {
-    type        = "BIGINT"
-    primary_key = true
-    # No classification = no encryption for non-sensitive IDs
-  }
+  columns = {
+    id = {
+      type        = "BIGINT"
+      primary_key = true
+      # No classification = no encryption for non-sensitive IDs
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    unique          = true
-    classifications = [kolumn_classification.pii.name]
-    # Encryption and GDPR compliance auto-applied from PII classification
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      unique          = true
+      classifications = [kolumn_classification.pii.name]
+      # Encryption and GDPR compliance auto-applied from PII classification
+    }
 
-  phone = {
-    type            = "VARCHAR(20)"
-    classifications = [kolumn_classification.pii.name]
-  }
+    phone = {
+      type            = "VARCHAR(20)"
+      classifications = [kolumn_classification.pii.name]
+    }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    classifications = [kolumn_classification.pii.name]
-  }
+    first_name = {
+      type            = "VARCHAR(100)"
+      classifications = [kolumn_classification.pii.name]
+    }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    classifications = [kolumn_classification.pii.name]
-  }
+    last_name = {
+      type            = "VARCHAR(100)"
+      classifications = [kolumn_classification.pii.name]
+    }
 
-  total_spent = {
-    type            = "DECIMAL(12,2)"
-    classifications = [kolumn_classification.financial.name]
-    # Financial encryption and PCI compliance auto-applied
-  }
+    total_spent = {
+      type            = "DECIMAL(12,2)"
+      classifications = [kolumn_classification.financial.name]
+      # Financial encryption and PCI compliance auto-applied
+    }
 
-  status = {
-    type            = "VARCHAR(20)"
-    classifications = [kolumn_classification.public.name]
-  }
+    status = {
+      type            = "VARCHAR(20)"
+      classifications = [kolumn_classification.public.name]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public.name]
+    created_at = {
+      type            = "TIMESTAMP"
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public.name]
+    }
   }
 
   # Provider-namespaced configurations

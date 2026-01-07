@@ -6,45 +6,47 @@ create "kolumn_data_object" "user_schema" {
   name        = "Standard User Schema"
   description = "User schema for standard project structure"
 
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
+  columns = {
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
+    }
 
-  username = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.public]
-  }
+    username = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.public]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.pii]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.pii]
+    }
 
-  password_hash = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    classifications = [kolumn_classification.sensitive]
-  }
+    password_hash = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      classifications = [kolumn_classification.sensitive]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
-  }
+    created_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
 
-  updated_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
+    updated_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   metadata = {
@@ -57,50 +59,52 @@ create "kolumn_data_object" "post_schema" {
   name        = "Standard Post Schema"
   description = "Post schema for content management"
 
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
+  columns = {
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
+    }
 
-  title = {
-    type            = "VARCHAR(200)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    title = {
+      type            = "VARCHAR(200)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  content = {
-    type            = "TEXT"
-    nullable        = true
-    classifications = [kolumn_classification.public]
-  }
+    content = {
+      type            = "TEXT"
+      nullable        = true
+      classifications = [kolumn_classification.public]
+    }
 
-  author_id = {
-    type            = "BIGINT"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    author_id = {
+      type            = "BIGINT"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  status = {
-    type            = "VARCHAR(20)"
-    nullable        = false
-    default         = "draft"
-    classifications = [kolumn_classification.public]
-  }
+    status = {
+      type            = "VARCHAR(20)"
+      nullable        = false
+      default         = "draft"
+      classifications = [kolumn_classification.public]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
-  }
+    created_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
 
-  updated_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
+    updated_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   metadata = {
@@ -144,22 +148,14 @@ create "kolumn_classification" "sensitive" {
   }
 }
 
-# ✅ CORRECT: Tables reference data objects with dynamic blocks
+# ✅ CORRECT: Tables reference data objects directly
 create "postgres_table" "users" {
   name = "users"
-
-  # Pull columns from data object
-  dynamic "column" {
-    for_each = kolumn_data_object.user_schema.columns
-    content {
-      name        = column.value.name
-      type        = column.value.type == "BIGINT" && column.value.primary_key ? "UUID" : column.value.type == "TIMESTAMP" ? "TIMESTAMP" : column.value.type
-      nullable    = column.value.nullable
-      primary_key = column.value.primary_key
-      unique      = column.value.unique
-      default     = column.value.type == "BIGINT" && column.value.primary_key ? "gen_random_uuid()" : column.value.type == "TIMESTAMP" ? "NOW()" : column.value.default
-    }
-  }
+  columns = transform_columns(kolumn_data_object.user_schema.columns, {
+    id         = { type = "UUID", default = "gen_random_uuid()" }
+    created_at = { default = "NOW()" }
+    updated_at = { default = "NOW()" }
+  })
 
   # Add environment-specific configuration
   schema = var.environment == "prod" ? "public" : var.environment
@@ -167,19 +163,12 @@ create "postgres_table" "users" {
 
 create "postgres_table" "posts" {
   name = "posts"
-
-  # Pull columns from data object
-  dynamic "column" {
-    for_each = kolumn_data_object.post_schema.columns
-    content {
-      name        = column.value.name
-      type        = column.value.type == "BIGINT" && column.value.primary_key ? "UUID" : column.value.type == "BIGINT" ? "UUID" : column.value.type == "TIMESTAMP" ? "TIMESTAMP" : column.value.type
-      nullable    = column.value.nullable
-      primary_key = column.value.primary_key
-      unique      = column.value.unique
-      default     = column.value.type == "BIGINT" && column.value.primary_key ? "gen_random_uuid()" : column.value.type == "TIMESTAMP" ? "NOW()" : column.value.default
-    }
-  }
+  columns = transform_columns(kolumn_data_object.post_schema.columns, {
+    id         = { type = "UUID", default = "gen_random_uuid()" }
+    author_id  = { type = "UUID" }
+    created_at = { default = "NOW()" }
+    updated_at = { default = "NOW()" }
+  })
 
   schema = var.environment == "prod" ? "public" : var.environment
 }

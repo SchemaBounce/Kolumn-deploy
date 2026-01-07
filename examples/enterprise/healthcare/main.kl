@@ -88,122 +88,124 @@ create "kolumn_data_object" "patient_record" {
   name        = "Patient Medical Record Schema"
   description = "Core patient data with HIPAA PHI protection"
 
-  patient_id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
-
-  mrn = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.phi]
-    encryption_config = {
-      algorithm    = "AES-256-GCM"
-      searchable   = true
-      key_rotation = true
+  columns = {
+    patient_id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
     }
-  }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.phi]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = true
+    mrn = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.phi]
+      encryption_config = {
+        algorithm    = "AES-256-GCM"
+        searchable   = true
+        key_rotation = true
+      }
     }
-  }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.phi]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = true
+    first_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.phi]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = true
+      }
     }
-  }
 
-  date_of_birth = {
-    type            = "DATE"
-    nullable        = false
-    classifications = [kolumn_classification.phi]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+    last_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.phi]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = true
+      }
     }
-  }
 
-  ssn = {
-    type            = "VARCHAR(11)"
-    nullable        = true
-    classifications = [kolumn_classification.phi, kolumn_classification.restricted]
-    encryption_config = {
-      algorithm    = "AES-256-GCM"
-      searchable   = false
-      access_audit = true
+    date_of_birth = {
+      type            = "DATE"
+      nullable        = false
+      classifications = [kolumn_classification.phi]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
     }
-  }
 
-  phone_number = {
-    type            = "VARCHAR(20)"
-    nullable        = true
-    classifications = [kolumn_classification.phi]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = true
+    ssn = {
+      type            = "VARCHAR(11)"
+      nullable        = true
+      classifications = [kolumn_classification.phi, kolumn_classification.restricted]
+      encryption_config = {
+        algorithm    = "AES-256-GCM"
+        searchable   = false
+        access_audit = true
+      }
     }
-  }
 
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = true
-    classifications = [kolumn_classification.phi]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = true
+    phone_number = {
+      type            = "VARCHAR(20)"
+      nullable        = true
+      classifications = [kolumn_classification.phi]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = true
+      }
     }
-  }
 
-  emergency_contact = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.phi]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = true
+      classifications = [kolumn_classification.phi]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = true
+      }
     }
-  }
 
-  insurance_info = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.phi, kolumn_classification.financial]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+    emergency_contact = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.phi]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
     }
-  }
 
-  created_at = {
-    type     = "TIMESTAMP"
-    nullable = false
-    default  = "CURRENT_TIMESTAMP"
-  }
+    insurance_info = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.phi, kolumn_classification.financial]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
+    }
 
-  updated_at = {
-    type     = "TIMESTAMP"
-    nullable = false
-    default  = "CURRENT_TIMESTAMP"
-  }
+    created_at = {
+      type     = "TIMESTAMP"
+      nullable = false
+      default  = "CURRENT_TIMESTAMP"
+    }
 
-  audit_trail = {
-    type            = "JSONB"
-    nullable        = false
-    classifications = [kolumn_classification.audit]
+    updated_at = {
+      type     = "TIMESTAMP"
+      nullable = false
+      default  = "CURRENT_TIMESTAMP"
+    }
+
+    audit_trail = {
+      type            = "JSONB"
+      nullable        = false
+      classifications = [kolumn_classification.audit]
+    }
   }
 
   config = {
@@ -219,71 +221,73 @@ create "kolumn_data_object" "clinical_record" {
   name        = "Clinical Data Schema"
   description = "Clinical procedures, diagnostics, and treatment data"
 
-  record_id = {
-    type        = "BIGINT"
-    nullable    = false
-    primary_key = true
-  }
-
-  patient_id = {
-    type            = "BIGINT"
-    nullable        = false
-    classifications = [kolumn_classification.identifier]
-  }
-
-  encounter_id = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    classifications = [kolumn_classification.identifier]
-  }
-
-  procedure_code = {
-    type            = "VARCHAR(20)"
-    nullable        = true
-    classifications = [kolumn_classification.medical]
-  }
-
-  diagnosis_code = {
-    type            = "VARCHAR(20)"
-    nullable        = true
-    classifications = [kolumn_classification.medical]
-  }
-
-  clinical_notes = {
-    type            = "TEXT"
-    nullable        = true
-    classifications = [kolumn_classification.phi, kolumn_classification.medical]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+  columns = {
+    record_id = {
+      type        = "BIGINT"
+      nullable    = false
+      primary_key = true
     }
-  }
 
-  lab_results = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.phi, kolumn_classification.medical]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+    patient_id = {
+      type            = "BIGINT"
+      nullable        = false
+      classifications = [kolumn_classification.identifier]
     }
-  }
 
-  physician_id = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    classifications = [kolumn_classification.identifier]
-  }
+    encounter_id = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      classifications = [kolumn_classification.identifier]
+    }
 
-  treatment_date = {
-    type     = "TIMESTAMP"
-    nullable = false
-  }
+    procedure_code = {
+      type            = "VARCHAR(20)"
+      nullable        = true
+      classifications = [kolumn_classification.medical]
+    }
 
-  location = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
+    diagnosis_code = {
+      type            = "VARCHAR(20)"
+      nullable        = true
+      classifications = [kolumn_classification.medical]
+    }
+
+    clinical_notes = {
+      type            = "TEXT"
+      nullable        = true
+      classifications = [kolumn_classification.phi, kolumn_classification.medical]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
+    }
+
+    lab_results = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.phi, kolumn_classification.medical]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
+    }
+
+    physician_id = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      classifications = [kolumn_classification.identifier]
+    }
+
+    treatment_date = {
+      type     = "TIMESTAMP"
+      nullable = false
+    }
+
+    location = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
   }
 }
 

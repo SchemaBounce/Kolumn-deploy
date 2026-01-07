@@ -168,65 +168,67 @@ create "kolumn_data_object" "customer_profile" {
   name        = "customer_profile"
   description = "Comprehensive customer profile with multi-tier data classification"
 
-  customer_id = {
-    type            = "UUID"
-    primary_key     = true
-    classifications = [kolumn_classification.public_data]
-  }
+  columns = {
+    customer_id = {
+      type            = "UUID"
+      primary_key     = true
+      classifications = [kolumn_classification.public_data]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  phone_number = {
-    type            = "VARCHAR(20)"
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    phone_number = {
+      type            = "VARCHAR(20)"
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  full_name = {
-    type            = "VARCHAR(200)"
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    full_name = {
+      type            = "VARCHAR(200)"
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  date_of_birth = {
-    type            = "DATE"
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    date_of_birth = {
+      type            = "DATE"
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  social_security_number = {
-    type            = "VARCHAR(11)"
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    social_security_number = {
+      type            = "VARCHAR(11)"
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  address = {
-    type            = "TEXT"
-    classifications = [kolumn_classification.highly_sensitive_pii]
-  }
+    address = {
+      type            = "TEXT"
+      classifications = [kolumn_classification.highly_sensitive_pii]
+    }
 
-  credit_score = {
-    type            = "INTEGER"
-    classifications = [kolumn_classification.financial_data]
-  }
+    credit_score = {
+      type            = "INTEGER"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  account_balance = {
-    type            = "DECIMAL(15,2)"
-    classifications = [kolumn_classification.financial_data]
-  }
+    account_balance = {
+      type            = "DECIMAL(15,2)"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  customer_segment = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.business_confidential]
-  }
+    customer_segment = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.business_confidential]
+    }
 
-  marketing_preferences = {
-    type            = "JSONB"
-    classifications = [kolumn_classification.business_confidential]
-  }
+    marketing_preferences = {
+      type            = "JSONB"
+      classifications = [kolumn_classification.business_confidential]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    classifications = [kolumn_classification.public_data]
+    created_at = {
+      type            = "TIMESTAMP"
+      classifications = [kolumn_classification.public_data]
+    }
   }
 
   # Governance metadata
@@ -243,65 +245,67 @@ create "kolumn_data_object" "financial_transaction" {
   name        = "financial_transaction"
   description = "Financial transaction with comprehensive compliance controls"
 
-  transaction_id = {
-    type            = "UUID"
-    primary_key     = true
-    classifications = [kolumn_classification.business_confidential]
-  }
+  columns = {
+    transaction_id = {
+      type            = "UUID"
+      primary_key     = true
+      classifications = [kolumn_classification.business_confidential]
+    }
 
-  customer_id = {
-    type            = "UUID"
-    classifications = [kolumn_classification.business_confidential]
-  }
+    customer_id = {
+      type            = "UUID"
+      classifications = [kolumn_classification.business_confidential]
+    }
 
-  account_number = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.financial_data]
-  }
+    account_number = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  transaction_amount = {
-    type            = "DECIMAL(15,2)"
-    classifications = [kolumn_classification.financial_data]
-  }
+    transaction_amount = {
+      type            = "DECIMAL(15,2)"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  currency = {
-    type            = "CHAR(3)"
-    classifications = [kolumn_classification.public_data]
-  }
+    currency = {
+      type            = "CHAR(3)"
+      classifications = [kolumn_classification.public_data]
+    }
 
-  payment_method = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.financial_data]
-  }
+    payment_method = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  merchant_id = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.business_confidential]
-  }
+    merchant_id = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.business_confidential]
+    }
 
-  transaction_type = {
-    type            = "VARCHAR(50)"
-    classifications = [kolumn_classification.business_confidential]
-  }
+    transaction_type = {
+      type            = "VARCHAR(50)"
+      classifications = [kolumn_classification.business_confidential]
+    }
 
-  fraud_score = {
-    type            = "DECIMAL(3,2)"
-    classifications = [kolumn_classification.financial_data]
-  }
+    fraud_score = {
+      type            = "DECIMAL(3,2)"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  risk_category = {
-    type            = "VARCHAR(20)"
-    classifications = [kolumn_classification.financial_data]
-  }
+    risk_category = {
+      type            = "VARCHAR(20)"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  regulatory_flags = {
-    type            = "JSONB"
-    classifications = [kolumn_classification.financial_data]
-  }
+    regulatory_flags = {
+      type            = "JSONB"
+      classifications = [kolumn_classification.financial_data]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    classifications = [kolumn_classification.business_confidential]
+    created_at = {
+      type            = "TIMESTAMP"
+      classifications = [kolumn_classification.business_confidential]
+    }
   }
 
   # Financial-specific governance

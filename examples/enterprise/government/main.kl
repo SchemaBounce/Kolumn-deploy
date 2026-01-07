@@ -95,93 +95,95 @@ create "kolumn_data_object" "citizen_record" {
   name        = "Citizen Services Record Schema"
   description = "Citizen data with Privacy Act protection"
 
-  citizen_id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.government_identifier]
-  }
-
-  ssn = {
-    type            = "VARCHAR(11)"
-    nullable        = true
-    classifications = [kolumn_classification.pii, kolumn_classification.restricted]
-    encryption_config = {
-      algorithm          = "AES-256-GCM"
-      searchable         = false
-      key_rotation       = true
-      access_audit       = true
-      clearance_required = "confidential"
+  columns = {
+    citizen_id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.government_identifier]
     }
-  }
 
-  first_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.pii]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = true
+    ssn = {
+      type            = "VARCHAR(11)"
+      nullable        = true
+      classifications = [kolumn_classification.pii, kolumn_classification.restricted]
+      encryption_config = {
+        algorithm          = "AES-256-GCM"
+        searchable         = false
+        key_rotation       = true
+        access_audit       = true
+        clearance_required = "confidential"
+      }
     }
-  }
 
-  last_name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.pii]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = true
+    first_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.pii]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = true
+      }
     }
-  }
 
-  date_of_birth = {
-    type            = "DATE"
-    nullable        = false
-    classifications = [kolumn_classification.pii]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+    last_name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.pii]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = true
+      }
     }
-  }
 
-  address = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.pii]
-    encryption_config = {
-      algorithm  = "AES-256-GCM"
-      searchable = false
+    date_of_birth = {
+      type            = "DATE"
+      nullable        = false
+      classifications = [kolumn_classification.pii]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
     }
-  }
 
-  security_clearance = {
-    type            = "VARCHAR(20)"
-    nullable        = true
-    classifications = [kolumn_classification.security_relevant]
-    encryption_config = {
-      algorithm          = "AES-256-GCM"
-      searchable         = false
-      clearance_required = "secret"
+    address = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.pii]
+      encryption_config = {
+        algorithm  = "AES-256-GCM"
+        searchable = false
+      }
     }
-  }
 
-  service_interactions = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.official_use]
-  }
+    security_clearance = {
+      type            = "VARCHAR(20)"
+      nullable        = true
+      classifications = [kolumn_classification.security_relevant]
+      encryption_config = {
+        algorithm          = "AES-256-GCM"
+        searchable         = false
+        clearance_required = "secret"
+      }
+    }
 
-  created_at = {
-    type     = "TIMESTAMP"
-    nullable = false
-    default  = "CURRENT_TIMESTAMP"
-  }
+    service_interactions = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.official_use]
+    }
 
-  audit_trail = {
-    type            = "JSONB"
-    nullable        = false
-    classifications = [kolumn_classification.audit]
+    created_at = {
+      type     = "TIMESTAMP"
+      nullable = false
+      default  = "CURRENT_TIMESTAMP"
+    }
+
+    audit_trail = {
+      type            = "JSONB"
+      nullable        = false
+      classifications = [kolumn_classification.audit]
+    }
   }
 
   config = {
@@ -197,56 +199,58 @@ create "kolumn_data_object" "security_event" {
   name        = "Security Operations Schema"
   description = "Security events and threat monitoring data"
 
-  event_id = {
-    type        = "BIGINT"
-    nullable    = false
-    primary_key = true
-  }
-
-  event_type = {
-    type            = "VARCHAR(50)"
-    nullable        = false
-    classifications = [kolumn_classification.security_relevant]
-  }
-
-  severity = {
-    type            = "VARCHAR(20)"
-    nullable        = false
-    classifications = [kolumn_classification.security_relevant]
-  }
-
-  source_ip = {
-    type            = "INET"
-    nullable        = true
-    classifications = [kolumn_classification.security_relevant]
-  }
-
-  user_agent = {
-    type            = "TEXT"
-    nullable        = true
-    classifications = [kolumn_classification.security_relevant]
-  }
-
-  threat_indicators = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.classified]
-    encryption_config = {
-      algorithm          = "AES-256-GCM"
-      searchable         = false
-      clearance_required = "secret"
+  columns = {
+    event_id = {
+      type        = "BIGINT"
+      nullable    = false
+      primary_key = true
     }
-  }
 
-  response_actions = {
-    type            = "JSONB"
-    nullable        = true
-    classifications = [kolumn_classification.official_use]
-  }
+    event_type = {
+      type            = "VARCHAR(50)"
+      nullable        = false
+      classifications = [kolumn_classification.security_relevant]
+    }
 
-  occurred_at = {
-    type     = "TIMESTAMP"
-    nullable = false
+    severity = {
+      type            = "VARCHAR(20)"
+      nullable        = false
+      classifications = [kolumn_classification.security_relevant]
+    }
+
+    source_ip = {
+      type            = "INET"
+      nullable        = true
+      classifications = [kolumn_classification.security_relevant]
+    }
+
+    user_agent = {
+      type            = "TEXT"
+      nullable        = true
+      classifications = [kolumn_classification.security_relevant]
+    }
+
+    threat_indicators = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.classified]
+      encryption_config = {
+        algorithm          = "AES-256-GCM"
+        searchable         = false
+        clearance_required = "secret"
+      }
+    }
+
+    response_actions = {
+      type            = "JSONB"
+      nullable        = true
+      classifications = [kolumn_classification.official_use]
+    }
+
+    occurred_at = {
+      type     = "TIMESTAMP"
+      nullable = false
+    }
   }
 }
 

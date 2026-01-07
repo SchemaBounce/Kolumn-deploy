@@ -1,0 +1,117 @@
+# Column Type Change Migration Example
+# Demonstrates converting a text column to integer with data normalization
+#
+# Use case: Your auth_provider_id was stored as text but should be an integer
+# for foreign key relationships and better indexing.
+#
+# Run with:
+#   kolumn migration plan --target users_auth_provider_id_to_int
+#   kolumn migration apply --target users_auth_provider_id_to_int
+#   kolumn migration rollback --target users_auth_provider_id_to_int
+
+# -----------------------------------------------------------------------------
+# Provider Configuration
+# -----------------------------------------------------------------------------
+
+provider "postgres" "primary" {
+  host     = "localhost"
+  port     = 5432
+  database = "myapp"
+  username = var.db_username
+  password = var.db_password
+}
+
+# -----------------------------------------------------------------------------
+# Target Table (for reference - managed separately via plan/apply)
+# -----------------------------------------------------------------------------
+
+create "postgres_table" "users" {
+  provider = postgres.primary
+  schema   = "public"
+  name     = "users"
+
+  columns = {
+    id = {
+      type        = "bigserial"
+      primary_key = true
+    }
+
+    email = {
+      type     = "varchar(255)"
+      not_null = true
+      unique   = true
+    }
+
+    # This column will be migrated from text to integer
+    auth_provider_id = {
+      type     = "integer" # Target type after migration
+      not_null = true
+    }
+
+    created_at = {
+      type    = "timestamptz"
+      default = "now()"
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Migration: Text to Integer Conversion
+# -----------------------------------------------------------------------------
+
+migration "column_type" "users_auth_provider_id_to_int" {
+  provider = postgres.primary
+  resource = postgres_table.users
+  column   = "auth_provider_id"
+
+  from_type = "text"
+  to_type   = "integer"
+
+  # Forward migration: text -> integer
+  forward {
+    # Prechecks run during plan phase - failures block apply unless --allow-risky-migrations
+    prechecks = [
+      "count_non_numeric table=users column=auth_provider_id"
+    ]
+
+    # Steps execute in order during apply
+    steps = [
+      # First, normalize any non-numeric values to 0
+      "normalize_column table=users column=auth_provider_id condition=!numeric value=0",
+      # Then alter the column type
+      "alter_column_type table=users column=auth_provider_id from=text to=integer"
+    ]
+  }
+
+  # Backward migration: integer -> text (for rollback)
+  backward {
+    steps = [
+      "alter_column_type table=users column=auth_provider_id from=integer to=text"
+    ]
+  }
+
+  # Safety configuration
+  safety {
+    quarantine     = true  # Create backup before destructive changes
+    quarantine_ttl = "7d"  # Keep quarantine data for 7 days
+    lock_table     = true  # Acquire exclusive lock during migration
+    timeout        = "10m" # Maximum migration duration
+    require_backup = true  # Require backward steps to be defined
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Variables
+# -----------------------------------------------------------------------------
+
+variable "db_username" {
+  description = "Database username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
+}

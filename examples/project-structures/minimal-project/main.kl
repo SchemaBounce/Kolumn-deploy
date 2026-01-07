@@ -15,31 +15,33 @@ create "kolumn_data_object" "user_schema" {
   name        = "Minimal User Schema"
   description = "Simple user schema for minimal project demonstration"
 
-  id = {
-    type            = "BIGINT"
-    nullable        = false
-    primary_key     = true
-    classifications = [kolumn_classification.identifier]
-  }
+  columns = {
+    id = {
+      type            = "BIGINT"
+      nullable        = false
+      primary_key     = true
+      classifications = [kolumn_classification.identifier]
+    }
 
-  name = {
-    type            = "VARCHAR(100)"
-    nullable        = false
-    classifications = [kolumn_classification.public]
-  }
+    name = {
+      type            = "VARCHAR(100)"
+      nullable        = false
+      classifications = [kolumn_classification.public]
+    }
 
-  email = {
-    type            = "VARCHAR(255)"
-    nullable        = false
-    unique          = true
-    classifications = [kolumn_classification.pii]
-  }
+    email = {
+      type            = "VARCHAR(255)"
+      nullable        = false
+      unique          = true
+      classifications = [kolumn_classification.pii]
+    }
 
-  created_at = {
-    type            = "TIMESTAMP"
-    nullable        = false
-    default         = "CURRENT_TIMESTAMP"
-    classifications = [kolumn_classification.public]
+    created_at = {
+      type            = "TIMESTAMP"
+      nullable        = false
+      default         = "CURRENT_TIMESTAMP"
+      classifications = [kolumn_classification.public]
+    }
   }
 
   metadata = {
@@ -74,22 +76,13 @@ create "kolumn_classification" "identifier" {
   }
 }
 
-# ✅ CORRECT: Table references data object with dynamic blocks
+# ✅ CORRECT: Table references data object directly
 create "postgres_table" "users" {
   name = "users"
-
-  # Pull columns from data object
-  dynamic "column" {
-    for_each = kolumn_data_object.user_schema.columns
-    content {
-      name        = column.value.name
-      type        = column.value.type == "BIGINT" && column.value.primary_key ? "SERIAL" : column.value.type == "TIMESTAMP" ? "TIMESTAMP" : column.value.type
-      nullable    = column.value.nullable
-      primary_key = column.value.primary_key
-      unique      = column.value.unique
-      default     = column.value.type == "TIMESTAMP" ? "NOW()" : column.value.default
-    }
-  }
+  columns = transform_columns(kolumn_data_object.user_schema.columns, {
+    id         = { type = "SERIAL" }
+    created_at = { default = "NOW()" }
+  })
 }
 
 # Basic index using column from data object

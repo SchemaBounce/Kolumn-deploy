@@ -3,11 +3,11 @@
 
 # Provider configuration
 provider "postgres" "production" {
-  host     = "localhost"
-  port     = 5432
-  database = "test_db"
-  username = "postgres"
-  password = "password"
+  host          = "localhost"
+  port          = 5432
+  database      = "test_db"
+  username      = "postgres"
+  password      = "password"
   store_backend = true
 }
 
@@ -18,8 +18,8 @@ sql "table_schemas" {
 
   template "users" {
     description    = "Standard user table template"
-    type          = "table"
-    source        = "./sql/users_table.sql"
+    type           = "table"
+    source         = "./sql/users_table.sql"
     database_types = ["postgres", "mysql", "snowflake"]
 
     # Provider-specific overrides
@@ -52,8 +52,8 @@ sql "table_schemas" {
 
   template "products" {
     description    = "Product catalog table template"
-    type          = "table"
-    source        = "./sql/products_table.sql"
+    type           = "table"
+    source         = "./sql/products_table.sql"
     database_types = ["postgres", "mysql"]
 
     variable "table_name" {
@@ -75,8 +75,8 @@ sql "view_schemas" {
 
   template "user_summary" {
     description    = "User summary view with aggregated data"
-    type          = "view"
-    source        = "./sql/views/user_summary.sql"
+    type           = "view"
+    source         = "./sql/views/user_summary.sql"
     database_types = ["postgres", "mysql"]
 
     variable "source_table" {
@@ -121,8 +121,8 @@ create "postgres_view" "user_analytics" {
   from_template = "sql.view_schemas.user_summary"
 
   variables = {
-    source_table     = postgres_table.users.name
-    include_metrics  = true
+    source_table    = postgres_table.users.name
+    include_metrics = true
   }
 
   depends_on = [postgres_table.users]
