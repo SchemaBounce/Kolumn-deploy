@@ -1,4 +1,4 @@
-# Kolumn 0.1.100
+# Kolumn 0.1.105
 
 Infrastructure-as-code tool for the modern data stack with enterprise governance.
 
@@ -11,12 +11,12 @@ curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash
 
 ### Manual Download
 Download the appropriate package for your platform:
-- Linux AMD64: [kolumn-0.1.100-linux-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.100/kolumn-0.1.100-linux-amd64.tar.gz)
-- Linux ARM64: [kolumn-0.1.100-linux-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.100/kolumn-0.1.100-linux-arm64.tar.gz)
-- macOS AMD64: [kolumn-0.1.100-darwin-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.100/kolumn-0.1.100-darwin-amd64.tar.gz)
-- macOS ARM64: [kolumn-0.1.100-darwin-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.100/kolumn-0.1.100-darwin-arm64.tar.gz)
-- Windows AMD64: [kolumn-0.1.100-windows-amd64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.100/kolumn-0.1.100-windows-amd64.zip)
-- Windows ARM64: [kolumn-0.1.100-windows-arm64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.100/kolumn-0.1.100-windows-arm64.zip)
+- Linux AMD64: [kolumn-0.1.105-linux-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.105/kolumn-0.1.105-linux-amd64.tar.gz)
+- Linux ARM64: [kolumn-0.1.105-linux-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.105/kolumn-0.1.105-linux-arm64.tar.gz)
+- macOS AMD64: [kolumn-0.1.105-darwin-amd64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.105/kolumn-0.1.105-darwin-amd64.tar.gz)
+- macOS ARM64: [kolumn-0.1.105-darwin-arm64.tar.gz](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.105/kolumn-0.1.105-darwin-arm64.tar.gz)
+- Windows AMD64: [kolumn-0.1.105-windows-amd64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.105/kolumn-0.1.105-windows-amd64.zip)
+- Windows ARM64: [kolumn-0.1.105-windows-arm64.zip](https://github.com/schemabounce/Kolumn-deploy/releases/download/v0.1.105/kolumn-0.1.105-windows-arm64.zip)
 
 ## ✨ What's Included
 - **kolumn**: Main CLI binary
