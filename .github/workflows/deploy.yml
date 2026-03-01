@@ -42,8 +42,11 @@ jobs:
       actions: read
     steps:
       - name: Download release packages from private repo
+        env:
+          INPUT_SOURCE_REPO: ${{ inputs.source_repo }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
         run: |
-          echo "🔽 Downloading release packages from ${{ inputs.source_repo }} run ${{ inputs.run_id }}"
+          echo "🔽 Downloading release packages from $INPUT_SOURCE_REPO run $INPUT_RUN_ID"
           
           # Debug: Check token availability  
           if [ -z "$SOURCE_REPO_TOKEN" ]; then
@@ -53,7 +56,7 @@ jobs:
             echo "1. Create a Personal Access Token at https://github.com/settings/personal-access-tokens/new"
             echo "2. Grant 'actions:read' and 'contents:read' permissions for SchemaBounce/Kolumn"
             echo "3. Add the token as a repository secret named 'SOURCE_REPO_TOKEN'"
-            echo "4. Go to: https://github.com/${{ env.DEPLOY_REPO }}/settings/secrets/actions"
+            echo "4. Go to: https://github.com/$DEPLOY_REPO/settings/secrets/actions"
             echo ""
             echo "🔍 Available environment variables:"
             env | grep -E "(TOKEN|GITHUB)" || echo "No token-related variables found"
@@ -75,8 +78,8 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer $SOURCE_REPO_TOKEN" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${{ inputs.source_repo }}/actions/runs/${{ inputs.run_id }}/artifacts")
-            
+              "https://api.github.com/repos/$INPUT_SOURCE_REPO/actions/runs/$INPUT_RUN_ID/artifacts")
+
             # Check if we got a valid response
             if echo "$ARTIFACT_RESPONSE" | jq -e '.artifacts' > /dev/null 2>&1; then
               ARTIFACT_URL=$(echo "$ARTIFACT_RESPONSE" | jq -r '.artifacts[] | select(.name == "kolumn-release-packages") | .archive_download_url')
@@ -104,7 +107,7 @@ jobs:
             echo "❌ Error: Could not find kolumn-release-packages artifact after $MAX_RETRIES attempts"
             echo "🔍 Final artifacts check:"
             curl -H "Authorization: Bearer $SOURCE_REPO_TOKEN" \
-              "https://api.github.com/repos/${{ inputs.source_repo }}/actions/runs/${{ inputs.run_id }}/artifacts"
+              "https://api.github.com/repos/$INPUT_SOURCE_REPO/actions/runs/$INPUT_RUN_ID/artifacts"
             exit 1
           fi
           
@@ -153,9 +156,11 @@ jobs:
           git config --global user.email "bot@kolumn.com"
 
       - name: Clone source repository for examples
+        env:
+          INPUT_SOURCE_REPO: ${{ inputs.source_repo }}
         run: |
           # Clone source repository with minimal depth and only fetch examples
-          git clone --depth=1 --filter=blob:none --sparse https://$SOURCE_REPO_TOKEN@github.com/${{ inputs.source_repo }}.git source
+          git clone --depth=1 --filter=blob:none --sparse https://$SOURCE_REPO_TOKEN@github.com/$INPUT_SOURCE_REPO.git source
           cd source
           
           # Configure sparse checkout to ONLY include examples directory
@@ -175,13 +180,15 @@ jobs:
           fi
 
       - name: Clone public deploy repository
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          echo "📂 Cloning ${{ env.DEPLOY_REPO }}"
-          git clone https://$DEPLOY_REPO_TOKEN@github.com/${{ env.DEPLOY_REPO }}.git deploy
+          echo "📂 Cloning $DEPLOY_REPO"
+          git clone https://$DEPLOY_REPO_TOKEN@github.com/$DEPLOY_REPO.git deploy
           cd deploy
-          
+
           # Create directory structure
-          mkdir -p releases/v${{ inputs.version }}
+          mkdir -p releases/v$INPUT_VERSION
           mkdir -p binaries
           mkdir -p scripts
           mkdir -p examples
@@ -360,8 +367,11 @@ jobs:
           fi
 
       - name: Deploy binaries to public repo
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="$INPUT_VERSION"
           cd deploy
           
           echo "📦 Deploying Kolumn v${VERSION} binaries"
@@ -409,7 +419,7 @@ jobs:
           cat > releases/latest/version.json << EOF
           {
             "version": "${VERSION}",
-            "tag": "${{ inputs.tag }}",
+            "tag": "$INPUT_TAG",
             "released": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": [
               "linux-amd64", "linux-arm64",
@@ -508,10 +518,13 @@ jobs:
           cp install.sh scripts/
 
       - name: Update website with new version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           cd deploy
-          VERSION="${{ inputs.version }}"
-          TAG="${{ inputs.tag }}"
+          VERSION="$INPUT_VERSION"
+          TAG="$INPUT_TAG"
           
           echo "🌐 Updating website content with version ${VERSION}"
 
@@ -526,10 +539,13 @@ jobs:
           echo "✅ Website content updated with version ${VERSION}"
 
       - name: Create GitHub release in public repo
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           cd deploy
-          VERSION="${{ inputs.version }}"
-          TAG="${{ inputs.tag }}"
+          VERSION="$INPUT_VERSION"
+          TAG="$INPUT_TAG"
           
           # Create release notes
           cat > release-notes.md << EOF
@@ -595,15 +611,17 @@ jobs:
           EOF
 
       - name: Commit and push to deploy repo
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           cd deploy
-          
+
           # Stage all changes
           git add .
-          
+
           # Commit if there are changes
           if [ -n "$(git status --porcelain)" ]; then
-              git commit -m "🚀 Deploy Kolumn ${{ inputs.version }}
+              git commit -m "🚀 Deploy Kolumn $INPUT_VERSION
           
           - Added binaries for all platforms (Linux, macOS, Windows)
           - Updated install script
@@ -623,11 +641,13 @@ jobs:
           fi
 
       - name: Verify release files before GitHub release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           echo "🔍 Verifying files for GitHub release..."
           cd deploy
-          
-          VERSION="${{ inputs.version }}"
+
+          VERSION="$INPUT_VERSION"
           RELEASE_FILES="releases/v${VERSION}/kolumn-${VERSION}-*"
           
           echo "📁 Looking for files matching: $RELEASE_FILES"
@@ -644,7 +664,7 @@ jobs:
           fi
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           token: ${{ env.DEPLOY_REPO_TOKEN }}
           tag_name: ${{ inputs.tag }}
@@ -658,11 +678,14 @@ jobs:
           generate_release_notes: false
 
       - name: Deployment summary
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          echo "🎉 Successfully deployed Kolumn ${{ inputs.version }} to public repository!"
-          echo "📦 Release: https://github.com/${{ env.DEPLOY_REPO }}/releases/tag/${{ inputs.tag }}"
+          echo "🎉 Successfully deployed Kolumn $INPUT_VERSION to public repository!"
+          echo "📦 Release: https://github.com/$DEPLOY_REPO/releases/tag/$INPUT_TAG"
           echo "🔗 Install: curl -fsSL https://schemabounce.github.io/Kolumn-deploy/install.sh | bash"
-          echo "📚 Examples: https://github.com/${{ env.DEPLOY_REPO }}/tree/main/examples"
+          echo "📚 Examples: https://github.com/$DEPLOY_REPO/tree/main/examples"
           echo ""
           echo "✅ Deployment includes:"
           echo "   • Multi-platform binaries (Linux, macOS, Windows)"

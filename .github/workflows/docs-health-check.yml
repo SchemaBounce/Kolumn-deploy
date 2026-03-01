@@ -152,10 +152,14 @@ jobs:
 
     - name: Check versioned endpoints
       if: github.event.inputs.check_all_versions == 'true' || github.event_name == 'schedule'
+      env:
+        DISCOVERED_VERSIONS: ${{ steps.discover-versions.outputs.versions }}
+        MAIN_ISSUES: ${{ steps.check-main.outputs.issues }}
+        MAIN_WARNINGS: ${{ steps.check-main.outputs.warnings }}
       run: |
-        VERSIONS="${{ steps.discover-versions.outputs.versions }}"
-        ISSUES=${{ steps.check-main.outputs.issues }}
-        WARNINGS=${{ steps.check-main.outputs.warnings }}
+        VERSIONS="$DISCOVERED_VERSIONS"
+        ISSUES=$MAIN_ISSUES
+        WARNINGS=$MAIN_WARNINGS
         
         echo "🔍 Checking versioned documentation endpoints..."
         
@@ -257,9 +261,12 @@ jobs:
         fi
 
     - name: Generate health report
+      env:
+        MAIN_ISSUES: ${{ steps.check-main.outputs.issues }}
+        MAIN_WARNINGS: ${{ steps.check-main.outputs.warnings }}
       run: |
-        ISSUES=${FINAL_ISSUES:-${{ steps.check-main.outputs.issues }}}
-        WARNINGS=${FINAL_WARNINGS:-${{ steps.check-main.outputs.warnings }}}
+        ISSUES=${FINAL_ISSUES:-$MAIN_ISSUES}
+        WARNINGS=${FINAL_WARNINGS:-$MAIN_WARNINGS}
         
         echo "📊 Documentation Health Check Report"
         echo "==================================="
