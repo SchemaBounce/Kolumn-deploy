@@ -366,56 +366,59 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy binaries to public repo
+      - name: Stage binaries for GitHub Release (not committed to git)
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          VERSION="$INPUT_VERSION"
+
+          echo "📦 Staging Kolumn v${VERSION} binaries for GitHub Release"
+
+          # Find all kolumn package files (in workflow workspace, NOT in deploy repo)
+          # Files may be at root or in release/ subdirectory depending on artifact structure
+          PACKAGE_FILES=$(find . -path ./deploy -prune -o -path ./staging -prune -o -name "kolumn-${VERSION}-*" -type f -print || echo "")
+
+          if [ -z "$PACKAGE_FILES" ]; then
+            echo "❌ Error: No package files found for version ${VERSION}"
+            find . -name "kolumn-*" -type f || echo "No kolumn files found"
+            exit 1
+          fi
+
+          echo "📁 Found package files for GitHub Release:"
+          echo "$PACKAGE_FILES"
+
+          # Stage binaries in a temporary directory for the GitHub Release step
+          # These are NOT committed to git — they're only used as release assets
+          mkdir -p staging/releases/v${VERSION}
+          echo "$PACKAGE_FILES" | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "📋 Staging: $file"
+              cp "$file" "staging/releases/v${VERSION}/"
+            fi
+          done
+
+          echo "✅ Binaries staged for GitHub Release (not committed to git)"
+          ls -la "staging/releases/v${VERSION}/"
+
+      - name: Update version metadata in deploy repo (lightweight, no binaries)
         env:
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           VERSION="$INPUT_VERSION"
           cd deploy
-          
-          echo "📦 Deploying Kolumn v${VERSION} binaries"
-          
-          # Check what files we have available
-          echo "🔍 Available files in parent directory:"
-          ls -la ../kolumn-* || echo "No kolumn-* files found"
-          
-          # Find all kolumn package files
-          PACKAGE_FILES=$(find .. -name "kolumn-${VERSION}-*" -type f || echo "")
-          
-          if [ -z "$PACKAGE_FILES" ]; then
-            echo "❌ Error: No package files found for version ${VERSION}"
-            echo "🔍 Looking for any kolumn files..."
-            find .. -name "kolumn-*" -type f || echo "No kolumn files found at all"
-            exit 1
-          fi
-          
-          echo "📁 Found package files:"
-          echo "$PACKAGE_FILES"
-          
-          # Copy release packages to versioned directory
-          echo "$PACKAGE_FILES" | while read -r file; do
-            if [ -f "$file" ]; then
-              echo "📋 Copying: $file"
-              cp "$file" "releases/v${VERSION}/"
-            fi
-          done
-          
-          # Also copy to latest directory for convenience
+
+          # Only commit version.json — binaries are served via GitHub Releases
           mkdir -p releases/latest
-          echo "$PACKAGE_FILES" | while read -r file; do
-            if [ -f "$file" ]; then
-              cp "$file" "releases/latest/"
-            fi
-          done
-          
-          # Verify files were copied
-          echo "✅ Files in releases/v${VERSION}/:"
-          ls -la "releases/v${VERSION}/" || echo "Directory is empty"
-          echo "✅ Files in releases/latest/:"
-          ls -la "releases/latest/" || echo "Directory is empty"
-          
-          # Update version metadata
+          mkdir -p releases/v${VERSION}
+
+          # Clean old binaries from releases/latest/ (only keep version.json)
+          find releases/latest/ -type f ! -name "version.json" -delete 2>/dev/null || true
+
+          # Clean old binaries from versioned directories
+          find releases/ -type f \( -name "*.tar.gz" -o -name "*.zip" \) -delete 2>/dev/null || true
+
           cat > releases/latest/version.json << EOF
           {
             "version": "${VERSION}",
@@ -423,13 +426,15 @@ jobs:
             "released": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": [
               "linux-amd64", "linux-arm64",
-              "darwin-amd64", "darwin-arm64", 
-              "windows-amd64", "windows-arm64"
+              "darwin-amd64", "darwin-arm64",
+              "windows-amd64"
             ]
           }
           EOF
-          
+
           cp releases/latest/version.json releases/v${VERSION}/
+
+          echo "✅ Version metadata updated (binaries served via GitHub Releases, not Pages)"
 
       - name: Update install script
         run: |
@@ -622,17 +627,11 @@ jobs:
           # Commit if there are changes
           if [ -n "$(git status --porcelain)" ]; then
               git commit -m "🚀 Deploy Kolumn $INPUT_VERSION
-          
-          - Added binaries for all platforms (Linux, macOS, Windows)
-          - Updated install script
+
           - Updated version metadata
-          - Deployed examples directory from source repository
-          - Added examples README and HTML index for easy browsing
-          - Ready for GitHub release
-          
-          📚 Examples now publicly available at:
-          - https://github.com/schemabounce/Kolumn-deploy/tree/main/examples
-          - Project templates, demos, enterprise configs, and documentation"
+          - Updated install script
+          - Deployed examples directory
+          - Binaries available via GitHub Releases (not committed to git)"
               
               git push origin main
               echo "✅ Changes pushed to deploy repository"
@@ -644,22 +643,21 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          echo "🔍 Verifying files for GitHub release..."
-          cd deploy
+          echo "🔍 Verifying staged files for GitHub release..."
 
           VERSION="$INPUT_VERSION"
-          RELEASE_FILES="releases/v${VERSION}/kolumn-${VERSION}-*"
-          
+          RELEASE_FILES="staging/releases/v${VERSION}/kolumn-${VERSION}-*"
+
           echo "📁 Looking for files matching: $RELEASE_FILES"
           ls -la $RELEASE_FILES || echo "❌ No files match the pattern"
-          
+
           if ls $RELEASE_FILES 1> /dev/null 2>&1; then
             echo "✅ Release files found!"
             ls -la $RELEASE_FILES
           else
             echo "❌ Error: No release files found for GitHub release"
-            echo "🔍 Available files in releases directory:"
-            find releases -type f || echo "No files in releases directory"
+            echo "🔍 Available files in staging directory:"
+            find staging -type f || echo "No files in staging directory"
             exit 1
           fi
 
@@ -671,7 +669,7 @@ jobs:
           name: "Kolumn ${{ inputs.version }}"
           body_path: deploy/release-notes.md
           files: |
-            deploy/releases/v${{ inputs.version }}/kolumn-${{ inputs.version }}-*
+            staging/releases/v${{ inputs.version }}/kolumn-${{ inputs.version }}-*
           draft: false
           prerelease: ${{ contains(inputs.version, 'dev') }}
           fail_on_unmatched_files: false
